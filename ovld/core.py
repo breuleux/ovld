@@ -153,6 +153,17 @@ def _fresh(t):
     return type(t.__name__, (t,), {})
 
 
+@keyword_decorator
+def _compile_first(fn, rename=False):
+    def wrapper(self, *args, **kwargs):
+        self.compile()
+        return fn(self, *args, **kwargs)
+
+    wrapper._unwrapped = fn
+    wrapper._rename = rename
+    return wrapper
+
+
 class _Ovld:
     """Overloaded function.
 
@@ -164,7 +175,6 @@ class _Ovld:
         bootstrap: Whether to bind the first argument to the OvldCall
             object. Forced to True if initial_state or postprocess is not
             None.
-        bind_to: Binds the first argument to the given object.
         wrapper: A function to use as the entry point. In addition to all
             normal arguments, it will receive as its first argument the
             function to dispatch to.
@@ -182,7 +192,6 @@ class _Ovld:
         self,
         *,
         bootstrap=False,
-        bind_to=None,
         wrapper=None,
         initial_state=None,
         postprocess=None,
@@ -191,22 +200,17 @@ class _Ovld:
     ):
         """Initialize an Ovld."""
         self._locked = False
-        self.bind_to = bind_to
         self._wrapper = wrapper
         self.state = None
         self.initial_state = initial_state
         self.postprocess = postprocess
-        self.bootstrap = bool(
-            bootstrap or self.initial_state or self.postprocess
-        )
+        self.bootstrap = bool(bootstrap or self.initial_state or self.postprocess)
         self.name = name
         self.__name__ = name
         self.defns = {}
         self.map = MultiTypeMap(key_error=self._key_error)
         for mixin in mixins:
             self.defns.update(mixin.defns)
-            # for key, fn in mixin.defns.items():
-            #     self.register_signature(key, fn)
         self.ocls = _fresh(_OvldCall)
 
     def _sig_string(self, type_tuple):
@@ -237,11 +241,9 @@ class _Ovld:
             params = list(sign.parameters.values())
             if wrapper:
                 params = params[1:]
-            if self.bootstrap or self.bind_to is not None:
+            if self.bootstrap:
                 params = params[1:]
-            params = [
-                p.replace(annotation=inspect.Parameter.empty) for p in params
-            ]
+            params = [p.replace(annotation=inspect.Parameter.empty) for p in params]
             self.__signature__ = sign.replace(parameters=params)
 
     def compile(self):
@@ -254,14 +256,18 @@ class _Ovld:
 
         name = self.__name__
 
-        # Place __real_call__ into __call__, renamed as the entry function
-        cls.__call__ = rename_function(cls.__real_call__, f"{name}.entry")
-        cls.__getitem__ = cls.__real_getitem__
-        cls.__get__ = cls.__real_get__
+        # Unwrap key functions so that they don't call compile()
+        for name in dir(cls):
+            entry = getattr(cls, name)
+            if hasattr(entry, "_unwrapped"):
+                fn = entry._unwrapped
+                if entry._rename:
+                    fn = rename_function(fn, f"{name}.{entry._rename}")
+                setattr(cls, name, fn)
 
         # Use the proper dispatch function
         method_name = "__xcall"
-        if self.bootstrap or self.bind_to:
+        if self.bootstrap:
             method_name += "_bind"
         if self._wrapper is not None:
             method_name += "_wrap"
@@ -296,7 +302,7 @@ class _Ovld:
             raise Exception(f"{self} is locked. No more methods can be defined.")
         ann = fn.__annotations__
         argnames = inspect.getfullargspec(fn).args
-        if self.bootstrap or self.bind_to:
+        if self.bootstrap:
             argnames = argnames[1:]
         typelist = []
         for i, name in enumerate(argnames):
@@ -319,7 +325,6 @@ class _Ovld:
         """
         return _fresh(_Ovld)(
             bootstrap=self.bootstrap,
-            bind_to=self.bind_to,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
             initial_state=initial_state or self.initial_state,
@@ -341,11 +346,8 @@ class _Ovld:
             ov.register(fn)
             return ov
 
+    @_compile_first
     def __get__(self, obj, cls):
-        self.compile()
-        return self.__real_get__(obj, cls)
-
-    def __real_get__(self, obj, cls):
         return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
@@ -354,24 +356,17 @@ class _Ovld:
             bind_to=obj,
         )
 
+    @_compile_first
     def __getitem__(self, t):
-        self.compile()
-        return self[t]
-
-    def __real_getitem__(self, t):
         if not isinstance(t, tuple):
             t = (t,)
-        assert not self.bootstrap and self.bind_to is None
+        assert not self.bootstrap
         return self.map[t]
 
+    @_compile_first(rename="entry")
     def __call__(self, *args, **kwargs):
-        """Compile the overloaded function and then call it."""
-        self.compile()
-        return self(*args, **kwargs)
-
-    def __real_call__(self, *args, **kwargs):
         """Call the overloaded function."""
-        ovc = self.__get__(self.bind_to, None)
+        ovc = self.__get__(None, None)
         res = ovc(*args, **kwargs)
         if self.postprocess:
             res = self.postprocess(res)
@@ -438,9 +433,7 @@ def _find_overload(fn, bootstrap, initial_state, postprocess):
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
         dispatch = _fresh(_Ovld)(
-            bootstrap=bootstrap,
-            initial_state=initial_state,
-            postprocess=postprocess,
+            bootstrap=bootstrap, initial_state=initial_state, postprocess=postprocess,
         )
     else:  # pragma: no cover
         assert bootstrap is False
