@@ -9,7 +9,6 @@ from .utils import MISSING, keyword_decorator
 
 
 class TypeMap(dict):
-
     def __init__(self):
         self.entries = {}
 
@@ -77,7 +76,6 @@ class TypeMap(dict):
 
 
 class MultiTypeMap(dict):
-
     def __init__(self, key_error=KeyError):
         self.maps = {}
         self.empty = MISSING
@@ -146,7 +144,7 @@ class MultiTypeMap(dict):
             # that no other candidate can dominate
             raise self.key_error(obj_t_tup, [result for result, _ in results])
         else:
-            (result, _), = results
+            ((result, _),) = results
             self[obj_t_tup] = result
             return result
 
@@ -217,19 +215,15 @@ class _Ovld:
     def _key_error(self, key, possibilities):
         typenames = self._sig_string(key)
         if not possibilities:
-            raise TypeError(
-                f"No method in {self} for argument types [{typenames}]"
-            )
+            raise TypeError(f"No method in {self} for argument types [{typenames}]")
         else:
             hlp = ""
             for p in possibilities:
                 hlp += f"* {p.__name__}\n"
-                # hlp += f"* {p}\n"
             raise TypeError(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
-                "Candidates are:\n"
-                + hlp
+                "Candidates are:\n" + hlp
             )
 
     def _set_attrs_from(self, fn, wrapper=False):
@@ -277,9 +271,7 @@ class _Ovld:
 
         # Rename the wrapper
         if self._wrapper:
-            self._wrapper = rename_function(
-                self._wrapper, f"{name}.wrapper"
-            )
+            self._wrapper = rename_function(self._wrapper, f"{name}.wrapper")
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
@@ -294,19 +286,14 @@ class _Ovld:
 
     def register_signature(self, sig, fn):
         """Register a function for the given signature."""
-        fn = rename_function(
-            fn,
-            f"{self.name}[{self._sig_string(sig)}]"
-        )
+        fn = rename_function(fn, f"{self.name}[{self._sig_string(sig)}]")
         self.map.register(sig, fn)
         return self
 
     def register(self, fn):
         """Register a function."""
         if self._locked:
-            raise Exception(
-                f"{self} is locked. No more methods can be defined."
-            )
+            raise Exception(f"{self} is locked. No more methods can be defined.")
         ann = fn.__annotations__
         argnames = inspect.getfullargspec(fn).args
         if self.bootstrap or self.bind_to:
@@ -493,9 +480,7 @@ def ovld(fn, *, bootstrap=False, initial_state=None, postprocess=None):
 
 
 @keyword_decorator
-def ovld_wrapper(
-    wrapper, *, bootstrap=False, initial_state=None, postprocess=None
-):
+def ovld_wrapper(wrapper, *, bootstrap=False, initial_state=None, postprocess=None):
     """Overload a function using the decorated function as a wrapper.
 
     The wrapper is the entry point for the function and receives as its
