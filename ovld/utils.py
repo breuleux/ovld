@@ -25,6 +25,7 @@ class Named:
         return self.name
 
 
+BOOTSTRAP = Named("BOOTSTRAP")
 MISSING = Named("MISSING")
 
 
@@ -47,6 +48,7 @@ def keyword_decorator(deco):
 
 
 __all__ = [
+    "BOOTSTRAP",
     "MISSING",
     "Named",
     "keyword_decorator",

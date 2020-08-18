@@ -5,7 +5,7 @@ import inspect
 from types import FunctionType
 from functools import reduce
 
-from .utils import MISSING, keyword_decorator
+from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 
 class TypeMap(dict):
@@ -352,7 +352,6 @@ class _Ovld:
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
             wrapper=self._wrapper,
-            bootstrap=self.bootstrap,
             bind_to=obj,
         )
 
@@ -366,7 +365,7 @@ class _Ovld:
     @_compile_first(rename="entry")
     def __call__(self, *args, **kwargs):
         """Call the overloaded function."""
-        ovc = self.__get__(None, None)
+        ovc = self.__get__(BOOTSTRAP, None)
         res = ovc(*args, **kwargs)
         if self.postprocess:
             res = self.postprocess(res)
@@ -379,12 +378,12 @@ class _Ovld:
 class _OvldCall:
     """Context for an Ovld call."""
 
-    def __init__(self, map, state, wrapper, bootstrap, bind_to):
+    def __init__(self, map, state, wrapper, bind_to):
         """Initialize an OvldCall."""
         self.map = map
         self.state = state
         self.wrapper = wrapper
-        self.bind_to = self if bootstrap else bind_to
+        self.bind_to = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
         return self.map[t].__get__(self)
