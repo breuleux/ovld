@@ -70,6 +70,21 @@ def test_getitem():
     assert f[float].__name__ == "f[float]"
 
 
+def test_bootstrap_getitem():
+    o = Ovld(name="f")
+
+    @o.register
+    def f(self, x: int):
+        return self[(float,)]
+
+    @o.register  # noqa: F811
+    def f(self, x: float):
+        return self[(int,)]
+
+    assert "f[int]" in str(f(1.0))
+    assert "f[float]" in str(f(111))
+
+
 def test_multimethod():
     o = Ovld()
 
@@ -134,7 +149,7 @@ def test_mixins():
 
 def test_bootstrap():
 
-    f = Ovld(bootstrap=True)
+    f = Ovld()
 
     @f.register
     def f(self, xs: list):
@@ -143,6 +158,11 @@ def test_bootstrap():
     @f.register
     def f(self, x: int):
         return x + 1
+
+    with pytest.raises(TypeError):
+        @f.register
+        def f(x: object):
+            return "missing self!"
 
     @f.register
     def f(self, x: object):
@@ -236,6 +256,29 @@ def test_stateful():
     assert h((None, None)) == (200, 300)
     assert h((None, (None, None))) == (200, (400, 500))
     assert h((None, (None, None))) == (200, (400, 500))
+
+
+def test_method():
+    class Greatifier:
+        def __init__(self, n):
+            self.n = n
+
+        perform = Ovld()
+
+        @perform.register
+        def perform(self, x: int):
+            return x + self.n
+
+        @perform.register
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+    g = Greatifier(2)
+    assert g.perform(7) == 9
+    assert g.perform("cheese") == "cheesess"
+
+    with pytest.raises(TypeError):
+        assert Greatifier.perform(g, "cheese") == "cheesess"
 
 
 def test_repr():

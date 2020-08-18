@@ -191,7 +191,7 @@ class _Ovld:
     def __init__(
         self,
         *,
-        bootstrap=False,
+        bootstrap=None,
         wrapper=None,
         initial_state=None,
         postprocess=None,
@@ -204,7 +204,11 @@ class _Ovld:
         self.state = None
         self.initial_state = initial_state
         self.postprocess = postprocess
-        self.bootstrap = bool(bootstrap or self.initial_state or self.postprocess)
+        if self.initial_state or self.postprocess:
+            assert bootstrap is not False
+            self.bootstrap = True
+        else:
+            self.bootstrap = bootstrap
         self.name = name
         self.__name__ = name
         self.defns = {}
@@ -231,6 +235,12 @@ class _Ovld:
             )
 
     def _set_attrs_from(self, fn, wrapper=False):
+        if self.bootstrap is None:
+            sign = inspect.signature(fn)
+            params = list(sign.parameters.values())
+            if params and params[0].name == "self":
+                self.bootstrap = True
+
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
             self.__doc__ = fn.__doc__
@@ -300,9 +310,16 @@ class _Ovld:
         """Register a function."""
         if self._locked:
             raise Exception(f"{self} is locked. No more methods can be defined.")
+
+        self._set_attrs_from(fn)
+
         ann = fn.__annotations__
         argnames = inspect.getfullargspec(fn).args
         if self.bootstrap:
+            if argnames[0] != "self":
+                raise TypeError(
+                    "The first argument of the function must be named `self`"
+                )
             argnames = argnames[1:]
         typelist = []
         for i, name in enumerate(argnames):
@@ -313,7 +330,6 @@ class _Ovld:
                 assert not isinstance(t, tuple)
                 typelist.append(t)
 
-        self._set_attrs_from(fn)
         self.defns[tuple(typelist)] = fn
         return self
 
@@ -348,6 +364,10 @@ class _Ovld:
 
     @_compile_first
     def __get__(self, obj, cls):
+        if obj is None:
+            raise TypeError(
+                f"Cannot get class method: {cls.__name__}::{self.__name__}"
+            )
         return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
@@ -408,19 +428,19 @@ class _OvldCall:
         method = self.map[key]
         return method(*args, **kwargs)
 
-    def __call__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
+    # def __call__(self, *args, **kwargs):
+    #     key = tuple(type(arg) for arg in args)
 
-        fself = self.bind_to
-        if fself is not None:
-            args = (fself,) + args
+    #     fself = self.bind_to
+    #     if fself is not None:
+    #         args = (fself,) + args
 
-        method = self.map[key]
+    #     method = self.map[key]
 
-        if self.wrapper is None:
-            return method(*args, **kwargs)
-        else:
-            return self.wrapper(method, *args, **kwargs)
+    #     if self.wrapper is None:
+    #         return method(*args, **kwargs)
+    #     else:
+    #         return self.wrapper(method, *args, **kwargs)
 
 
 def Ovld(*args, **kwargs):
