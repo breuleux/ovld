@@ -1,6 +1,6 @@
 
 import pytest
-from ovld import ovld, Ovld
+from ovld import ovld, Ovld, OvldMC
 from ovld.utils import MISSING
 
 
@@ -286,6 +286,29 @@ def test_method():
     g = Greatifier(2)
     assert g.perform(7) == 9
     assert g.perform("cheese") == "cheesess"
+
+    with pytest.raises(TypeError):
+        assert Greatifier.perform(g, "cheese") == "cheesess"
+
+
+def test_metaclass():
+    class Greatifier(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+        def perform(self, x: int):
+            return x + self.n
+
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+        def perform(self, x: object):
+            return x
+
+    g = Greatifier(2)
+    assert g.perform(7) == 9
+    assert g.perform("cheese") == "cheesess"
+    assert g.perform(g) is g
 
     with pytest.raises(TypeError):
         assert Greatifier.perform(g, "cheese") == "cheesess"

@@ -367,9 +367,7 @@ class _Ovld:
     @_compile_first
     def __get__(self, obj, cls):
         if obj is None:
-            raise TypeError(
-                f"Cannot get class method: {cls.__name__}::{self.__name__}"
-            )
+            raise TypeError(f"Cannot get class method: {cls.__name__}::{self.__name__}")
         return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
@@ -447,6 +445,37 @@ class _OvldCall:
 
 def Ovld(*args, **kwargs):
     return _fresh(_Ovld)(*args, **kwargs)
+
+
+class ovld_cls_dict(dict):
+    """A dict for use with OvldMC.__prepare__.
+
+    Setting the same key more than once creates an Ovld that can dispatch
+    to any of the values.
+    """
+
+    def __setitem__(self, attr, value):
+        if attr in self:
+            prev = self[attr]
+            if isinstance(prev, _Ovld):
+                o = prev
+            else:
+                o = Ovld()
+                o.register(self[attr])
+            o.register(value)
+            value = o
+        super().__setitem__(attr, value)
+
+
+class OvldMC(type):
+    """Metaclass that allows overloading.
+
+    A class which uses this metaclass can define multiple functions with
+    the same name and different type signatures.
+    """
+
+    def __prepare__(self, cls):
+        return ovld_cls_dict()
 
 
 def _find_overload(fn, bootstrap, initial_state, postprocess):
@@ -550,4 +579,4 @@ def rename_function(fn, newname):
     )
 
 
-__all__ = ["Ovld", "TypeMap", "TypeMapMulti", "ovld", "ovld_wrapper"]
+__all__ = ["Ovld", "OvldMC", "TypeMap", "TypeMapMulti", "ovld", "ovld_wrapper"]
