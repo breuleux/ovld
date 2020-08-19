@@ -2,6 +2,7 @@
 
 
 import inspect
+import textwrap
 from types import FunctionType
 from functools import reduce
 
@@ -239,6 +240,7 @@ class _Ovld:
         self._locked = False
         self._wrapper = wrapper
         self.state = None
+        self.maindoc = None
         self.initial_state = initial_state
         self.postprocess = postprocess
         if self.initial_state or self.postprocess:
@@ -256,6 +258,7 @@ class _Ovld:
             assert mixin.bootstrap is self.bootstrap
             self.defns.update(mixin.defns)
         self.ocls = _fresh(_OvldCall)
+        self._make_signature()
 
     def _sig_string(self, type_tuple):
         return ", ".join(
@@ -278,6 +281,28 @@ class _Ovld:
                 "Candidates are:\n" + hlp
             )
 
+    def _make_signature(self):
+        def modelA(*args, **kwargs):  # pragma: no cover
+            pass
+
+        def modelB(self, *args, **kwargs):  # pragma: no cover
+            pass
+
+        doc = f"{self.maindoc}\n\n" if self.maindoc else ""
+        for key, fn in self.defns.items():
+            fndef = inspect.signature(fn)
+            fdoc = fn.__doc__
+            if not fdoc or fdoc == self.maindoc:
+                doc += f"{self.__name__}{fndef}\n\n"
+            else:
+                fdoc = textwrap.indent(fdoc, "    ")
+                doc += f"{self.__name__}{fndef}\n{fdoc}\n\n"
+        self.__doc__ = doc
+        if self.bootstrap:
+            self.__signature__ = inspect.signature(modelB)
+        else:
+            self.__signature__ = inspect.signature(modelA)
+
     def _set_attrs_from(self, fn, wrapper=False):
         if self.bootstrap is None:
             sign = inspect.signature(fn)
@@ -289,7 +314,7 @@ class _Ovld:
 
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
-            self.__doc__ = fn.__doc__
+            self.maindoc = fn.__doc__
             self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
@@ -344,7 +369,7 @@ class _Ovld:
 
     def register_signature(self, sig, fn):
         """Register a function for the given signature."""
-        fn = rename_function(fn, f"{self.name}[{self._sig_string(sig)}]")
+        fn = rename_function(fn, f"{self.__name__}[{self._sig_string(sig)}]")
         self.map.register(sig, fn)
         return self
 
@@ -375,6 +400,7 @@ class _Ovld:
                 typelist.append(t)
 
         self.defns[tuple(typelist)] = fn
+        self._make_signature()
         return self
 
     def copy(self, wrapper=MISSING, initial_state=None, postprocess=None):

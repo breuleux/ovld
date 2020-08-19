@@ -9,10 +9,12 @@ def test_Ovld():
 
     @o.register
     def f(x: int):
+        """Integers!"""
         return "int"
 
     @o.register  # noqa: F811
     def f(x: float):
+        """Floats!"""
         return "float"
 
     assert f(2) == "int"
