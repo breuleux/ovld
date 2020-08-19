@@ -125,7 +125,9 @@ def _setattrs(fn, **kwargs):
 class _PremadeGeneric:
     def __get__(self, obj, cls):
         if obj is None:
-            raise TypeError(f"Cannot get class method: {cls.__name__}::{self.__name__}")
+            raise TypeError(
+                f"Cannot get class method: {cls.__name__}::{self.__name__}"
+            )
         return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
@@ -153,7 +155,7 @@ class _PremadeGeneric:
 class _(_PremadeGeneric):
     @_setattrs(rename="dispatch")
     def __call__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
+        key = tuple(map(type, args))
         method = self.map[key]
         return method(*args, **kwargs)
 
@@ -164,7 +166,7 @@ class _(_PremadeGeneric):
 class _(_PremadeGeneric):
     @_setattrs(rename="dispatch")
     def __call__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
+        key = tuple(map(type, args))
         method = self.map[key]
         return self._wrapper(method, *args, **kwargs)
 
@@ -175,7 +177,7 @@ class _(_PremadeGeneric):
 class _(_PremadeGeneric):
     @_setattrs(rename="dispatch")
     def __subcall__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
+        key = tuple(map(type, args))
         method = self.map[key]
         return method(self.bind_to, *args, **kwargs)
 
@@ -184,7 +186,7 @@ class _(_PremadeGeneric):
 class _(_PremadeGeneric):
     @_setattrs(rename="dispatch")
     def __subcall__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
+        key = tuple(map(type, args))
         method = self.map[key]
         return self.wrapper(method, self.bind_to, *args, **kwargs)
 
@@ -256,12 +258,16 @@ class _Ovld:
         self.ocls = _fresh(_OvldCall)
 
     def _sig_string(self, type_tuple):
-        return ", ".join("*" if cls is object else cls.__name__ for cls in type_tuple)
+        return ", ".join(
+            "*" if cls is object else cls.__name__ for cls in type_tuple
+        )
 
     def _key_error(self, key, possibilities):
         typenames = self._sig_string(key)
         if not possibilities:
-            raise TypeError(f"No method in {self} for argument types [{typenames}]")
+            raise TypeError(
+                f"No method in {self} for argument types [{typenames}]"
+            )
         else:
             hlp = ""
             for p in possibilities:
@@ -293,12 +299,14 @@ class _Ovld:
                 params = params[1:]
             if self.bootstrap:
                 params = params[1:]
-            params = [p.replace(annotation=inspect.Parameter.empty) for p in params]
+            params = [
+                p.replace(annotation=inspect.Parameter.empty) for p in params
+            ]
             self.__signature__ = sign.replace(parameters=params)
 
     def _maybe_rename(self, fn):
         if hasattr(fn, "rename"):
-            return rename_function(fn, f"{self.__name__}.dispatch")
+            return rename_function(fn, f"{self.__name__}.{fn.rename}")
         else:
             return fn
 
@@ -343,7 +351,9 @@ class _Ovld:
     def register(self, fn):
         """Register a function."""
         if self._locked:
-            raise Exception(f"{self} is locked. No more methods can be defined.")
+            raise Exception(
+                f"{self} is locked. No more methods can be defined."
+            )
 
         self._set_attrs_from(fn)
 
@@ -458,10 +468,12 @@ def _find_overload(fn, bootstrap, initial_state, postprocess):
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
         dispatch = _fresh(_Ovld)(
-            bootstrap=bootstrap, initial_state=initial_state, postprocess=postprocess,
+            bootstrap=bootstrap,
+            initial_state=initial_state,
+            postprocess=postprocess,
         )
     else:  # pragma: no cover
-        assert bootstrap is False
+        assert bootstrap is None
         assert initial_state is None
         assert postprocess is None
     if not isinstance(dispatch, _Ovld):  # pragma: no cover
@@ -470,7 +482,7 @@ def _find_overload(fn, bootstrap, initial_state, postprocess):
 
 
 @keyword_decorator
-def ovld(fn, *, bootstrap=False, initial_state=None, postprocess=None):
+def ovld(fn, *, bootstrap=None, initial_state=None, postprocess=None):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -498,7 +510,9 @@ def ovld(fn, *, bootstrap=False, initial_state=None, postprocess=None):
 
 
 @keyword_decorator
-def ovld_wrapper(wrapper, *, bootstrap=False, initial_state=None, postprocess=None):
+def ovld_wrapper(
+    wrapper, *, bootstrap=False, initial_state=None, postprocess=None
+):
     """Overload a function using the decorated function as a wrapper.
 
     The wrapper is the entry point for the function and receives as its
