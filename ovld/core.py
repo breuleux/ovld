@@ -17,11 +17,6 @@ class TypeMap(dict):
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
 
-    # def copy(self, transform):
-    #     tm = TypeMap()
-    #     tm.entries = {k: {transform(v) if transform is not None else v for v in vs} for k, vs in self.entries.items()}
-    #     return tm
-
     def __missing__(self, obj_t):
         """Get the handler for the given type."""
 
@@ -36,43 +31,6 @@ class TypeMap(dict):
             return results
         else:
             raise KeyError(obj_t)
-
-    # def __missing__(self, obj_t):
-    #     """Get the handler for the given type."""
-    #     print("=======")
-    #     print(obj_t)
-    #     results = {}
-    #     to_set = []
-    #     mro = type.mro(obj_t)
-    #     specif = len(mro)
-
-    #     for cls in reversed(mro):
-    #         to_set.append(cls)
-
-    #         handlers = super().get(cls, None)
-    #         if handlers is not None:
-    #             results.update(handlers)
-    #             for cls2 in to_set:
-    #                 print(cls2, cls, "1<===", results)
-    #                 self[cls2] = results
-    #             break
-
-    #         else:
-    #             handlers = self.entries.get(cls, None)
-    #             if handlers is not None:
-    #                 results.update({h: specif for h in handlers})
-    #                 for cls2 in to_set:
-    #                     print(cls2, "2<===", results)
-    #                     self[cls2] = results
-    #                 results = dict(results)
-    #                 to_set = []
-
-    #         specif -= 1
-
-    #     if results:
-    #         return results
-    #     else:
-    #         raise KeyError(obj_t)
 
 
 class MultiTypeMap(dict):
@@ -89,12 +47,6 @@ class MultiTypeMap(dict):
         for i, cls in enumerate(obj_t_tup):
             tm = self.maps.setdefault((nargs, i), TypeMap())
             tm.register(cls, handler)
-
-    # def copy(self, transform=None):
-    #     tm = MultiTypeMap(key_error=self.key_error)
-    #     tm.maps = {k: v.copy(transform=transform)
-    #                for k, v in self.maps.items()}
-    #     return tm
 
     def __missing__(self, obj_t_tup):
         specificities = {}
@@ -171,12 +123,9 @@ def _setattrs(fn, **kwargs):
 
 
 class _PremadeGeneric:
-
     def __get__(self, obj, cls):
         if obj is None:
-            raise TypeError(
-                f"Cannot get class method: {cls.__name__}::{self.__name__}"
-            )
+            raise TypeError(f"Cannot get class method: {cls.__name__}::{self.__name__}")
         return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
@@ -246,6 +195,7 @@ def _compile_first(name):
         fn = getattr(self, name)
         assert fn is not deco
         return fn(*args, **kwargs)
+
     return deco
 
 
