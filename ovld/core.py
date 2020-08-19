@@ -83,10 +83,11 @@ class MultiTypeMap(dict):
 
     def register(self, obj_t_tup, handler):
         self.clear()
+        nargs = len(obj_t_tup)
         if not obj_t_tup:
             self.empty = handler
         for i, cls in enumerate(obj_t_tup):
-            tm = self.maps.setdefault(i, TypeMap())
+            tm = self.maps.setdefault((nargs, i), TypeMap())
             tm.register(cls, handler)
 
     # def copy(self, transform=None):
@@ -98,6 +99,7 @@ class MultiTypeMap(dict):
     def __missing__(self, obj_t_tup):
         specificities = {}
         candidates = None
+        nargs = len(obj_t_tup)
 
         if not obj_t_tup:
             if self.empty is MISSING:
@@ -107,7 +109,7 @@ class MultiTypeMap(dict):
 
         for i, cls in enumerate(obj_t_tup):
             try:
-                results = self.maps[i][cls]
+                results = self.maps[(nargs, i)][cls]
             except KeyError:
                 raise self.key_error(obj_t_tup, ())
             if candidates is None:

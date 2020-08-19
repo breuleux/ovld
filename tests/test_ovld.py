@@ -25,19 +25,29 @@ def test_Ovld():
         f()
 
 
-def test_noargs():
+def test_nargs():
     o = Ovld()
 
     @o.register
-    def f(x: int):
-        return "int"
+    def f():
+        return 0
 
     @o.register
-    def f():
-        return "noargs"
+    def f(x: int):
+        return 1
 
-    assert f(2) == "int"
-    assert f() == "noargs"
+    @o.register
+    def f(x: int, y: int):
+        return 2
+
+    @o.register
+    def f(x: int, y: int, z: int):
+        return 3
+
+    assert f() == 0
+    assert f(0) == 1
+    assert f(0, 0) == 2
+    assert f(0, 0, 0) == 3
 
 
 def test_lock():

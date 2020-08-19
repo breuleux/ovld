@@ -121,8 +121,8 @@ def test_deeper_caching():
 
     tm.register((Mammal, Mammal), "MM")
 
-    m0 = tm.maps[0]
-    m1 = tm.maps[1]
+    m0 = tm.maps[(2, 0)]
+    m1 = tm.maps[(2, 1)]
 
     assert Cat not in m0
     assert Cat not in m1

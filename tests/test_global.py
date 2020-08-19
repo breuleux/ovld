@@ -17,12 +17,12 @@ except Exception as exc:
 _ovld_wrapper_exc = None
 try:
     @ovld_wrapper(bootstrap=True)
-    def frittata(fn, self, x: int):
+    def frittata(fn, self, x, _):
         return fn(self, x, x)
 
     @ovld
     def frittata(self, x: int, y):
-        return x + y
+        return x * y
 
     @ovld
     def frittata(self, x: str, y):
@@ -46,5 +46,5 @@ def test_global_ovld():
 def test_global_ovld_wrapper():
     if _ovld_wrapper_exc:
         raise _ovld_wrapper_exc
-    assert frittata(10) == 20
-    assert frittata("alouette") == "alouettealouette"
+    assert frittata(10, 4) == 100
+    assert frittata("alouette", 4) == "alouettealouette"
