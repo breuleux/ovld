@@ -155,15 +155,98 @@ def _fresh(t):
     return type(t.__name__, (t,), {})
 
 
-@keyword_decorator
-def _compile_first(fn, rename=False):
-    def wrapper(self, *args, **kwargs):
-        self.compile()
-        return fn(self, *args, **kwargs)
+_premades = {}
 
-    wrapper._unwrapped = fn
-    wrapper._rename = rename
-    return wrapper
+
+@keyword_decorator
+def _premade(kls, bind, wrapper):
+    _premades[(bind, wrapper)] = kls
+
+
+@keyword_decorator
+def _setattrs(fn, **kwargs):
+    for k, v in kwargs.items():
+        setattr(fn, k, v)
+    return fn
+
+
+class _PremadeGeneric:
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            raise TypeError(
+                f"Cannot get class method: {cls.__name__}::{self.__name__}"
+            )
+        return self.ocls(
+            map=self.map,
+            state=self.initial_state() if self.initial_state else None,
+            wrapper=self._wrapper,
+            bind_to=obj,
+        )
+
+    def __getitem__(self, t):
+        if not isinstance(t, tuple):
+            t = (t,)
+        assert not self.bootstrap
+        return self.map[t]
+
+    @_setattrs(rename="entry")
+    def __call__(self, *args, **kwargs):
+        """Call the overloaded function."""
+        ovc = self.__get__(BOOTSTRAP, None)
+        res = ovc(*args, **kwargs)
+        if self.postprocess:
+            res = self.postprocess(res)
+        return res
+
+
+@_premade(bind=False, wrapper=False)
+class _(_PremadeGeneric):
+    @_setattrs(rename="dispatch")
+    def __call__(self, *args, **kwargs):
+        key = tuple(type(arg) for arg in args)
+        method = self.map[key]
+        return method(*args, **kwargs)
+
+    __subcall__ = False
+
+
+@_premade(bind=False, wrapper=True)
+class _(_PremadeGeneric):
+    @_setattrs(rename="dispatch")
+    def __call__(self, *args, **kwargs):
+        key = tuple(type(arg) for arg in args)
+        method = self.map[key]
+        return self._wrapper(method, *args, **kwargs)
+
+    __subcall__ = False
+
+
+@_premade(bind=True, wrapper=False)
+class _(_PremadeGeneric):
+    @_setattrs(rename="dispatch")
+    def __subcall__(self, *args, **kwargs):
+        key = tuple(type(arg) for arg in args)
+        method = self.map[key]
+        return method(self.bind_to, *args, **kwargs)
+
+
+@_premade(bind=True, wrapper=True)
+class _(_PremadeGeneric):
+    @_setattrs(rename="dispatch")
+    def __subcall__(self, *args, **kwargs):
+        key = tuple(type(arg) for arg in args)
+        method = self.map[key]
+        return self.wrapper(method, self.bind_to, *args, **kwargs)
+
+
+def _compile_first(name):
+    def deco(self, *args, **kwargs):
+        self.compile()
+        fn = getattr(self, name)
+        assert fn is not deco
+        return fn(*args, **kwargs)
+    return deco
 
 
 class _Ovld:
@@ -216,6 +299,9 @@ class _Ovld:
         self.defns = {}
         self.map = MultiTypeMap(key_error=self._key_error)
         for mixin in mixins:
+            if mixin.bootstrap is not None:
+                self.bootstrap = mixin.bootstrap
+            assert mixin.bootstrap is self.bootstrap
             self.defns.update(mixin.defns)
         self.ocls = _fresh(_OvldCall)
 
@@ -242,6 +328,8 @@ class _Ovld:
             params = list(sign.parameters.values())
             if params and params[0].name == "self":
                 self.bootstrap = True
+            else:
+                self.bootstrap = False
 
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
@@ -258,6 +346,12 @@ class _Ovld:
             params = [p.replace(annotation=inspect.Parameter.empty) for p in params]
             self.__signature__ = sign.replace(parameters=params)
 
+    def _maybe_rename(self, fn):
+        if hasattr(fn, "rename"):
+            return rename_function(fn, f"{self.__name__}.dispatch")
+        else:
+            return fn
+
     def compile(self):
         """Finalize this overload."""
         self._locked = True
@@ -268,24 +362,12 @@ class _Ovld:
 
         name = self.__name__
 
-        # Unwrap key functions so that they don't call compile()
-        for name in dir(cls):
-            entry = getattr(cls, name)
-            if hasattr(entry, "_unwrapped"):
-                fn = entry._unwrapped
-                if entry._rename:
-                    fn = rename_function(fn, f"{name}.{entry._rename}")
-                setattr(cls, name, fn)
-
-        # Use the proper dispatch function
-        method_name = "__xcall"
-        if self.bootstrap:
-            method_name += "_bind"
-        if self._wrapper is not None:
-            method_name += "_wrap"
-        method_name += "__"
-        callfn = getattr(self.ocls, method_name)
-        self.ocls.__call__ = rename_function(callfn, f"{name}.dispatch")
+        # Replace functions by premade versions that are specialized to the
+        # pattern of bootstrap and wrapper
+        model = _premades[(self.bootstrap, self._wrapper is not None)]
+        for method in ("__get__", "__getitem__", "__call__"):
+            setattr(cls, method, self._maybe_rename(getattr(model, method)))
+        self.ocls.__call__ = self._maybe_rename(model.__subcall__)
 
         # Rename the wrapper
         if self._wrapper:
@@ -364,32 +446,9 @@ class _Ovld:
             ov.register(fn)
             return ov
 
-    @_compile_first
-    def __get__(self, obj, cls):
-        if obj is None:
-            raise TypeError(f"Cannot get class method: {cls.__name__}::{self.__name__}")
-        return self.ocls(
-            map=self.map,
-            state=self.initial_state() if self.initial_state else None,
-            wrapper=self._wrapper,
-            bind_to=obj,
-        )
-
-    @_compile_first
-    def __getitem__(self, t):
-        if not isinstance(t, tuple):
-            t = (t,)
-        assert not self.bootstrap
-        return self.map[t]
-
-    @_compile_first(rename="entry")
-    def __call__(self, *args, **kwargs):
-        """Call the overloaded function."""
-        ovc = self.__get__(BOOTSTRAP, None)
-        res = ovc(*args, **kwargs)
-        if self.postprocess:
-            res = self.postprocess(res)
-        return res
+    __get__ = _compile_first("__get__")
+    __getitem__ = _compile_first("__getitem__")
+    __call__ = _compile_first("__call__")
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
@@ -406,41 +465,7 @@ class _OvldCall:
         self.bind_to = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
-        return self.map[t].__get__(self)
-
-    def __xcall_bind_wrap__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
-        method = self.map[key]
-        return self.wrapper(method, self.bind_to, *args, **kwargs)
-
-    def __xcall_bind__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
-        method = self.map[key]
-        return method(self.bind_to, *args, **kwargs)
-
-    def __xcall_wrap__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
-        method = self.map[key]
-        return self.wrapper(method, *args, **kwargs)
-
-    def __xcall__(self, *args, **kwargs):
-        key = tuple(type(arg) for arg in args)
-        method = self.map[key]
-        return method(*args, **kwargs)
-
-    # def __call__(self, *args, **kwargs):
-    #     key = tuple(type(arg) for arg in args)
-
-    #     fself = self.bind_to
-    #     if fself is not None:
-    #         args = (fself,) + args
-
-    #     method = self.map[key]
-
-    #     if self.wrapper is None:
-    #         return method(*args, **kwargs)
-    #     else:
-    #         return self.wrapper(method, *args, **kwargs)
+        return self.map[t].__get__(self.bind_to)
 
 
 def Ovld(*args, **kwargs):
