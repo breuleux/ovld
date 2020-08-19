@@ -216,6 +216,8 @@ class _Ovld:
         wrapper: A function to use as the entry point. In addition to all
             normal arguments, it will receive as its first argument the
             function to dispatch to.
+        dispatch: A function to use as the entry point. It must find the
+            function to dispatch to and call it.
         initial_state: A function returning the initial state, or None if
             there is no state.
         postprocess: A function to call on the return value. It is not called
@@ -231,6 +233,7 @@ class _Ovld:
         *,
         bootstrap=None,
         wrapper=None,
+        dispatch=None,
         initial_state=None,
         postprocess=None,
         mixins=[],
@@ -239,6 +242,8 @@ class _Ovld:
         """Initialize an Ovld."""
         self._locked = False
         self._wrapper = wrapper
+        self._dispatch = dispatch
+        assert wrapper is None or dispatch is None
         self.state = None
         self.maindoc = None
         self.initial_state = initial_state
@@ -303,14 +308,17 @@ class _Ovld:
         else:
             self.__signature__ = inspect.signature(modelA)
 
-    def _set_attrs_from(self, fn, wrapper=False):
+    def _set_attrs_from(self, fn, wrapper=False, dispatch=False):
         if self.bootstrap is None:
             sign = inspect.signature(fn)
             params = list(sign.parameters.values())
-            if params and params[0].name == "self":
-                self.bootstrap = True
-            else:
-                self.bootstrap = False
+            if wrapper:
+                params = params[1:]
+            if not dispatch:
+                if params and params[0].name == "self":
+                    self.bootstrap = True
+                else:
+                    self.bootstrap = False
 
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
@@ -318,16 +326,6 @@ class _Ovld:
             self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
-            sign = inspect.signature(fn)
-            params = list(sign.parameters.values())
-            if wrapper:
-                params = params[1:]
-            if self.bootstrap:
-                params = params[1:]
-            params = [
-                p.replace(annotation=inspect.Parameter.empty) for p in params
-            ]
-            self.__signature__ = sign.replace(parameters=params)
 
     def _maybe_rename(self, fn):
         if hasattr(fn, "rename"):
@@ -351,10 +349,19 @@ class _Ovld:
         for method in ("__get__", "__getitem__", "__call__"):
             setattr(cls, method, self._maybe_rename(getattr(model, method)))
         self.ocls.__call__ = self._maybe_rename(model.__subcall__)
+        if self._dispatch:
+            if model.__subcall__:
+                self.ocls.__call__ = self._dispatch
+            else:
+                cls.__call__ = self._dispatch
 
         # Rename the wrapper
         if self._wrapper:
             self._wrapper = rename_function(self._wrapper, f"{name}.wrapper")
+
+        # Rename the dispatch
+        if self._dispatch:
+            self._dispatch = rename_function(self._dispatch, f"{name}.dispatch")
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
@@ -363,9 +370,24 @@ class _Ovld:
         """Set a wrapper function."""
         if self._wrapper is not None:
             raise TypeError(f"wrapper for {self} is already set")
+        if self._dispatch is not None:
+            raise TypeError(f"cannot set both wrapper and dispatch")
         self._wrapper = wrapper
         self._set_attrs_from(wrapper, wrapper=True)
         return self
+
+    def dispatch(self, dispatch):
+        """Set a dispatch function."""
+        if self._dispatch is not None:
+            raise TypeError(f"dispatch for {self} is already set")
+        if self._wrapper is not None:
+            raise TypeError(f"cannot set both wrapper and dispatch")
+        self._dispatch = dispatch
+        self._set_attrs_from(dispatch, dispatch=True)
+        return self
+
+    def resolve(self, *args):
+        return self.map[tuple(map(type, args))]
 
     def register_signature(self, sig, fn):
         """Register a function for the given signature."""
@@ -403,7 +425,13 @@ class _Ovld:
         self._make_signature()
         return self
 
-    def copy(self, wrapper=MISSING, initial_state=None, postprocess=None):
+    def copy(
+        self,
+        wrapper=MISSING,
+        dispatch=MISSING,
+        initial_state=None,
+        postprocess=None,
+    ):
         """Create a copy of this Ovld.
 
         New functions can be registered to the copy without affecting the
@@ -412,20 +440,27 @@ class _Ovld:
         return _fresh(_Ovld)(
             bootstrap=self.bootstrap,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
+            dispatch=self._dispatch if dispatch is MISSING else dispatch,
             mixins=[self],
             initial_state=initial_state or self.initial_state,
             postprocess=postprocess or self.postprocess,
         )
 
     def variant(
-        self, fn=None, *, wrapper=MISSING, initial_state=None, postprocess=None
+        self,
+        fn=None,
+        *,
+        wrapper=MISSING,
+        dispatch=MISSING,
+        initial_state=None,
+        postprocess=None,
     ):
         """Decorator to create a variant of this Ovld.
 
         New functions can be registered to the variant without affecting the
         original.
         """
-        ov = self.copy(wrapper, initial_state, postprocess)
+        ov = self.copy(wrapper, dispatch, initial_state, postprocess)
         if fn is None:
             return ov.register
         else:
@@ -452,6 +487,9 @@ class _OvldCall:
 
     def __getitem__(self, t):
         return self.map[t].__get__(self.bind_to)
+
+    def resolve(self, *args):
+        return self[tuple(map(type, args))]
 
 
 def Ovld(*args, **kwargs):
@@ -537,7 +575,7 @@ def ovld(fn, *, bootstrap=None, initial_state=None, postprocess=None):
 
 @keyword_decorator
 def ovld_wrapper(
-    wrapper, *, bootstrap=False, initial_state=None, postprocess=None
+    wrapper, *, bootstrap=None, initial_state=None, postprocess=None
 ):
     """Overload a function using the decorated function as a wrapper.
 
@@ -556,11 +594,38 @@ def ovld_wrapper(
             results of recursive calls.
 
     """
-    dispatch = _find_overload(wrapper, bootstrap, initial_state, postprocess)
-    return dispatch.wrapper(wrapper)
+    ov = _find_overload(wrapper, bootstrap, initial_state, postprocess)
+    return ov.wrapper(wrapper)
+
+
+@keyword_decorator
+def ovld_dispatch(
+    dispatch, *, bootstrap=None, initial_state=None, postprocess=None
+):
+    """Overload a function using the decorated function as a dispatcher.
+
+    The dispatch is the entry point for the function and receives a `self`
+    which is an Ovld or OvldCall instance, and the rest of the arguments.
+    It may call `self.resolve(arg1, arg2, ...)` to get the right method to
+    call.
+
+    Arguments:
+        dispatch: Function to use for dispatching.
+        bootstrap: Whether to bootstrap this function so that it receives
+            itself as its first argument. Useful for recursive functions.
+        initial_state: A function with no arguments that returns the initial
+            state for top level calls to the overloaded function, or None
+            if there is no initial state.
+        postprocess: A function to transform the result. Not called on the
+            results of recursive calls.
+
+    """
+    ov = _find_overload(dispatch, bootstrap, initial_state, postprocess)
+    return ov.dispatch(dispatch)
 
 
 ovld.wrapper = ovld_wrapper
+ovld.dispatch = ovld_dispatch
 
 
 def rename_function(fn, newname):
@@ -594,4 +659,12 @@ def rename_function(fn, newname):
     )
 
 
-__all__ = ["Ovld", "OvldMC", "TypeMap", "TypeMapMulti", "ovld", "ovld_wrapper"]
+__all__ = [
+    "Ovld",
+    "OvldMC",
+    "TypeMap",
+    "TypeMapMulti",
+    "ovld",
+    "ovld_dispatch",
+    "ovld_wrapper",
+]

@@ -1,1 +1,9 @@
-from .core import ovld, ovld_wrapper, Ovld, OvldMC, TypeMap, MultiTypeMap
+from .core import (
+    ovld,
+    ovld_dispatch,
+    ovld_wrapper,
+    Ovld,
+    OvldMC,
+    TypeMap,
+    MultiTypeMap,
+)

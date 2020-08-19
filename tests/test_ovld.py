@@ -206,6 +206,7 @@ def test_bootstrap():
     # Postprocessor is kept
     assert i([1, 2, "xxx", [3, 4]]) == {"result": [2, 3, "D", [4, 5]]}
 
+
 def test_Overload_wrapper():
 
     f = Ovld()
@@ -220,6 +221,12 @@ def test_Overload_wrapper():
         def f(fn, x):
             return [fn(x)]
 
+    with pytest.raises(TypeError):
+
+        @f.dispatch
+        def f(self, x):
+            return "bad"
+
     @f.register
     def f(x: int):
         return x + 1
@@ -230,6 +237,58 @@ def test_Overload_wrapper():
 
     assert f(1) == [2]
     assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
+
+
+def test_Overload_dispatch():
+
+    f = Ovld()
+
+    @f.dispatch
+    def f(self, x):
+        return self.resolve(x, x)(x, x)
+
+    with pytest.raises(TypeError):
+
+        @f.dispatch
+        def f(self, x):
+            return self.map[(type(x), type(x))](x, x)
+
+    with pytest.raises(TypeError):
+
+        @f.wrapper
+        def f(self, x):
+            return "bad"
+
+    @f.register
+    def f(x: int, y: int):
+        return x + y
+
+    @f.register
+    def f(xs: tuple, ys: tuple):
+        return tuple(f(x) for x in xs)
+
+    assert f(1) == 2
+    assert f((4, 5)) == (8, 10)
+
+
+def test_Overload_dispatch_bootstrap():
+
+    f = Ovld()
+
+    @f.dispatch
+    def f(self, x):
+        return self.resolve(x, x)(x, x)
+
+    @f.register
+    def f(self, x: int, y: int):
+        return x + y
+
+    @f.register
+    def f(self, xs: tuple, ys: tuple):
+        return tuple(self(x) for x in xs)
+
+    assert f(1) == 2
+    assert f((4, 5)) == (8, 10)
 
 
 def test_stateful():
