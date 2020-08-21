@@ -173,6 +173,24 @@ def test_typetuple_override():
     assert f(1.0) == "if"
 
 
+def test_abstract_types():
+    from collections.abc import Iterable
+
+    o = Ovld()
+
+    @o.register
+    def f(x: object):
+        return "o"
+
+    @o.register
+    def f(xs: Iterable):
+        return type(xs)(f(x) for x in xs)
+
+    assert f(1) == "o"
+    assert f([1, 2, 3]) == ["o", "o", "o"]
+    assert f((1, [2, 3])) == ("o", ["o", "o"])
+
+
 def test_varargs():
     o = Ovld()
 

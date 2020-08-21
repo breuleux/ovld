@@ -8,14 +8,17 @@ import textwrap
 from types import FunctionType
 
 from .utils import BOOTSTRAP, MISSING, keyword_decorator
+from .mro import compose_mro
 
 
 class TypeMap(dict):
     def __init__(self):
         self.entries = {}
+        self.types = set()
 
     def register(self, obj_t, handler):
         self.clear()
+        self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
 
@@ -23,7 +26,8 @@ class TypeMap(dict):
         """Get the handler for the given type."""
 
         results = {}
-        for lvl, cls in enumerate(reversed(type.mro(obj_t))):
+        mro = compose_mro(obj_t, self.types)
+        for lvl, cls in enumerate(reversed(mro)):
             handlers = self.entries.get(cls, None)
             if handlers:
                 results.update({h: lvl for h in handlers})
