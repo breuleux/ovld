@@ -1,6 +1,7 @@
 
-from ovld import MultiTypeMap
 import pytest
+
+from ovld import MultiTypeMap
 
 
 class Animal:
