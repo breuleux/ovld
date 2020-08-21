@@ -43,13 +43,7 @@ class MultiTypeMap(dict):
 
     def register(self, obj_t_tup, nargs, handler):
         self.clear()
-        obj_t_tup = tuple(
-            t if isinstance(t, tuple) else (t,) for t in obj_t_tup
-        )
-        for tup in itertools.product(*obj_t_tup):
-            self._register(tup, nargs, handler)
 
-    def _register(self, obj_t_tup, nargs, handler):
         amin, amax, vararg = nargs
 
         entry = (handler, amin, amax, vararg)
@@ -306,8 +300,6 @@ class _Ovld:
         def clsname(cls):
             if cls is object:
                 return "*"
-            elif isinstance(cls, tuple):
-                return "|".join(map(clsname, cls))
             else:
                 return cls.__name__
 
@@ -457,6 +449,7 @@ class _Ovld:
                     "The first argument of the function must be named `self`"
                 )
             argnames = argnames[1:]
+
         typelist = []
         for i, name in enumerate(argnames):
             t = ann.get(name, None)
@@ -468,9 +461,14 @@ class _Ovld:
         max_pos = len(argnames)
         req_pos = max_pos - len(argspec.defaults or ())
 
-        self.defns[
-            tuple(typelist), req_pos, max_pos, bool(argspec.varargs)
-        ] = fn
+        typelist_tups = tuple(
+            t if isinstance(t, tuple) else (t,) for t in typelist
+        )
+        for tl in itertools.product(*typelist_tups):
+            self.defns[
+                tuple(tl), req_pos, max_pos, bool(argspec.varargs)
+            ] = fn
+
         self._make_signature()
         return self
 
@@ -535,6 +533,8 @@ class _OvldCall:
         self.bind_to = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
+        if not isinstance(t, tuple):
+            t = (t,)
         return self.map[t].__get__(self.bind_to)
 
     def resolve(self, *args):

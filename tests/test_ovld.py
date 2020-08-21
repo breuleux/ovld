@@ -88,11 +88,11 @@ def test_bootstrap_getitem():
 
     @o.register
     def f(self, x: int):
-        return self[(float,)]
+        return self[float]
 
     @o.register  # noqa: F811
     def f(self, x: float):
-        return self[(int,)]
+        return self[int]
 
     assert "f[int]" in str(f(1.0))
     assert "f[float]" in str(f(111))
@@ -156,6 +156,21 @@ def test_typetuple():
 
     assert f(1, "x") == "io"
     assert f("x", 1) == "oi"
+
+
+def test_typetuple_override():
+    o = Ovld()
+
+    @o.register
+    def f(x: (int, float)):
+        return "if"
+
+    @o.register
+    def f(x: int):
+        return "i"
+
+    assert f(1) == "i"
+    assert f(1.0) == "if"
 
 
 def test_varargs():
@@ -283,7 +298,7 @@ def test_bootstrap():
     assert i([1, 2, "xxx", [3, 4]]) == {"result": [2, 3, "D", [4, 5]]}
 
 
-def test_Overload_wrapper():
+def test_Ovld_wrapper():
 
     f = Ovld()
 
@@ -315,13 +330,16 @@ def test_Overload_wrapper():
     assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
 
 
-def test_Overload_dispatch():
+def test_Ovld_dispatch():
 
     f = Ovld()
 
     @f.dispatch
     def f(self, x):
-        return self.resolve(x, x)(x, x)
+        f1 = self.resolve(x, x)
+        f2 = self[type(x), type(x)]
+        assert f1 == f2
+        return f1(x, x)
 
     with pytest.raises(TypeError):
 
@@ -347,13 +365,16 @@ def test_Overload_dispatch():
     assert f((4, 5)) == (8, 10)
 
 
-def test_Overload_dispatch_bootstrap():
+def test_Ovld_dispatch_bootstrap():
 
     f = Ovld()
 
     @f.dispatch
     def f(self, x):
-        return self.resolve(x, x)(x, x)
+        f1 = self.resolve(x, x)
+        f2 = self[type(x), type(x)]
+        assert f1 == f2
+        return f1(x, x)
 
     @f.register
     def f(self, x: int, y: int):
