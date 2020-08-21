@@ -1,6 +1,6 @@
 
 import pytest
-from ovld import ovld, Ovld, OvldMC
+from ovld import Ovld, OvldMC
 from ovld.utils import MISSING
 
 
@@ -194,7 +194,7 @@ def test_default_args():
         return y
 
     @o.register
-    def f(x: float, y = 7):
+    def f(x: float, y=7):
         return x + y
 
     assert f(1) == "A"
