@@ -465,9 +465,7 @@ class _Ovld:
             t if isinstance(t, tuple) else (t,) for t in typelist
         )
         for tl in itertools.product(*typelist_tups):
-            self.defns[
-                tuple(tl), req_pos, max_pos, bool(argspec.varargs)
-            ] = fn
+            self.defns[tuple(tl), req_pos, max_pos, bool(argspec.varargs)] = fn
 
         self._make_signature()
         return self
