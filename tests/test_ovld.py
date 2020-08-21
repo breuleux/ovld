@@ -131,6 +131,33 @@ def test_multimethod():
         f(1, 2)
 
 
+def test_typetuple():
+    o = Ovld()
+    o = Ovld()
+
+    @o.register
+    def f(x, y):
+        return "oo"
+
+    @o.register
+    def f(x: (int, float), y):
+        return "io"
+
+    @o.register
+    def f(x, y: (int, float)):
+        return "oi"
+
+    @o.register
+    def f(x: (int, float), y: (int, float)):
+        return "ii"
+
+    assert f(1, 1) == "ii"
+    assert f(1.0, 1.0) == "ii"
+
+    assert f(1, "x") == "io"
+    assert f("x", 1) == "oi"
+
+
 def test_mixins():
 
     f = Ovld()

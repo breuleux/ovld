@@ -2,6 +2,7 @@
 
 
 import inspect
+import itertools
 import textwrap
 from types import FunctionType
 from functools import reduce
@@ -42,6 +43,13 @@ class MultiTypeMap(dict):
 
     def register(self, obj_t_tup, handler):
         self.clear()
+        obj_t_tup = tuple(
+            t if isinstance(t, tuple) else (t,) for t in obj_t_tup
+        )
+        for tup in itertools.product(*obj_t_tup):
+            self._register(tup, handler)
+
+    def _register(self, obj_t_tup, handler):
         nargs = len(obj_t_tup)
         if not obj_t_tup:
             self.empty = handler
@@ -266,9 +274,15 @@ class _Ovld:
         self._make_signature()
 
     def _sig_string(self, type_tuple):
-        return ", ".join(
-            "*" if cls is object else cls.__name__ for cls in type_tuple
-        )
+        def clsname(cls):
+            if cls is object:
+                return "*"
+            elif isinstance(cls, tuple):
+                return "|".join(map(clsname, cls))
+            else:
+                return cls.__name__
+
+        return ", ".join(map(clsname, type_tuple))
 
     def _key_error(self, key, possibilities):
         typenames = self._sig_string(key)
@@ -418,7 +432,6 @@ class _Ovld:
             if t is None:
                 typelist.append(object)
             else:
-                assert not isinstance(t, tuple)
                 typelist.append(t)
 
         self.defns[tuple(typelist)] = fn
