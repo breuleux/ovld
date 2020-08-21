@@ -3,9 +3,9 @@
 
 import inspect
 import itertools
+import math
 import textwrap
 from types import FunctionType
-from functools import reduce
 
 from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
@@ -41,21 +41,27 @@ class MultiTypeMap(dict):
         self.empty = MISSING
         self.key_error = key_error
 
-    def register(self, obj_t_tup, handler):
+    def register(self, obj_t_tup, nargs, handler):
         self.clear()
         obj_t_tup = tuple(
             t if isinstance(t, tuple) else (t,) for t in obj_t_tup
         )
         for tup in itertools.product(*obj_t_tup):
-            self._register(tup, handler)
+            self._register(tup, nargs, handler)
 
-    def _register(self, obj_t_tup, handler):
-        nargs = len(obj_t_tup)
+    def _register(self, obj_t_tup, nargs, handler):
+        amin, amax, vararg = nargs
+
+        entry = (handler, amin, amax, vararg)
         if not obj_t_tup:
-            self.empty = handler
+            self.empty = entry
+
         for i, cls in enumerate(obj_t_tup):
-            tm = self.maps.setdefault((nargs, i), TypeMap())
-            tm.register(cls, handler)
+            tm = self.maps.setdefault(i, TypeMap())
+            tm.register(cls, entry)
+        if vararg:
+            tm = self.maps.setdefault(-1, TypeMap())
+            tm.register(object, entry)
 
     def __missing__(self, obj_t_tup):
         specificities = {}
@@ -66,19 +72,42 @@ class MultiTypeMap(dict):
             if self.empty is MISSING:
                 raise self.key_error(obj_t_tup, ())
             else:
-                return self.empty
+                return self.empty[0]
 
         for i, cls in enumerate(obj_t_tup):
             try:
-                results = self.maps[(nargs, i)][cls]
+                results = self.maps[i][cls]
             except KeyError:
-                raise self.key_error(obj_t_tup, ())
+                results = {}
+
+            results = {
+                handler: spc
+                for (handler, min, max, va), spc in results.items()
+                if min <= nargs <= (math.inf if va else max)
+            }
+
+            try:
+                vararg_results = self.maps[-1][cls]
+            except KeyError:
+                vararg_results = {}
+
+            vararg_results = {
+                handler: spc
+                for (handler, min, max, va), spc in vararg_results.items()
+                if min <= nargs and i >= max
+            }
+
+            results.update(vararg_results)
+
             if candidates is None:
                 candidates = set(results.keys())
             else:
                 candidates &= results.keys()
             for c in candidates:
                 specificities.setdefault(c, []).append(results[c])
+
+        if not candidates:
+            raise self.key_error(obj_t_tup, ())
 
         candidates = [(c, tuple(specificities[c])) for c in candidates]
 
@@ -385,7 +414,7 @@ class _Ovld:
         if self._wrapper is not None:
             raise TypeError(f"wrapper for {self} is already set")
         if self._dispatch is not None:
-            raise TypeError(f"cannot set both wrapper and dispatch")
+            raise TypeError("cannot set both wrapper and dispatch")
         self._wrapper = wrapper
         self._set_attrs_from(wrapper, wrapper=True)
         return self
@@ -395,7 +424,7 @@ class _Ovld:
         if self._dispatch is not None:
             raise TypeError(f"dispatch for {self} is already set")
         if self._wrapper is not None:
-            raise TypeError(f"cannot set both wrapper and dispatch")
+            raise TypeError("cannot set both wrapper and dispatch")
         self._dispatch = dispatch
         self._set_attrs_from(dispatch, dispatch=True)
         return self
@@ -403,10 +432,11 @@ class _Ovld:
     def resolve(self, *args):
         return self.map[tuple(map(type, args))]
 
-    def register_signature(self, sig, fn):
+    def register_signature(self, key, fn):
         """Register a function for the given signature."""
+        sig, min, max, vararg = key
         fn = rename_function(fn, f"{self.__name__}[{self._sig_string(sig)}]")
-        self.map.register(sig, fn)
+        self.map.register(sig, (min, max, vararg), fn)
         return self
 
     def register(self, fn):
@@ -419,7 +449,8 @@ class _Ovld:
         self._set_attrs_from(fn)
 
         ann = fn.__annotations__
-        argnames = inspect.getfullargspec(fn).args
+        argspec = inspect.getfullargspec(fn)
+        argnames = argspec.args
         if self.bootstrap:
             if argnames[0] != "self":
                 raise TypeError(
@@ -434,7 +465,12 @@ class _Ovld:
             else:
                 typelist.append(t)
 
-        self.defns[tuple(typelist)] = fn
+        max_pos = len(argnames)
+        req_pos = max_pos - len(argspec.defaults or ())
+
+        self.defns[
+            tuple(typelist), req_pos, max_pos, bool(argspec.varargs)
+        ] = fn
         self._make_signature()
         return self
 
@@ -673,10 +709,10 @@ def rename_function(fn, newname):
 
 
 __all__ = [
+    "MultiTypeMap",
     "Ovld",
     "OvldMC",
     "TypeMap",
-    "TypeMapMulti",
     "ovld",
     "ovld_dispatch",
     "ovld_wrapper",

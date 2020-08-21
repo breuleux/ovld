@@ -133,7 +133,6 @@ def test_multimethod():
 
 def test_typetuple():
     o = Ovld()
-    o = Ovld()
 
     @o.register
     def f(x, y):
@@ -156,6 +155,55 @@ def test_typetuple():
 
     assert f(1, "x") == "io"
     assert f("x", 1) == "oi"
+
+
+def test_varargs():
+    o = Ovld()
+
+    @o.register
+    def f(*args):
+        return "A"
+
+    @o.register
+    def f(x: int, *args):
+        return "B"
+
+    @o.register
+    def f(x: int, y: int, *args):
+        return "C"
+
+    assert f() == "A"
+    assert f("X") == "A"
+
+    assert f(1) == "B"
+    assert f(1, "x", "y") == "B"
+
+    assert f(1, 2) == "C"
+    assert f(1, 2, 3) == "C"
+
+
+def test_default_args():
+    o = Ovld()
+
+    @o.register
+    def f(x: int):
+        return "A"
+
+    @o.register
+    def f(x: str, y: int = 3):
+        return y
+
+    @o.register
+    def f(x: float, y = 7):
+        return x + y
+
+    assert f(1) == "A"
+    assert f("X") == 3
+    assert f("X", 24) == 24
+    with pytest.raises(TypeError):
+        f("X", "Y")
+
+    assert f(3.7) == 10.7
 
 
 def test_mixins():

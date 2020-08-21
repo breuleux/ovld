@@ -49,9 +49,9 @@ def test_not_found():
 def test_inheritance():
     tm = MultiTypeMap()
 
-    tm.register((object,), "o")
-    tm.register((Animal,), "A")
-    tm.register((Bird,), "B")
+    tm.register((object,), (1, 1, False), "o")
+    tm.register((Animal,), (1, 1, False), "A")
+    tm.register((Bird,), (1, 1, False), "B")
 
     assert _get(tm, object) == ["o"]
     assert _get(tm, int) == ["o"]
@@ -68,12 +68,12 @@ def test_inheritance():
 def test_multiple_dispatch():
     tm = MultiTypeMap()
 
-    tm.register((object, object), "oo")
-    tm.register((Animal, object), "Ao")
-    tm.register((Mammal, object), "Mo")
-    tm.register((object, Animal), "oA")
-    tm.register((object, Mammal), "oM")
-    tm.register((Mammal, Mammal), "MM")
+    tm.register((object, object), (2, 2, False), "oo")
+    tm.register((Animal, object), (2, 2, False), "Ao")
+    tm.register((Mammal, object), (2, 2, False), "Mo")
+    tm.register((object, Animal), (2, 2, False), "oA")
+    tm.register((object, Mammal), (2, 2, False), "oM")
+    tm.register((Mammal, Mammal), (2, 2, False), "MM")
 
     assert _get(tm, int, int) == ["oo"]
     assert _get(tm, Cat, int) == ["Mo"]
@@ -88,8 +88,8 @@ def test_multiple_dispatch():
 def test_direct_ambiguity():
     tm = MultiTypeMap()
 
-    tm.register((str, int), "A")
-    tm.register((str, int), "B")
+    tm.register((str, int), (2, 2, False), "A")
+    tm.register((str, int), (2, 2, False), "B")
 
     # Could be in either order
     assert set(_get(tm, str, int)) == {"A", "B"}
@@ -98,7 +98,7 @@ def test_direct_ambiguity():
 def test_caching():
     tm = MultiTypeMap()
 
-    tm.register((Mammal, Mammal), "X")
+    tm.register((Mammal, Mammal), (2, 2, False), "X")
 
     assert (Mammal, Mammal) not in tm
     assert (Cat, Cat) not in tm
@@ -119,28 +119,28 @@ def test_caching():
 def test_deeper_caching():
     tm = MultiTypeMap()
 
-    tm.register((Mammal, Mammal), "MM")
+    tm.register((Mammal, Mammal), (2, 2, False), "MM")
 
-    m0 = tm.maps[(2, 0)]
-    m1 = tm.maps[(2, 1)]
+    m0 = tm.maps[0]
+    m1 = tm.maps[1]
 
     assert Cat not in m0
     assert Cat not in m1
 
     assert _get(tm, Cat, Cat) == ["MM"]
 
-    assert m0[Cat] == {"MM": 2}
-    assert m1[Cat] == {"MM": 2}
+    assert m0[Cat] == {("MM", 2, 2, False): 2}
+    assert m1[Cat] == {("MM", 2, 2, False): 2}
 
 
 def test_cache_invalidation():
     tm = MultiTypeMap()
 
-    tm.register((Mammal, Mammal), "MM")
+    tm.register((Mammal, Mammal), (2, 2, False), "MM")
     assert (Cat, Cat) not in tm
     assert _get(tm, Cat, Cat) == ["MM"]
 
     assert (Cat, Cat) in tm
-    tm.register((Cat, Cat), "CC")
+    tm.register((Cat, Cat), (2, 2, False), "CC")
     assert (Cat, Cat) not in tm
     assert _get(tm, Cat, Cat) == ["CC"]
