@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from ovld import Ovld, OvldMC
+from ovld import Ovld, OvldCall, OvldMC
 from ovld.utils import MISSING
 
 
@@ -321,6 +321,25 @@ def test_bootstrap():
 
     # Postprocessor is kept
     assert i([1, 2, "xxx", [3, 4]]) == {"result": [2, 3, "D", [4, 5]]}
+
+
+class CustomCall(OvldCall):
+    def inc(self, x):
+        return x + 1
+
+
+def test_bootstrap_custom_ovcall():
+    f = Ovld(bootstrap=CustomCall)
+
+    @f.register
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    @f.register
+    def f(self, x: int):
+        return self.inc(x)
+
+    assert f([1, 2, 3]) == [2, 3, 4]
 
 
 def test_Ovld_dispatch():

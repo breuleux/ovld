@@ -257,8 +257,12 @@ class _Ovld:
         self.maindoc = None
         self.initial_state = initial_state
         self.postprocess = postprocess
+        self.bootstrap_class = OvldCall
         if self.initial_state or self.postprocess:
             assert bootstrap is not False
+            self.bootstrap = True
+        elif isinstance(bootstrap, type):
+            self.bootstrap_class = bootstrap
             self.bootstrap = True
         else:
             self.bootstrap = bootstrap
@@ -271,7 +275,7 @@ class _Ovld:
                 self.bootstrap = mixin.bootstrap
             assert mixin.bootstrap is self.bootstrap
             self.defns.update(mixin.defns)
-        self.ocls = _fresh(_OvldCall)
+        self.ocls = _fresh(self.bootstrap_class)
         self._make_signature()
 
     def _sig_string(self, type_tuple):
@@ -474,7 +478,7 @@ class _Ovld:
         return f"<Ovld {self.name or hex(id(self))}>"
 
 
-class _OvldCall:
+class OvldCall:
     """Context for an Ovld call."""
 
     def __init__(self, map, state, bind_to):
@@ -639,6 +643,7 @@ def rename_function(fn, newname):
 __all__ = [
     "MultiTypeMap",
     "Ovld",
+    "OvldCall",
     "OvldMC",
     "TypeMap",
     "ovld",
