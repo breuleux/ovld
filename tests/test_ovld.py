@@ -1,5 +1,6 @@
-import pytest
 import sys
+
+import pytest
 
 from ovld import Ovld, OvldMC
 from ovld.utils import MISSING
