@@ -1,4 +1,4 @@
-from ovld import ovld, ovld_dispatch, ovld_wrapper
+from ovld import ovld, ovld_dispatch
 
 _ovld_exc = None
 try:
@@ -12,28 +12,6 @@ try:
 
 except Exception as exc:
     _ovld_exc = exc
-
-
-_ovld_wrapper_exc = None
-try:
-    @ovld_wrapper(bootstrap=True)
-    def frittata(fn, self, x, _):
-        return fn(self, x, x)
-
-    @ovld
-    def frittata(self, x: int, y):
-        return x * y
-
-    @ovld
-    def frittata(self, x: str, y):
-        return x + y
-
-    @ovld
-    def frittata(self, xs: list, _):
-        return [self(x) for x in xs]
-
-except Exception as exc:
-    _ovld_wrapper_exc = exc
 
 
 _ovld_dispatch_exc = None
@@ -55,7 +33,7 @@ try:
         return [self(x) for x in xs]
 
 except Exception as exc:
-    _ovld_wrapper_exc = exc
+    _ovld_dispatch_exc = exc
 
 
 def test_global_ovld():
@@ -63,13 +41,6 @@ def test_global_ovld():
         raise _ovld_exc
     assert pluralize(10) == 11
     assert pluralize("alouette") == "alouettes"
-
-
-def test_global_ovld_wrapper():
-    if _ovld_wrapper_exc:
-        raise _ovld_wrapper_exc
-    assert frittata(10, 4) == 100
-    assert frittata("alouette", 4) == "alouettealouette"
 
 
 def test_global_ovld_dispatch():

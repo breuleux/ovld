@@ -316,38 +316,6 @@ def test_bootstrap():
     assert i([1, 2, "xxx", [3, 4]]) == {"result": [2, 3, "D", [4, 5]]}
 
 
-def test_Ovld_wrapper():
-
-    f = Ovld()
-
-    @f.wrapper
-    def f(fn, x):
-        return [fn(x)]
-
-    with pytest.raises(TypeError):
-
-        @f.wrapper
-        def f(fn, x):
-            return [fn(x)]
-
-    with pytest.raises(TypeError):
-
-        @f.dispatch
-        def f(self, x):
-            return "bad"
-
-    @f.register
-    def f(x: int):
-        return x + 1
-
-    @f.register
-    def f(xs: tuple):
-        return tuple(f(x) for x in xs)
-
-    assert f(1) == [2]
-    assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
-
-
 def test_Ovld_dispatch():
 
     f = Ovld()
@@ -364,12 +332,6 @@ def test_Ovld_dispatch():
         @f.dispatch
         def f(self, x):
             return self.map[(type(x), type(x))](x, x)
-
-    with pytest.raises(TypeError):
-
-        @f.wrapper
-        def f(self, x):
-            return "bad"
 
     @f.register
     def f(x: int, y: int):
@@ -410,10 +372,11 @@ def test_stateful():
 
     f = Ovld(initial_state=lambda: -1)
 
-    @f.wrapper
-    def f(fn, self, x):
+    @f.dispatch
+    def f(self, x):
+        fn = self.resolve(x)
         self.state += 1
-        return fn(self, x)
+        return fn(x)
 
     @f.register
     def f(self, x: type(None)):

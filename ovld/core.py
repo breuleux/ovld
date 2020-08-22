@@ -7,8 +7,8 @@ import math
 import textwrap
 from types import FunctionType
 
-from .utils import BOOTSTRAP, MISSING, keyword_decorator
 from .mro import compose_mro
+from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 
 class TypeMap(dict):
@@ -147,8 +147,8 @@ _premades = {}
 
 
 @keyword_decorator
-def _premade(kls, bind, wrapper):
-    _premades[(bind, wrapper)] = kls
+def _premade(kls, bind):
+    _premades[bind] = kls
 
 
 @keyword_decorator
@@ -167,7 +167,6 @@ class _PremadeGeneric:
         return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
-            wrapper=self._wrapper,
             bind_to=obj,
         )
 
@@ -187,7 +186,7 @@ class _PremadeGeneric:
         return res
 
 
-@_premade(bind=False, wrapper=False)
+@_premade(bind=False)
 class _(_PremadeGeneric):
     @_setattrs(rename="dispatch")
     def __call__(self, *args, **kwargs):
@@ -198,33 +197,13 @@ class _(_PremadeGeneric):
     __subcall__ = False
 
 
-@_premade(bind=False, wrapper=True)
-class _(_PremadeGeneric):
-    @_setattrs(rename="dispatch")
-    def __call__(self, *args, **kwargs):
-        key = tuple(map(type, args))
-        method = self.map[key]
-        return self._wrapper(method, *args, **kwargs)
-
-    __subcall__ = False
-
-
-@_premade(bind=True, wrapper=False)
+@_premade(bind=True)
 class _(_PremadeGeneric):
     @_setattrs(rename="dispatch")
     def __subcall__(self, *args, **kwargs):
         key = tuple(map(type, args))
         method = self.map[key]
         return method(self.bind_to, *args, **kwargs)
-
-
-@_premade(bind=True, wrapper=True)
-class _(_PremadeGeneric):
-    @_setattrs(rename="dispatch")
-    def __subcall__(self, *args, **kwargs):
-        key = tuple(map(type, args))
-        method = self.map[key]
-        return self.wrapper(method, self.bind_to, *args, **kwargs)
 
 
 def _compile_first(name):
@@ -248,9 +227,6 @@ class _Ovld:
         bootstrap: Whether to bind the first argument to the OvldCall
             object. Forced to True if initial_state or postprocess is not
             None.
-        wrapper: A function to use as the entry point. In addition to all
-            normal arguments, it will receive as its first argument the
-            function to dispatch to.
         dispatch: A function to use as the entry point. It must find the
             function to dispatch to and call it.
         initial_state: A function returning the initial state, or None if
@@ -260,14 +236,14 @@ class _Ovld:
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
         name: Optional name for the Ovld. If not provided, it will be
-            gotten automatically from the first registered function or wrapper.
+            gotten automatically from the first registered function or
+            dispatch.
     """
 
     def __init__(
         self,
         *,
         bootstrap=None,
-        wrapper=None,
         dispatch=None,
         initial_state=None,
         postprocess=None,
@@ -276,9 +252,7 @@ class _Ovld:
     ):
         """Initialize an Ovld."""
         self._locked = False
-        self._wrapper = wrapper
         self._dispatch = dispatch
-        assert wrapper is None or dispatch is None
         self.state = None
         self.maindoc = None
         self.initial_state = initial_state
@@ -347,12 +321,10 @@ class _Ovld:
         else:
             self.__signature__ = inspect.signature(modelA)
 
-    def _set_attrs_from(self, fn, wrapper=False, dispatch=False):
+    def _set_attrs_from(self, fn, dispatch=False):
         if self.bootstrap is None:
             sign = inspect.signature(fn)
             params = list(sign.parameters.values())
-            if wrapper:
-                params = params[1:]
             if not dispatch:
                 if params and params[0].name == "self":
                     self.bootstrap = True
@@ -383,8 +355,8 @@ class _Ovld:
         name = self.__name__
 
         # Replace functions by premade versions that are specialized to the
-        # pattern of bootstrap and wrapper
-        model = _premades[(self.bootstrap, self._wrapper is not None)]
+        # pattern of bootstrap
+        model = _premades[self.bootstrap]
         for method in ("__get__", "__getitem__", "__call__"):
             setattr(cls, method, self._maybe_rename(getattr(model, method)))
         self.ocls.__call__ = self._maybe_rename(model.__subcall__)
@@ -394,10 +366,6 @@ class _Ovld:
             else:
                 cls.__call__ = self._dispatch
 
-        # Rename the wrapper
-        if self._wrapper:
-            self._wrapper = rename_function(self._wrapper, f"{name}.wrapper")
-
         # Rename the dispatch
         if self._dispatch:
             self._dispatch = rename_function(self._dispatch, f"{name}.dispatch")
@@ -405,22 +373,10 @@ class _Ovld:
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
 
-    def wrapper(self, wrapper):
-        """Set a wrapper function."""
-        if self._wrapper is not None:
-            raise TypeError(f"wrapper for {self} is already set")
-        if self._dispatch is not None:
-            raise TypeError("cannot set both wrapper and dispatch")
-        self._wrapper = wrapper
-        self._set_attrs_from(wrapper, wrapper=True)
-        return self
-
     def dispatch(self, dispatch):
         """Set a dispatch function."""
         if self._dispatch is not None:
             raise TypeError(f"dispatch for {self} is already set")
-        if self._wrapper is not None:
-            raise TypeError("cannot set both wrapper and dispatch")
         self._dispatch = dispatch
         self._set_attrs_from(dispatch, dispatch=True)
         return self
@@ -475,11 +431,7 @@ class _Ovld:
         return self
 
     def copy(
-        self,
-        wrapper=MISSING,
-        dispatch=MISSING,
-        initial_state=None,
-        postprocess=None,
+        self, dispatch=MISSING, initial_state=None, postprocess=None,
     ):
         """Create a copy of this Ovld.
 
@@ -488,7 +440,6 @@ class _Ovld:
         """
         return _fresh(_Ovld)(
             bootstrap=self.bootstrap,
-            wrapper=self._wrapper if wrapper is MISSING else wrapper,
             dispatch=self._dispatch if dispatch is MISSING else dispatch,
             mixins=[self],
             initial_state=initial_state or self.initial_state,
@@ -499,7 +450,6 @@ class _Ovld:
         self,
         fn=None,
         *,
-        wrapper=MISSING,
         dispatch=MISSING,
         initial_state=None,
         postprocess=None,
@@ -509,7 +459,7 @@ class _Ovld:
         New functions can be registered to the variant without affecting the
         original.
         """
-        ov = self.copy(wrapper, dispatch, initial_state, postprocess)
+        ov = self.copy(dispatch, initial_state, postprocess)
         if fn is None:
             return ov.register
         else:
@@ -527,11 +477,10 @@ class _Ovld:
 class _OvldCall:
     """Context for an Ovld call."""
 
-    def __init__(self, map, state, wrapper, bind_to):
+    def __init__(self, map, state, bind_to):
         """Initialize an OvldCall."""
         self.map = map
         self.state = state
-        self.wrapper = wrapper
         self.bind_to = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
@@ -625,31 +574,6 @@ def ovld(fn, *, bootstrap=None, initial_state=None, postprocess=None):
 
 
 @keyword_decorator
-def ovld_wrapper(
-    wrapper, *, bootstrap=None, initial_state=None, postprocess=None
-):
-    """Overload a function using the decorated function as a wrapper.
-
-    The wrapper is the entry point for the function and receives as its
-    first argument the method to dispatch to, and then the arguments to
-    give to that method.
-
-    Arguments:
-        wrapper: Function to wrap the dispatch with.
-        bootstrap: Whether to bootstrap this function so that it receives
-            itself as its first argument. Useful for recursive functions.
-        initial_state: A function with no arguments that returns the initial
-            state for top level calls to the overloaded function, or None
-            if there is no initial state.
-        postprocess: A function to transform the result. Not called on the
-            results of recursive calls.
-
-    """
-    ov = _find_overload(wrapper, bootstrap, initial_state, postprocess)
-    return ov.wrapper(wrapper)
-
-
-@keyword_decorator
 def ovld_dispatch(
     dispatch, *, bootstrap=None, initial_state=None, postprocess=None
 ):
@@ -675,7 +599,6 @@ def ovld_dispatch(
     return ov.dispatch(dispatch)
 
 
-ovld.wrapper = ovld_wrapper
 ovld.dispatch = ovld_dispatch
 
 
@@ -717,5 +640,4 @@ __all__ = [
     "TypeMap",
     "ovld",
     "ovld_dispatch",
-    "ovld_wrapper",
 ]

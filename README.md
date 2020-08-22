@@ -126,36 +126,6 @@ There are other uses for this feature, e.g. memoization.
 
 The normal functions may also have a `self`, which works the same as bootstrapping, and you can give an `initial_state` to `@ovld.dispatch` as well.
 
-<!-- 
-## Wrappers
-
-You can define a function to wrap every call. As its first argument, the wrapper will receive the `__fn__` argument which is the function picked by the multiple dispatch algorithm.
-
-If the function is bootstrapped, `__fn__` goes **before** `self`.
-
-```python
-@ovld.wrapper
-def inc(__fn__, x):
-    print(f"x={x}")
-    return __fn__(x)
-
-@ovld
-def inc(x: int):
-    return x + 1
-
-@ovld
-def inc(x: str):
-    return x + "s"
-
-@ovld
-def inc(xs: list):
-    return [inc(x) for x in xs]
-
-print(inc([1, 2, 3]))
-```
-
-You can use the wrapper to implement e.g. memoization. -->
-
 ## Postprocess
 
 `@ovld`, `@ovld.dispatch`, etc. take a `postprocess` argument which should be a function of one argument. That function will be called with the result of the call and must return the final result of the call.
