@@ -2,6 +2,7 @@ from ovld import ovld, ovld_dispatch
 
 _ovld_exc = None
 try:
+
     @ovld
     def pluralize(x: int):
         return x + 1
@@ -10,12 +11,14 @@ try:
     def pluralize(x: str):
         return x + "s"
 
+
 except Exception as exc:
     _ovld_exc = exc
 
 
 _ovld_dispatch_exc = None
 try:
+
     @ovld_dispatch
     def roesti(self, x):
         return self.resolve(x, x)(x, x)
@@ -31,6 +34,7 @@ try:
     @ovld
     def roesti(self, xs: list, _):
         return [self(x) for x in xs]
+
 
 except Exception as exc:
     _ovld_dispatch_exc = exc

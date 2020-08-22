@@ -1,5 +1,5 @@
-
 import pytest
+import sys
 
 from ovld import Ovld, OvldMC
 from ovld.utils import MISSING
@@ -63,6 +63,7 @@ def test_lock():
     f(1234)
 
     with pytest.raises(Exception):
+
         @o.register  # noqa: F811
         def f(x: float):
             return "float"
@@ -173,6 +174,10 @@ def test_typetuple_override():
     assert f(1.0) == "if"
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 7),
+    reason="subclasscheck on Iterable seems to require python3.7 or higher",
+)
 def test_abstract_types():
     from collections.abc import Iterable
 
@@ -281,6 +286,7 @@ def test_bootstrap():
         return x + 1
 
     with pytest.raises(TypeError):
+
         @f.register
         def f(x: object):
             return "missing self!"

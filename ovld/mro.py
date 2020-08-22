@@ -2,10 +2,6 @@
 # functools.singledispatch)
 # https://github.com/python/cpython/blob/3.8/Lib/functools.py
 
-################################################################################
-### singledispatch() - single-dispatch generic function decorator
-################################################################################
-
 # We do not cover the functions because they are part of Python's stdlib and we
 # assume they have already been properly tested.
 
@@ -89,6 +85,7 @@ def compose_mro(cls, types):  # pragma: no cover
     the *types* iterable. Uses a modified C3 linearization algorithm.
     """
     bases = set(cls.__mro__)
+
     # Remove entries which are already present in the __mro__ or unrelated.
     def is_related(typ):
         return (
@@ -98,6 +95,7 @@ def compose_mro(cls, types):  # pragma: no cover
         )
 
     types = [n for n in types if is_related(n)]
+
     # Remove entries which are strict bases of other entries (they will end up
     # in the MRO anyway.
     def is_strict_base(typ):
