@@ -491,6 +491,9 @@ class _OvldCall:
     def resolve(self, *args):
         return self[tuple(map(type, args))]
 
+    def with_state(self, state):
+        return type(self)(self.map, state, BOOTSTRAP)
+
 
 def Ovld(*args, **kwargs):
     return _fresh(_Ovld)(*args, **kwargs)

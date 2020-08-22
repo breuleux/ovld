@@ -414,6 +414,22 @@ def test_stateful():
     assert h((None, (None, None))) == (200, (400, 500))
 
 
+def test_with_state():
+
+    f = Ovld(initial_state=lambda: 0)
+
+    @f.register
+    def f(self, x):
+        return self.state
+
+    @f.register
+    def f(self, xs: (list, tuple)):
+        self2 = self.with_state(self.state + 1)
+        return type(xs)(self2(x) for x in xs)
+
+    assert f((0, 0, [[[0]], 0])) == (1, 1, [[[4]], 2])
+
+
 def test_method():
     class Greatifier:
         def __init__(self, n):
