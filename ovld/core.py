@@ -224,9 +224,6 @@ class _Ovld:
     function should annotate the same parameter.
 
     Arguments:
-        bootstrap: Whether to bind the first argument to the OvldCall
-            object. Forced to True if initial_state or postprocess is not
-            None.
         dispatch: A function to use as the entry point. It must find the
             function to dispatch to and call it.
         initial_state: A function returning the initial state, or None if
@@ -235,6 +232,8 @@ class _Ovld:
             after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
+        type_error: The error type to raise when no function can be found to
+            dispatch to (default: TypeError).
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
@@ -243,11 +242,12 @@ class _Ovld:
     def __init__(
         self,
         *,
-        bootstrap=None,
         dispatch=None,
         initial_state=None,
         postprocess=None,
+        type_error=TypeError,
         mixins=[],
+        bootstrap=None,
         name=None,
     ):
         """Initialize an Ovld."""
@@ -255,6 +255,7 @@ class _Ovld:
         self._dispatch = dispatch
         self.state = None
         self.maindoc = None
+        self.type_error = type_error
         self.initial_state = initial_state
         self.postprocess = postprocess
         self.bootstrap_class = OvldCall
@@ -290,14 +291,14 @@ class _Ovld:
     def _key_error(self, key, possibilities):
         typenames = self._sig_string(key)
         if not possibilities:
-            raise TypeError(
+            raise self.type_error(
                 f"No method in {self} for argument types [{typenames}]"
             )
         else:
             hlp = ""
             for p in possibilities:
                 hlp += f"* {p.__name__}\n"
-            raise TypeError(
+            raise self.type_error(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
                 "Candidates are:\n" + hlp
@@ -534,26 +535,20 @@ class OvldMC(type):
         return ovld_cls_dict()
 
 
-def _find_overload(fn, bootstrap, initial_state, postprocess):
+def _find_overload(fn, **kwargs):
     mod = __import__(fn.__module__, fromlist="_")
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = _fresh(_Ovld)(
-            bootstrap=bootstrap,
-            initial_state=initial_state,
-            postprocess=postprocess,
-        )
-    else:  # pragma: no cover
-        assert bootstrap is None
-        assert initial_state is None
-        assert postprocess is None
+        dispatch = _fresh(_Ovld)(**kwargs)
+    elif kwargs:  # pragma: no cover
+        raise TypeError("Cannot configure an overload that already exists")
     if not isinstance(dispatch, _Ovld):  # pragma: no cover
         raise TypeError("@ovld requires Ovld instance")
     return dispatch
 
 
 @keyword_decorator
-def ovld(fn, *, bootstrap=None, initial_state=None, postprocess=None):
+def ovld(fn, **kwargs):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -567,23 +562,26 @@ def ovld(fn, *, bootstrap=None, initial_state=None, postprocess=None):
 
     Arguments:
         fn: The function to register.
-        bootstrap: Whether to bootstrap this function so that it receives
-            itself as its first argument. Useful for recursive functions.
-        initial_state: A function with no arguments that returns the initial
-            state for top level calls to the overloaded function, or None
-            if there is no initial state.
-        postprocess: A function to transform the result. Not called on the
-            results of recursive calls.
-
+        dispatch: A function to use as the entry point. It must find the
+            function to dispatch to and call it.
+        initial_state: A function returning the initial state, or None if
+            there is no state.
+        postprocess: A function to call on the return value. It is not called
+            after recursive calls.
+        mixins: A list of Ovld instances that contribute functions to this
+            Ovld.
+        type_error: The error type to raise when no function can be found to
+            dispatch to (default: TypeError).
+        name: Optional name for the Ovld. If not provided, it will be
+            gotten automatically from the first registered function or
+            dispatch.
     """
-    dispatch = _find_overload(fn, bootstrap, initial_state, postprocess)
+    dispatch = _find_overload(fn, **kwargs)
     return dispatch.register(fn)
 
 
 @keyword_decorator
-def ovld_dispatch(
-    dispatch, *, bootstrap=None, initial_state=None, postprocess=None
-):
+def ovld_dispatch(dispatch, **kwargs):
     """Overload a function using the decorated function as a dispatcher.
 
     The dispatch is the entry point for the function and receives a `self`
@@ -591,18 +589,25 @@ def ovld_dispatch(
     It may call `self.resolve(arg1, arg2, ...)` to get the right method to
     call.
 
-    Arguments:
-        dispatch: Function to use for dispatching.
-        bootstrap: Whether to bootstrap this function so that it receives
-            itself as its first argument. Useful for recursive functions.
-        initial_state: A function with no arguments that returns the initial
-            state for top level calls to the overloaded function, or None
-            if there is no initial state.
-        postprocess: A function to transform the result. Not called on the
-            results of recursive calls.
+    The decorator optionally takes keyword arguments, *only* on the first
+    use.
 
+    Arguments:
+        dispatch: The function to use as the entry point. It must find the
+            function to dispatch to and call it.
+        initial_state: A function returning the initial state, or None if
+            there is no state.
+        postprocess: A function to call on the return value. It is not called
+            after recursive calls.
+        mixins: A list of Ovld instances that contribute functions to this
+            Ovld.
+        type_error: The error type to raise when no function can be found to
+            dispatch to (default: TypeError).
+        name: Optional name for the Ovld. If not provided, it will be
+            gotten automatically from the first registered function or
+            dispatch.
     """
-    ov = _find_overload(dispatch, bootstrap, initial_state, postprocess)
+    ov = _find_overload(dispatch, **kwargs)
     return ov.dispatch(dispatch)
 
 

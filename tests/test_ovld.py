@@ -495,6 +495,17 @@ def test_metaclass():
         assert Greatifier.perform(g, "cheese") == "cheesess"
 
 
+def test_error():
+    o = Ovld(type_error=FileNotFoundError)
+
+    @o.register
+    def f(x: int, y: int):
+        return x + y
+
+    with pytest.raises(FileNotFoundError):
+        o("hello")
+
+
 def test_repr():
 
     humptydumpty = Ovld()
