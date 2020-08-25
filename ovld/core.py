@@ -311,15 +311,17 @@ class _Ovld:
         def modelB(self, *args, **kwargs):  # pragma: no cover
             pass
 
-        doc = f"{self.maindoc}\n\n" if self.maindoc else ""
+        doc = f"{self.maindoc}\n" if self.maindoc else ""
         for key, fn in self.defns.items():
             fndef = inspect.signature(fn)
             fdoc = fn.__doc__
             if not fdoc or fdoc == self.maindoc:
-                doc += f"{self.__name__}{fndef}\n\n"
+                doc += f"    ``{self.__name__}{fndef}``\n\n"
             else:
-                fdoc = textwrap.indent(fdoc, "    ")
-                doc += f"{self.__name__}{fndef}\n{fdoc}\n\n"
+                if not fdoc.strip(" ").endswith("\n"):
+                    fdoc += "\n"
+                fdoc = textwrap.indent(fdoc, " " * 8)
+                doc += f"    ``{self.__name__}{fndef}``\n{fdoc}\n"
         self.__doc__ = doc
         if self.bootstrap:
             self.__signature__ = inspect.signature(modelB)
@@ -339,6 +341,8 @@ class _Ovld:
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
             self.maindoc = fn.__doc__
+            if self.maindoc and not self.maindoc.strip(" ").endswith("\n"):
+                self.maindoc += "\n"
             self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
