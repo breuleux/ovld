@@ -251,7 +251,7 @@ class _Ovld:
         name=None,
     ):
         """Initialize an Ovld."""
-        self._locked = False
+        self._compiled = False
         self._dispatch = dispatch
         self.state = None
         self.maindoc = None
@@ -270,7 +270,6 @@ class _Ovld:
         self.name = name
         self.__name__ = name
         self.defns = {}
-        self.map = MultiTypeMap(key_error=self._key_error)
         for mixin in mixins:
             if mixin.bootstrap is not None:
                 self.bootstrap = mixin.bootstrap
@@ -355,7 +354,8 @@ class _Ovld:
 
     def compile(self):
         """Finalize this overload."""
-        self._locked = True
+        self._compiled = True
+        self.map = MultiTypeMap(key_error=self._key_error)
 
         cls = type(self)
         if self.name is None:
@@ -402,11 +402,6 @@ class _Ovld:
 
     def register(self, fn):
         """Register a function."""
-        if self._locked:
-            raise Exception(
-                f"{self} is locked. No more methods can be defined."
-            )
-
         self._set_attrs_from(fn)
 
         ann = fn.__annotations__
@@ -437,6 +432,8 @@ class _Ovld:
             self.defns[tuple(tl), req_pos, max_pos, bool(argspec.varargs)] = fn
 
         self._make_signature()
+        if self._compiled:
+            self.compile()
         return self
 
     def copy(

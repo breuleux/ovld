@@ -5,6 +5,8 @@ import pytest
 from ovld import Ovld, OvldCall, OvldMC
 from ovld.utils import MISSING
 
+from .test_typemap import Animal, Bird, Mammal
+
 
 def test_Ovld():
     o = Ovld()
@@ -52,22 +54,6 @@ def test_nargs():
     assert f(0) == 1
     assert f(0, 0) == 2
     assert f(0, 0, 0) == 3
-
-
-def test_lock():
-    o = Ovld()
-
-    @o.register
-    def f(x: int):
-        return "int"
-
-    f(1234)
-
-    with pytest.raises(Exception):
-
-        @o.register  # noqa: F811
-        def f(x: float):
-            return "float"
 
 
 def test_getitem():
@@ -132,6 +118,46 @@ def test_multimethod():
     with pytest.raises(TypeError):
         # Ambiguous
         f(1, 2)
+
+    @o.register
+    def f(x: int, y: int):
+        return "ii"
+
+    assert f(1, 2) == "ii"
+
+
+def test_redefine():
+    o = Ovld()
+
+    @o.register
+    def f(x: int):
+        return x + x
+
+    assert f(10) == 20
+
+    @o.register
+    def f(x: int):
+        return x * x
+
+    assert f(10) == 100
+
+
+def test_redefine_2():
+    o = Ovld()
+
+    @o.register
+    def f(x: Animal):
+        return "animal"
+
+    assert f(Bird()) == "animal"
+    assert f(Mammal()) == "animal"
+
+    @o.register
+    def f(x: Mammal):
+        return "mammal"
+
+    assert f(Bird()) == "animal"
+    assert f(Mammal()) == "mammal"
 
 
 def test_typetuple():
