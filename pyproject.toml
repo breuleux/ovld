@@ -4,6 +4,9 @@ version = "0.1.8"
 description = "Overloading Python functions"
 authors = ["Olivier Breuleux <breuleux@gmail.com>"]
 license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/breuleux/ovld"
+repository = "https://github.com/breuleux/ovld"
 
 [tool.poetry.dependencies]
 python = "^3.6"
