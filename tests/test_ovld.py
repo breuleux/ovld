@@ -334,7 +334,7 @@ def test_bootstrap():
     # The new method in g is used
     assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
 
-    @f.variant(postprocess=lambda x: {"result": x})
+    @f.variant(postprocess=lambda self, x: {"result": x})
     def h(self, x: object):
         return "C"
 

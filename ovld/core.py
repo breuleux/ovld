@@ -182,7 +182,7 @@ class _PremadeGeneric:
         ovc = self.__get__(BOOTSTRAP, None)
         res = ovc(*args, **kwargs)
         if self.postprocess:
-            res = self.postprocess(res)
+            res = self.postprocess(self, res)
         return res
 
 
