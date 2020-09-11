@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ovld"
-version = "0.1.8"
+version = "0.1.9"
 description = "Overloading Python functions"
 authors = ["Olivier Breuleux <breuleux@gmail.com>"]
 license = "MIT"
