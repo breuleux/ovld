@@ -160,6 +160,35 @@ def test_redefine_2():
     assert f(Mammal()) == "mammal"
 
 
+def test_redefine_parent():
+    o = Ovld(bootstrap=False)
+    o2 = o.copy()
+
+    @o.register
+    def f(x: Animal):
+        return "animal"
+
+    @o2.register
+    def f2(x: Bird):
+        return "a bird"
+
+    assert f(Bird()) == "animal"
+    assert f(Mammal()) == "animal"
+
+    @o.register
+    def f(x: Mammal):
+        return "mammal"
+
+    assert f2(Bird()) == "a bird"
+    assert f2(Mammal()) == "mammal"
+
+    with pytest.raises(Exception):
+
+        @o.register
+        def f(x: Bird):
+            return "b bird"
+
+
 def test_typetuple():
     o = Ovld()
 

@@ -269,14 +269,27 @@ class _Ovld:
             self.bootstrap = bootstrap
         self.name = name
         self.__name__ = name
-        self.defns = {}
+        self._defns = {}
+        self._locked = False
+        self.mixins = mixins
         for mixin in mixins:
-            if mixin.bootstrap is not None:
+            assert mixin.bootstrap is not None
+            if self.bootstrap is None:
                 self.bootstrap = mixin.bootstrap
             assert mixin.bootstrap is self.bootstrap
-            self.defns.update(mixin.defns)
         self.ocls = _fresh(self.bootstrap_class)
         self._make_signature()
+
+    @property
+    def defns(self):
+        defns = {}
+        for mixin in self.mixins:
+            defns.update(mixin.defns)
+        defns.update(self._defns)
+        return defns
+
+    def lock(self):
+        self._locked = True
 
     def _sig_string(self, type_tuple):
         def clsname(cls):
@@ -354,6 +367,8 @@ class _Ovld:
 
     def compile(self):
         """Finalize this overload."""
+        for mixin in self.mixins:
+            mixin.lock()
         self._compiled = True
         self.map = MultiTypeMap(key_error=self._key_error)
 
@@ -402,6 +417,9 @@ class _Ovld:
 
     def register(self, fn):
         """Register a function."""
+        if self._locked:
+            raise Exception(f"ovld {self} is locked for modifications")
+
         self._set_attrs_from(fn)
 
         ann = fn.__annotations__
@@ -429,7 +447,7 @@ class _Ovld:
             t if isinstance(t, tuple) else (t,) for t in typelist
         )
         for tl in itertools.product(*typelist_tups):
-            self.defns[tuple(tl), req_pos, max_pos, bool(argspec.varargs)] = fn
+            self._defns[tuple(tl), req_pos, max_pos, bool(argspec.varargs)] = fn
 
         self._make_signature()
         if self._compiled:
