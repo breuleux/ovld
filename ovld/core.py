@@ -159,16 +159,19 @@ def _setattrs(fn, **kwargs):
 
 
 class _PremadeGeneric:
+    def instantiate(self, **state):
+        return self.ocls(map=self.map, state=state, bind_to=BOOTSTRAP)
+
     def __get__(self, obj, cls):
         if obj is None:
             raise TypeError(
                 f"Cannot get class method: {cls.__name__}::{self.__name__}"
             )
-        return self.ocls(
-            map=self.map,
-            state=self.initial_state() if self.initial_state else None,
-            bind_to=obj,
-        )
+        if self.initial_state is None or isinstance(self.initial_state, dict):
+            state = self.initial_state
+        else:
+            state = self.initial_state()
+        return self.ocls(map=self.map, state=state, bind_to=obj)
 
     def __getitem__(self, t):
         if not isinstance(t, tuple):
@@ -253,7 +256,6 @@ class _Ovld:
         """Initialize an Ovld."""
         self._compiled = False
         self._dispatch = dispatch
-        self.state = None
         self.maindoc = None
         self.type_error = type_error
         self.initial_state = initial_state
@@ -381,7 +383,7 @@ class _Ovld:
         # Replace functions by premade versions that are specialized to the
         # pattern of bootstrap
         model = _premades[self.bootstrap]
-        for method in ("__get__", "__getitem__", "__call__"):
+        for method in ("__get__", "__getitem__", "__call__", "instantiate"):
             setattr(cls, method, self._maybe_rename(getattr(model, method)))
         self.ocls.__call__ = self._maybe_rename(model.__subcall__)
         if self._dispatch:
@@ -490,6 +492,7 @@ class _Ovld:
             ov.register(fn)
             return ov
 
+    instantiate = _compile_first("instantiate")
     __get__ = _compile_first("__get__")
     __getitem__ = _compile_first("__getitem__")
     __call__ = _compile_first("__call__")
@@ -504,7 +507,8 @@ class OvldCall:
     def __init__(self, map, state, bind_to):
         """Initialize an OvldCall."""
         self.map = map
-        self.state = state
+        if state is not None:
+            self.__dict__.update(state)
         self.bind_to = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
@@ -515,7 +519,7 @@ class OvldCall:
     def resolve(self, *args):
         return self[tuple(map(type, args))]
 
-    def with_state(self, state):
+    def with_state(self, **state):
         return type(self)(self.map, state, BOOTSTRAP)
 
 

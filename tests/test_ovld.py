@@ -451,7 +451,7 @@ def test_Ovld_dispatch_bootstrap():
 
 def test_stateful():
 
-    f = Ovld(initial_state=lambda: -1)
+    f = Ovld(initial_state=lambda: {"state": -1})
 
     @f.dispatch
     def f(self, x):
@@ -479,7 +479,7 @@ def test_stateful():
     assert g((None, (None, None))) == (10, (30, 40))
     assert g((None, (None, None))) == (10, (30, 40))
 
-    @f.variant(initial_state=lambda: 0)
+    @f.variant(initial_state=lambda: {"state": 0})
     def h(self, x: type(None)):
         return self.state * 100
 
@@ -490,7 +490,7 @@ def test_stateful():
 
 def test_with_state():
 
-    f = Ovld(initial_state=lambda: 0)
+    f = Ovld(initial_state=lambda: {"state": 0})
 
     @f.register
     def f(self, x):
@@ -498,10 +498,29 @@ def test_with_state():
 
     @f.register
     def f(self, xs: (list, tuple)):
-        self2 = self.with_state(self.state + 1)
+        self2 = self.with_state(state=self.state + 1)
         return type(xs)(self2(x) for x in xs)
 
     assert f((0, 0, [[[0]], 0])) == (1, 1, [[[4]], 2])
+
+
+def test_instantiate():
+    f = Ovld()
+
+    @f.register
+    def f(self, x):
+        return self.state
+
+    @f.register
+    def f(self, xs: (list, tuple)):
+        self2 = self.with_state(state=self.state + 1)
+        return type(xs)(self2(x) for x in xs)
+
+    ff = f.instantiate(state=0)
+    assert ff((0, 0, [[[0]], 0])) == (1, 1, [[[4]], 2])
+
+    ff = f.instantiate(state=1)
+    assert ff((0, 0, [[[0]], 0])) == (2, 2, [[[5]], 3])
 
 
 def test_method():
