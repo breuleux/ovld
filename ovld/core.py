@@ -164,9 +164,7 @@ class _PremadeGeneric:
 
     def __get__(self, obj, cls):
         if obj is None:
-            raise TypeError(
-                f"Cannot get class method: {cls.__name__}::{self.__name__}"
-            )
+            return self
         if self.initial_state is None or isinstance(self.initial_state, dict):
             state = self.initial_state
         else:
@@ -457,7 +455,7 @@ class _Ovld:
         return self
 
     def copy(
-        self, dispatch=MISSING, initial_state=None, postprocess=None,
+        self, dispatch=MISSING, initial_state=None, postprocess=None, mixins=[]
     ):
         """Create a copy of this Ovld.
 
@@ -467,7 +465,7 @@ class _Ovld:
         return _fresh(_Ovld)(
             bootstrap=self.bootstrap,
             dispatch=self._dispatch if dispatch is MISSING else dispatch,
-            mixins=[self],
+            mixins=[self, *mixins],
             initial_state=initial_state or self.initial_state,
             postprocess=postprocess or self.postprocess,
         )
@@ -479,13 +477,14 @@ class _Ovld:
         dispatch=MISSING,
         initial_state=None,
         postprocess=None,
+        mixins=[],
     ):
         """Decorator to create a variant of this Ovld.
 
         New functions can be registered to the variant without affecting the
         original.
         """
-        ov = self.copy(dispatch, initial_state, postprocess)
+        ov = self.copy(dispatch, initial_state, postprocess, mixins)
         if fn is None:
             return ov.register
         else:
@@ -535,7 +534,7 @@ class ovld_cls_dict(dict):
     """
 
     def __setitem__(self, attr, value):
-        if attr in self:
+        if attr in self and inspect.isfunction(value):
             prev = self[attr]
             if isinstance(prev, _Ovld):
                 o = prev
@@ -554,8 +553,29 @@ class OvldMC(type):
     the same name and different type signatures.
     """
 
-    def __prepare__(self, cls):
-        return ovld_cls_dict()
+    discards = {"__init__", "__init_subclass__", "__dict__"}
+
+    @classmethod
+    def __prepare__(cls, name, bases):
+        d = ovld_cls_dict()
+
+        names = set()
+        for base in bases:
+            names.update(dir(base))
+
+        names.difference_update(cls.discards)
+
+        for name in names:
+            values = [getattr(base, name, None) for base in bases]
+            mixins = [v for v in values if isinstance(v, _Ovld)]
+            rest = [v for v in values if not isinstance(v, _Ovld)]
+            if mixins:
+                o = mixins[0].copy(mixins=mixins[1:])
+                d[name] = o
+            for x in rest:
+                d[name] = x
+
+        return d
 
 
 def _find_overload(fn, **kwargs):

@@ -569,6 +569,62 @@ def test_metaclass():
         assert Greatifier.perform(g, "cheese") == "cheesess"
 
 
+def test_metaclass_inherit():
+    class Greatifier(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+        def perform(self, x: int):
+            return x + self.n
+
+    class Greatestifier(Greatifier):
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+        def perform(self, x: object):
+            return x
+
+    g = Greatifier(2)
+    assert g.perform(7) == 9
+    with pytest.raises(TypeError):
+        g.perform("cheese")
+
+    gg = Greatestifier(2)
+    assert gg.perform(7) == 9
+    assert gg.perform("cheese") == "cheesess"
+
+
+def test_metaclass_multiple_inherit():
+    class One(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+    class Two(One):
+        def perform(self, x: int):
+            return x + self.n
+
+        def perform(self, x: float):
+            return x * self.n
+
+    class Three(One):
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+    class Four(Two, Three):
+        pass
+
+    g = Four(2)
+    assert g.perform(7) == 9
+    assert g.perform(7.0) == 14
+    assert g.perform("cheese") == "cheesess"
+
+    with pytest.raises(TypeError):
+        Two(2).perform("cheese")
+
+    with pytest.raises(TypeError):
+        Three(2).perform(7)
+
+
 def test_error():
     o = Ovld(type_error=FileNotFoundError)
 
