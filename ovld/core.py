@@ -204,7 +204,7 @@ class _(_PremadeGeneric):
     def __subcall__(self, *args, **kwargs):
         key = tuple(map(type, args))
         method = self.map[key]
-        return method(self.bind_to, *args, **kwargs)
+        return method(self.obj, *args, **kwargs)
 
 
 def _compile_first(name):
@@ -516,12 +516,12 @@ class OvldCall:
         self.map = map
         if state is not None:
             self.__dict__.update(state)
-        self.bind_to = self if bind_to is BOOTSTRAP else bind_to
+        self.obj = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
         if not isinstance(t, tuple):
             t = (t,)
-        return self.map[t].__get__(self.bind_to)
+        return self.map[t].__get__(self.obj)
 
     def resolve(self, *args):
         return self[tuple(map(type, args))]
