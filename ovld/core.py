@@ -271,12 +271,8 @@ class _Ovld:
         self.__name__ = name
         self._defns = {}
         self._locked = False
-        self.mixins = mixins
-        for mixin in mixins:
-            assert mixin.bootstrap is not None
-            if self.bootstrap is None:
-                self.bootstrap = mixin.bootstrap
-            assert mixin.bootstrap is self.bootstrap
+        self.mixins = []
+        self.add_mixins(*mixins)
         self.ocls = _fresh(self.bootstrap_class)
         self._make_signature()
 
@@ -290,6 +286,19 @@ class _Ovld:
 
     def lock(self):
         self._locked = True
+
+    def _attempt_modify(self):
+        if self._locked:
+            raise Exception(f"ovld {self} is locked for modifications")
+
+    def add_mixins(self, *mixins):
+        self._attempt_modify()
+        for mixin in mixins:
+            assert mixin.bootstrap is not None
+            if self.bootstrap is None:
+                self.bootstrap = mixin.bootstrap
+            assert mixin.bootstrap is self.bootstrap
+        self.mixins += mixins
 
     def _sig_string(self, type_tuple):
         def clsname(cls):
@@ -417,8 +426,7 @@ class _Ovld:
 
     def register(self, fn):
         """Register a function."""
-        if self._locked:
-            raise Exception(f"ovld {self} is locked for modifications")
+        self._attempt_modify()
 
         self._set_attrs_from(fn)
 
@@ -534,15 +542,22 @@ class ovld_cls_dict(dict):
     """
 
     def __setitem__(self, attr, value):
-        if attr in self and inspect.isfunction(value):
+        if attr in self:
             prev = self[attr]
-            if isinstance(prev, _Ovld):
-                o = prev
-            else:
-                o = Ovld()
-                o.register(self[attr])
-            o.register(value)
-            value = o
+            if inspect.isfunction(value):
+                if isinstance(prev, _Ovld):
+                    o = prev
+                else:
+                    o = Ovld()
+                    o.register(self[attr])
+                o.register(value)
+                value = o
+            elif isinstance(value, _Ovld):
+                if isinstance(prev, _Ovld):
+                    value.add_mixins(prev)
+                elif inspect.isfunction(prev):
+                    value.register(prev)
+
         super().__setitem__(attr, value)
 
 

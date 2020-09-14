@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from ovld import Ovld, OvldCall, OvldMC
+from ovld import Ovld, OvldCall, OvldMC, ovld
 from ovld.utils import MISSING
 
 from .test_typemap import Animal, Bird, Mammal
@@ -623,6 +623,33 @@ def test_metaclass_multiple_inherit():
 
     with pytest.raises(TypeError):
         Three(2).perform(7)
+
+
+def test_metaclass_dispatch():
+    class One(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+        @ovld.dispatch
+        def perform(ovld_call, x):
+            return ovld_call.resolve(x)(x)
+
+        def perform(self, x: int):
+            return x + self.n
+
+        def perform(self, xs: list):
+            return [self.perform(x) for x in xs]
+
+    x = One(1)
+    assert x.perform([1, 2, 3]) == [2, 3, 4]
+
+    class Two(One):
+        @ovld.dispatch
+        def perform(ovld_call, x):
+            return ovld_call.resolve(x)(x) * 2
+
+    x2 = Two(1)
+    assert x2.perform([1, 2, 3]) == [4, 6, 8, 4, 6, 8]
 
 
 def test_error():
