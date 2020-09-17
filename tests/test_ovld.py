@@ -683,3 +683,15 @@ def test_repr():
 
 def test_repr_misc():
     assert repr(MISSING) == "MISSING"
+
+
+def test_bizarre_bug():
+    # Don't ask
+
+    class A:
+        pass
+
+    class B(A, metaclass=OvldMC):
+        pass
+
+    assert not isinstance(B(), type)

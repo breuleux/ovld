@@ -568,7 +568,28 @@ class OvldMC(type):
     the same name and different type signatures.
     """
 
-    discards = {"__init__", "__init_subclass__", "__dict__"}
+    discards = {
+        "__doc__",
+        "__sizeof__",
+        "__str__",
+        "__dir__",
+        "__init_subclass__",
+        "__getattribute__",
+        "__reduce__",
+        "__class__",
+        "__subclasshook__",
+        "__repr__",
+        "__dict__",
+        "__format__",
+        "__reduce_ex__",
+        "__setattr__",
+        "__weakref__",
+        "__init__",
+        "__delattr__",
+        "__module__",
+        "__new__",
+        "__hash__",
+    }
 
     @classmethod
     def __prepare__(cls, name, bases):
