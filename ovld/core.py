@@ -194,14 +194,6 @@ def _fresh(t):
     return type(t.__name__, (t,), {})
 
 
-_premades = {}
-
-
-@keyword_decorator
-def _premade(kls, bind):
-    _premades[bind] = kls
-
-
 @keyword_decorator
 def _setattrs(fn, **kwargs):
     for k, v in kwargs.items():
@@ -209,62 +201,22 @@ def _setattrs(fn, **kwargs):
     return fn
 
 
-class _PremadeGeneric:
-    def instantiate(self, **state):
-        return self.ocls(map=self.map, state=state, bind_to=BOOTSTRAP)
-
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self
-        if self.initial_state is None or isinstance(self.initial_state, dict):
-            state = self.initial_state
-        else:
-            state = self.initial_state()
-        return self.ocls(map=self.map, state=state, bind_to=obj)
-
-    def __getitem__(self, t):
-        if not isinstance(t, tuple):
-            t = (t,)
-        assert not self.bootstrap
-        return self.map[t]
-
-    @_setattrs(rename="entry")
-    def __call__(self, *args, **kwargs):
-        """Call the overloaded function."""
-        ovc = self.__get__(BOOTSTRAP, None)
-        res = ovc(*args, **kwargs)
-        if self.postprocess:
-            res = self.postprocess(self, res)
-        return res
-
-
-@_premade(bind=False)
-class _(_PremadeGeneric):
-    @_setattrs(rename="dispatch")
-    def __call__(self, *args, **kwargs):
-        key = tuple(map(type, args))
-        method = self.map[key]
-        return method(*args, **kwargs)
-
-    __subcall__ = False
-
-
-@_premade(bind=True)
-class _(_PremadeGeneric):
-    @_setattrs(rename="dispatch")
-    def __subcall__(self, *args, **kwargs):
-        key = tuple(map(type, args))
-        method = self.map[key]
-        return method(self.obj, *args, **kwargs)
-
-
-def _compile_first(name):
+@keyword_decorator
+def _compile_first(fn, rename=None):
     def deco(self, *args, **kwargs):
         self.compile()
-        fn = getattr(self, name)
-        assert fn is not deco
-        return fn(*args, **kwargs)
+        method = getattr(self, fn.__name__)
+        assert method is not deco
+        return method(*args, **kwargs)
 
+    def setalt(alt):
+        deco._alt = alt
+        return None
+
+    deco.setalt = setalt
+    deco._replace_by = fn
+    deco._alt = None
+    deco._rename = rename
     return deco
 
 
@@ -384,6 +336,7 @@ class _Ovld:
 
     def _make_signature(self):
         """Make the __doc__ and __signature__."""
+
         def modelA(*args, **kwargs):  # pragma: no cover
             pass
 
@@ -454,14 +407,18 @@ class _Ovld:
 
         name = self.__name__
 
-        # Replace functions by premade versions that are specialized to the
-        # pattern of bootstrap
-        model = _premades[self.bootstrap]
-        for method in ("__get__", "__getitem__", "__call__", "instantiate"):
-            setattr(cls, method, self._maybe_rename(getattr(model, method)))
-        self.ocls.__call__ = self._maybe_rename(model.__subcall__)
+        # Replace the appropriate functions by their final behavior
+        for method in dir(cls):
+            value = getattr(cls, method)
+            repl = getattr(value, "_replace_by", None)
+            if repl:
+                if self.bootstrap and value._alt:
+                    repl = value._alt
+                repl = self._maybe_rename(repl)
+                setattr(cls, method, repl)
+
         if self._dispatch:
-            if model.__subcall__:
+            if self.bootstrap:
                 self.ocls.__call__ = self._dispatch
             else:
                 cls.__call__ = self._dispatch
@@ -567,10 +524,56 @@ class _Ovld:
             ov.register(fn)
             return ov
 
-    instantiate = _compile_first("instantiate")
-    __get__ = _compile_first("__get__")
-    __getitem__ = _compile_first("__getitem__")
-    __call__ = _compile_first("__call__")
+    @_compile_first
+    def instantiate(self, **state):
+        return self.ocls(map=self.map, state=state, bind_to=BOOTSTRAP)
+
+    @_compile_first
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+        if self.initial_state is None or isinstance(self.initial_state, dict):
+            state = self.initial_state
+        else:
+            state = self.initial_state()
+        return self.ocls(map=self.map, state=state, bind_to=obj)
+
+    @_compile_first
+    def __getitem__(self, t):
+        if not isinstance(t, tuple):
+            t = (t,)
+        assert not self.bootstrap
+        return self.map[t]
+
+    @_compile_first
+    @_setattrs(rename="dispatch")
+    def __call__(self, *args, **kwargs):
+        """Call the overloaded function.
+
+        This version of __call__ is used when bootstrap is False.
+
+        If bootstrap is False and a dispatch function is provided, it
+        replaces this function.
+        """
+        key = tuple(map(type, args))
+        method = self.map[key]
+        return method(*args, **kwargs)
+
+    @__call__.setalt
+    @_setattrs(rename="entry")
+    def __ovldcall__(self, *args, **kwargs):
+        """Call the overloaded function.
+
+        This version of __call__ is used when bootstrap is True. It creates an
+        OvldCall instance to contain the state. This function is only called
+        once at the entry point: recursive calls will will be to
+        OvldCall.__call__.
+        """
+        ovc = self.__get__(BOOTSTRAP, None)
+        res = ovc(*args, **kwargs)
+        if self.postprocess:
+            res = self.postprocess(self, res)
+        return res
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
@@ -599,6 +602,15 @@ class OvldCall:
     def with_state(self, **state):
         """Return a new OvldCall using the given state."""
         return type(self)(self.map, state, BOOTSTRAP)
+
+    def __call__(self, *args, **kwargs):
+        """Call this overloaded function.
+
+        If a dispatch function is provided, it replaces this function.
+        """
+        key = tuple(map(type, args))
+        method = self.map[key]
+        return method(self.obj, *args, **kwargs)
 
 
 def Ovld(*args, **kwargs):
