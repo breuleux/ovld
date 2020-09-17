@@ -12,19 +12,35 @@ from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 
 class TypeMap(dict):
+    """Represents a mapping from types to handlers.
+
+    The mro of a type is considered when getting the handler, so setting the
+    [object] key creates a default for all objects.
+
+    typemap[some_type] returns a tuple of a handler and a "level" that
+    represents the distance from the handler to the type `object`. Essentially,
+    the level is the index of the type for which the handler was registered
+    in the mro of `some_type`. So for example, `object` has level 0, a class
+    that inherits directly from `object` has level 1, and so on.
+    """
+
     def __init__(self):
         self.entries = {}
         self.types = set()
 
     def register(self, obj_t, handler):
+        """Register a handler for the given object type."""
         self.clear()
         self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
 
     def __missing__(self, obj_t):
-        """Get the handler for the given type."""
+        """Get the handler for the given type.
 
+        The result is cached so that the normal dict getitem will find it
+        the next time getitem is called.
+        """
         results = {}
         mro = compose_mro(obj_t, self.types)
         for lvl, cls in enumerate(reversed(mro)):
@@ -40,12 +56,42 @@ class TypeMap(dict):
 
 
 class MultiTypeMap(dict):
+    """Represents a mapping from tuples of types to handlers.
+
+    The mro is taken into account to find a match. If multiple registered
+    handlers match the tuple of types that's given, if one of the handlers is
+    more specific than every other handler, that handler is returned.
+    Otherwise, the resolution is considered ambiguous and an error is raised.
+
+    Handler A, registered for types (A1, A2, ..., An), is more specific than
+    handler B, registered for types (B1, B2, ..., Bn), if there exists n such
+    that An is more specific than Bn, and for all n, either An == Bn or An is
+    more specific than Bn. An is more specific than Bn if An is a direct or
+    indirect subclass of Bn.
+
+    In other words, [int, object] is more specific than [object, object] and
+    less specific than [int, int], but it is neither less specific nor more
+    specific than [object, int] (which means there is an ambiguity).
+    """
+
     def __init__(self, key_error=KeyError):
         self.maps = {}
         self.empty = MISSING
         self.key_error = key_error
 
     def register(self, obj_t_tup, nargs, handler):
+        """Register a handler for a tuple of argument types.
+
+        Arguments:
+            obj_t_tup: A tuple of argument types.
+            nargs: A (amin, amax, varargs) tuple where amin is the minimum
+                number of arguments needed to match this tuple (if there are
+                default arguments, it is possible that amin < len(obj_t_tup)),
+                amax is the maximum number of arguments, and varargs is a
+                boolean indicating whether there can be an arbitrary number
+                of arguments.
+            handler: A function to handle the tuple.
+        """
         self.clear()
 
         amin, amax, vararg = nargs
@@ -140,6 +186,11 @@ class MultiTypeMap(dict):
 
 
 def _fresh(t):
+    """Returns a new subclass of type t.
+
+    Each Ovld corresponds to its own class, which allows for specialization of
+    methods.
+    """
     return type(t.__name__, (t,), {})
 
 
@@ -332,6 +383,7 @@ class _Ovld:
         self._make_signature()
 
     def _make_signature(self):
+        """Make the __doc__ and __signature__."""
         def modelA(*args, **kwargs):  # pragma: no cover
             pass
 
@@ -364,6 +416,7 @@ class _Ovld:
             self.__signature__ = inspect.signature(modelA)
 
     def _set_attrs_from(self, fn, dispatch=False):
+        """Inherit relevant attributes from the function."""
         if self.bootstrap is None:
             sign = inspect.signature(fn)
             params = list(sign.parameters.values())
@@ -429,6 +482,7 @@ class _Ovld:
         return self
 
     def resolve(self, *args):
+        """Find the correct method to call for the given arguments."""
         return self.map[tuple(map(type, args))]
 
     def register_signature(self, key, fn):
@@ -533,18 +587,22 @@ class OvldCall:
         self.obj = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
+        """Find the right method to call given a tuple of types."""
         if not isinstance(t, tuple):
             t = (t,)
         return self.map[t].__get__(self.obj)
 
     def resolve(self, *args):
+        """Find the right method to call for the given arguments."""
         return self[tuple(map(type, args))]
 
     def with_state(self, **state):
+        """Return a new OvldCall using the given state."""
         return type(self)(self.map, state, BOOTSTRAP)
 
 
 def Ovld(*args, **kwargs):
+    """Returns an instance of a fresh Ovld class."""
     return _fresh(_Ovld)(*args, **kwargs)
 
 
