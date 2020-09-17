@@ -325,6 +325,12 @@ class _Ovld:
                 "Candidates are:\n" + hlp
             )
 
+    def rename(self, name):
+        """Rename this Ovld."""
+        self.name = name
+        self.__name__ = name
+        self._make_signature()
+
     def _make_signature(self):
         def modelA(*args, **kwargs):  # pragma: no cover
             pass
@@ -332,8 +338,16 @@ class _Ovld:
         def modelB(self, *args, **kwargs):  # pragma: no cover
             pass
 
-        doc = f"{self.maindoc}\n" if self.maindoc else ""
+        seen = set()
+        doc = (
+            f"{self.maindoc}\n"
+            if self.maindoc
+            else f"Ovld with {len(self.defns)} methods.\n\n"
+        )
         for key, fn in self.defns.items():
+            if fn in seen:
+                continue
+            seen.add(fn)
             fndef = inspect.signature(fn)
             fdoc = fn.__doc__
             if not fdoc or fdoc == self.maindoc:
@@ -607,6 +621,7 @@ class OvldMC(type):
             rest = [v for v in values if not isinstance(v, _Ovld)]
             if mixins:
                 o = mixins[0].copy(mixins=mixins[1:])
+                o.rename(name)
                 d[name] = o
             for x in rest:
                 d[name] = x
