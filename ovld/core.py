@@ -634,26 +634,18 @@ def Ovld(*args, **kwargs):
 class ovld_cls_dict(dict):
     """A dict for use with OvldMC.__prepare__.
 
-    Setting the same key more than once creates an Ovld that can dispatch
-    to any of the values.
+    Setting a key that already corresponds to an Olvd extends that Ovld.
     """
 
     def __setitem__(self, attr, value):
         if attr in self:
             prev = self[attr]
-            if inspect.isfunction(value):
-                if isinstance(prev, _Ovld):
-                    o = prev
-                else:
-                    o = Ovld()
-                    o.register(self[attr])
-                o.register(value)
-                value = o
-            elif isinstance(value, _Ovld):
-                if isinstance(prev, _Ovld):
+            if isinstance(prev, _Ovld):
+                if isinstance(value, _Ovld):
                     value.add_mixins(prev)
-                elif inspect.isfunction(prev):
-                    value.register(prev)
+                elif inspect.isfunction(value):
+                    prev.register(value)
+                    value = prev
 
         super().__setitem__(attr, value)
 
@@ -665,29 +657,6 @@ class OvldMC(type):
     the same name and different type signatures.
     """
 
-    discards = {
-        "__doc__",
-        "__sizeof__",
-        "__str__",
-        "__dir__",
-        "__init_subclass__",
-        "__getattribute__",
-        "__reduce__",
-        "__class__",
-        "__subclasshook__",
-        "__repr__",
-        "__dict__",
-        "__format__",
-        "__reduce_ex__",
-        "__setattr__",
-        "__weakref__",
-        "__init__",
-        "__delattr__",
-        "__module__",
-        "__new__",
-        "__hash__",
-    }
-
     @classmethod
     def __prepare__(cls, name, bases):
         d = ovld_cls_dict()
@@ -695,8 +664,6 @@ class OvldMC(type):
         names = set()
         for base in bases:
             names.update(dir(base))
-
-        names.difference_update(cls.discards)
 
         for name in names:
             values = [getattr(base, name, None) for base in bases]
@@ -706,8 +673,6 @@ class OvldMC(type):
                 o = mixins[0].copy(mixins=mixins[1:])
                 o.rename(name)
                 d[name] = o
-            for x in rest:
-                d[name] = x
 
         return d
 

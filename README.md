@@ -137,9 +137,10 @@ Note that intermediate, bootstrapped recursive calls (recursive calls using `sel
 Use the `OvldMC` metaclass to use multiple dispatch on methods. In this case there is no bootstrapping as described above and `self` is simply bound to the class instance.
 
 ```python
-from ovld import OvldMC
+from ovld import OvldMC, ovld
 
 class Cat(metaclass=OvldMC):
+    @ovld
     def interact(self, x: Mouse):
         return "catch"
 

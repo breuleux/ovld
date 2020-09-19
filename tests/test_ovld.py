@@ -551,6 +551,7 @@ def test_metaclass():
         def __init__(self, n):
             self.n = n
 
+        @ovld
         def perform(self, x: int):
             return x + self.n
 
@@ -574,6 +575,7 @@ def test_metaclass_inherit():
         def __init__(self, n):
             self.n = n
 
+        @ovld
         def perform(self, x: int):
             return x + self.n
 
@@ -600,6 +602,7 @@ def test_metaclass_multiple_inherit():
             self.n = n
 
     class Two(One):
+        @ovld
         def perform(self, x: int):
             return x + self.n
 
@@ -607,6 +610,7 @@ def test_metaclass_multiple_inherit():
             return x * self.n
 
     class Three(One):
+        @ovld
         def perform(self, x: str):
             return x + "s" * self.n
 
@@ -630,12 +634,12 @@ def test_metaclass_dispatch():
         def __init__(self, n):
             self.n = n
 
-        def perform(self, x: int):
-            return x + self.n
-
         @ovld.dispatch
         def perform(ovld_call, x):
             return ovld_call.resolve(x)(x)
+
+        def perform(self, x: int):
+            return x + self.n
 
         def perform(self, xs: list):
             return [self.perform(x) for x in xs]
