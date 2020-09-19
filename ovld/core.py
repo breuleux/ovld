@@ -77,6 +77,7 @@ class MultiTypeMap(dict):
     def __init__(self, key_error=KeyError):
         self.maps = {}
         self.empty = MISSING
+        self.transform = type
         self.key_error = key_error
 
     def register(self, obj_t_tup, nargs, handler):
@@ -253,11 +254,13 @@ class _Ovld:
         mixins=[],
         bootstrap=None,
         name=None,
+        mapper=MultiTypeMap,
     ):
         """Initialize an Ovld."""
         self._compiled = False
         self._dispatch = dispatch
         self.maindoc = None
+        self.mapper = mapper
         self.type_error = type_error
         self.initial_state = initial_state
         self.postprocess = postprocess
@@ -307,12 +310,14 @@ class _Ovld:
         def clsname(cls):
             if cls is object:
                 return "*"
-            else:
+            elif hasattr(cls, "__name__"):
                 return cls.__name__
+            else:
+                return repr(cls)
 
         return ", ".join(map(clsname, type_tuple))
 
-    def _key_error(self, key, possibilities):
+    def _key_error(self, key, possibilities=None):
         typenames = self._sig_string(key)
         if not possibilities:
             raise self.type_error(
@@ -407,7 +412,7 @@ class _Ovld:
         for mixin in self.mixins:
             mixin.lock()
         self._compiled = True
-        self.map = MultiTypeMap(key_error=self._key_error)
+        self.map = self.mapper(key_error=self._key_error)
 
         cls = type(self)
         if self.name is None:
@@ -448,7 +453,7 @@ class _Ovld:
 
     def resolve(self, *args):
         """Find the correct method to call for the given arguments."""
-        return self.map[tuple(map(type, args))]
+        return self.map[tuple(map(self.map.transform, args))]
 
     def register_signature(self, key, fn):
         """Register a function for the given signature."""
@@ -563,7 +568,7 @@ class _Ovld:
         If bootstrap is False and a dispatch function is provided, it
         replaces this function.
         """
-        key = tuple(map(type, args))
+        key = tuple(map(self.map.transform, args))
         method = self.map[key]
         return method(*args, **kwargs)
 
@@ -605,7 +610,7 @@ class OvldCall:
 
     def resolve(self, *args):
         """Find the right method to call for the given arguments."""
-        return self[tuple(map(type, args))]
+        return self[tuple(map(self.map.transform, args))]
 
     def with_state(self, **state):
         """Return a new OvldCall using the given state."""
@@ -616,7 +621,7 @@ class OvldCall:
 
         If a dispatch function is provided, it replaces this function.
         """
-        key = tuple(map(type, args))
+        key = tuple(map(self.map.transform, args))
         method = self.map[key]
         return method(self.obj, *args, **kwargs)
 

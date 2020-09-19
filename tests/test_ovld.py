@@ -695,3 +695,35 @@ def test_bizarre_bug():
         pass
 
     assert not isinstance(B(), type)
+
+
+def test_custom_mapper():
+    class StringPrefixMap:
+        def __init__(self, key_error):
+            self.key_error = key_error
+            self.transform = lambda x: x
+            self.members = {}
+
+        def register(self, tup, nargs, handler):
+            (pfx,) = tup
+            self.members[pfx] = handler
+
+        def __getitem__(self, key):
+            (key,) = key
+            for pfx, h in self.members.items():
+                if key.startswith(pfx):
+                    return h
+            raise self.key_error(key)
+
+    @ovld(mapper=StringPrefixMap)
+    def f(x: "A"):
+        return x.lower()
+
+    @f.register
+    def f(x: "Ba"):
+        return x * 2
+
+    assert f("ApplE") == "apple"
+    assert f("Banana") == "BananaBanana"
+    with pytest.raises(TypeError):
+        f("Brains")
