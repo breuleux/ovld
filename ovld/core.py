@@ -395,7 +395,15 @@ class _Ovld:
             return fn
 
     def compile(self):
-        """Finalize this overload."""
+        """Finalize this overload.
+
+        This will populate the type maps and replace the functions decorated
+        with _compile_first (__call__, __get__, etc.) with versions that assume
+        the ovld has been compiled.
+
+        This will also lock this ovld's parent mixins to prevent their
+        modification.
+        """
         for mixin in self.mixins:
             mixin.lock()
         self._compiled = True

@@ -150,6 +150,31 @@ class Cat(metaclass=OvldMC):
         return "destroy"
 ```
 
+Subclasses of `Cat` will inherit the overloaded `interact` and it may define additional overloaded methods which will only be valid for the subclass.
+
+**Note:** It is possible to use `ovld.dispatch` on methods, but in this case be aware that the first argument for the dispatch method will not be the usual `self` but an `OvldCall` object. The `self` can be retrived as `ovldcall.obj`. Here's an example to make it all clear:
+
+```python
+class Stuff(metaclass=OvldMC):
+    def __init__(self, mul):
+        self.mul = mul
+
+    @ovld.dispatch
+    def calc(ovldcall, x):
+        # Wraps every call to self.calc, but we receive ovldcall instead of self
+        # ovldcall[type(x)] returns the right method to call
+        # ovldcall.obj is the self (the actual instance of Stuff)
+        return ovldcall[type(x)](x) * ovldcall.obj.mul
+
+    def calc(self, x: int):
+        return x + 1
+
+    def calc(self, xs: list):
+        return [self.calc(x) for x in xs]
+
+print(Stuff(2).calc([1, 2, 3]))  # [4, 6, 8, 4, 6, 8]
+```
+
 ## Ambiguous calls
 
 The following definitions will cause a TypeError at runtime when called with two ints, because it is unclear which function is the right match:
