@@ -242,6 +242,10 @@ class _Ovld:
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
+        mapper: Class implementing a mapping interface from a tuple of
+            types to a handler (default: MultiTypeMap).
+        linkback: Whether to keep a pointer in the parent mixins to this
+            ovld so that updates can be propagated. (default: False)
     """
 
     def __init__(
@@ -255,12 +259,15 @@ class _Ovld:
         bootstrap=None,
         name=None,
         mapper=MultiTypeMap,
+        linkback=False,
     ):
         """Initialize an Ovld."""
         self._compiled = False
         self._dispatch = dispatch
         self.maindoc = None
         self.mapper = mapper
+        self.linkback = linkback
+        self.children = []
         self.type_error = type_error
         self.initial_state = initial_state
         self.postprocess = postprocess
@@ -300,6 +307,8 @@ class _Ovld:
     def add_mixins(self, *mixins):
         self._attempt_modify()
         for mixin in mixins:
+            if self.linkback:
+                mixin.children.append(self)
             assert mixin.bootstrap is not None
             if self.bootstrap is None:
                 self.bootstrap = mixin.bootstrap
@@ -410,7 +419,8 @@ class _Ovld:
         modification.
         """
         for mixin in self.mixins:
-            mixin.lock()
+            if self not in mixin.children:
+                mixin.lock()
         self._compiled = True
         self.map = self.mapper(key_error=self._key_error)
 
@@ -496,12 +506,22 @@ class _Ovld:
             self._defns[tuple(tl), req_pos, max_pos, bool(argspec.varargs)] = fn
 
         self._make_signature()
-        if self._compiled:
-            self.compile()
+        self._update()
+        for child in self.children:
+            child._update()
         return self
 
+    def _update(self):
+        if self._compiled:
+            self.compile()
+
     def copy(
-        self, dispatch=MISSING, initial_state=None, postprocess=None, mixins=[]
+        self,
+        dispatch=MISSING,
+        initial_state=None,
+        postprocess=None,
+        mixins=[],
+        linkback=False,
     ):
         """Create a copy of this Ovld.
 
@@ -514,23 +534,18 @@ class _Ovld:
             mixins=[self, *mixins],
             initial_state=initial_state or self.initial_state,
             postprocess=postprocess or self.postprocess,
+            linkback=linkback,
         )
 
     def variant(
-        self,
-        fn=None,
-        *,
-        dispatch=MISSING,
-        initial_state=None,
-        postprocess=None,
-        mixins=[],
+        self, fn=None, **kwargs,
     ):
         """Decorator to create a variant of this Ovld.
 
         New functions can be registered to the variant without affecting the
         original.
         """
-        ov = self.copy(dispatch, initial_state, postprocess, mixins)
+        ov = self.copy(**kwargs)
         if fn is None:
             return ov.register
         else:
@@ -668,7 +683,6 @@ class OvldMC(type):
         for name in names:
             values = [getattr(base, name, None) for base in bases]
             mixins = [v for v in values if isinstance(v, _Ovld)]
-            rest = [v for v in values if not isinstance(v, _Ovld)]
             if mixins:
                 o = mixins[0].copy(mixins=mixins[1:])
                 o.rename(name)
@@ -717,6 +731,10 @@ def ovld(fn, **kwargs):
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
+        mapper: Class implementing a mapping interface from a tuple of
+            types to a handler (default: MultiTypeMap).
+        linkback: Whether to keep a pointer in the parent mixins to this
+            ovld so that updates can be propagated. (default: False)
     """
     dispatch = _find_overload(fn, **kwargs)
     return dispatch.register(fn)
@@ -748,6 +766,10 @@ def ovld_dispatch(dispatch, **kwargs):
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
+        mapper: Class implementing a mapping interface from a tuple of
+            types to a handler (default: MultiTypeMap).
+        linkback: Whether to keep a pointer in the parent mixins to this
+            ovld so that updates can be propagated. (default: False)
     """
     ov = _find_overload(dispatch, **kwargs)
     return ov.dispatch(dispatch)

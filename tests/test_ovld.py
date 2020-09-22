@@ -189,6 +189,36 @@ def test_redefine_parent():
             return "b bird"
 
 
+def test_redefine_parent_with_linkback():
+    o = Ovld(bootstrap=False)
+    o2 = o.copy(linkback=True)
+
+    @o.register
+    def f(x: Animal):
+        return "animal"
+
+    @o2.register
+    def f2(x: Bird):
+        return "a bird"
+
+    assert f(Bird()) == "animal"
+    assert f(Mammal()) == "animal"
+
+    @o.register
+    def f(x: Mammal):
+        return "mammal"
+
+    assert f2(Bird()) == "a bird"
+    assert f2(Mammal()) == "mammal"
+
+    @o.register
+    def f(x: Bird):
+        return "b bird"
+
+    assert f(Bird()) == "b bird"
+    assert f2(Bird()) == "a bird"
+
+
 def test_typetuple():
     o = Ovld()
 
