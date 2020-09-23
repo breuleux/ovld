@@ -9,7 +9,6 @@ class Named:
 
     This class can be used to construct objects with a name that will be used
     for the string representation.
-
     """
 
     def __init__(self, name):
@@ -17,7 +16,6 @@ class Named:
 
         Arguments:
             name: The name of this object.
-
         """
         self.name = name
 
@@ -59,6 +57,10 @@ def meta(condition):
     For example, a dataclass is a subclass of `meta(dataclasses.is_dataclass)`,
     and a class which name starts with "X" is a subclass of
     `meta(lambda cls: cls.__name__.startswith("X"))`.
+
+    Arguments:
+        condition: A function that takes a class as an argument and returns
+            True or False depending on whether it matches some condition.
     """
 
     class M(metaclass=_MetaMC):
@@ -78,6 +80,19 @@ def _getcls(ref):
 
 
 def deferred(ref):
+    """Represent a class from an external module without importing it.
+
+    For instance, `deferred("numpy.ndarray")` matches instances of
+    numpy.ndarray, but it does not import numpy. When tested against a
+    class, if the first part of class's `__module__` is `numpy`, then
+    we do get the class and perform a normal issubclass check.
+
+    If the module is already loaded, `deferred` returns the class directly.
+
+    Arguments:
+        ref: A string starting with a module name representing the path
+            to import a class.
+    """
     module, _ = ref.split(".", 1)
     if module in sys.modules:
         return _getcls(ref)

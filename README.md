@@ -202,6 +202,63 @@ def ambig(x: int, y: int):
 
 ## Other features
 
+### meta
+
+To test arbitrary conditions, you can use `meta`:
+
+```python
+from ovld import ovld, meta
+
+@meta
+def StartsWithT(cls):
+    return cls.__name__.startswith("T")
+
+@ovld
+def f(x: StartsWithT):
+    return "T"
+
+assert f(TypeError("xyz")) == "T"
+
+
+# Or: a useful example, since dataclasses have no common superclass:
+
+from dataclasses import dataclass, is_dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+@ovld
+def f(x: meta(is_dataclass)):
+    return "dataclass"
+
+assert f(Point(1, 2)) == "dataclass"
+```
+
+
+### deferred
+
+You may define overloads for certain classes from external packages without
+having to import them:
+
+
+```python
+from ovld import ovld, deferred
+
+@ovld
+def f(x: deferred("numpy.ndarray")):
+    return "ndarray"
+
+# numpy is not imported
+assert "numpy" not in sys.modules
+
+# But once we import it, the ovld works:
+import numpy
+assert f(numpy.arange(10)) == "ndarray"
+```
+
+
 ### Tracebacks
 
 `ovld` automagically renames functions so that the stack trace is more informative:
