@@ -672,10 +672,11 @@ class OvldMC(type):
     the same name and different type signatures.
     """
 
-    @classmethod
-    def new(cls, name, bases):
-        """Create a new class with overloadable methods."""
-        return cls(name, bases, cls.__prepare__(name, bases))
+    def create_subclass(cls, *bases, name=None):
+        """Create a new subclass with the given extra bases."""
+        name = name or "UnnamedOvld"
+        bases = (cls, *bases)
+        return type(cls)(name, bases, cls.__prepare__(name, bases))
 
     @classmethod
     def __prepare__(cls, name, bases):
@@ -690,7 +691,11 @@ class OvldMC(type):
             mixins = [v for v in values if isinstance(v, _Ovld)]
             if mixins:
                 o = mixins[0].copy(mixins=mixins[1:])
-                others = [v for v in values if not isinstance(v, _Ovld)]
+                others = [
+                    v
+                    for v in values
+                    if v is not None and not isinstance(v, _Ovld)
+                ]
                 for other in others:
                     o.register(other)
                 o.rename(name)

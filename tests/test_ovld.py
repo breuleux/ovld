@@ -676,7 +676,7 @@ def test_multiple_inherit_2():
         def perform(self, x: str):
             return x + "s" * self.n
 
-    cls = OvldMC.new("Test", (One, M1, M2))
+    cls = One.create_subclass(M1, M2, name="Test")
 
     g = cls(2)
     assert g.perform(7) == 9
