@@ -659,6 +659,31 @@ def test_metaclass_multiple_inherit():
         Three(2).perform(7)
 
 
+def test_multiple_inherit_2():
+    class One(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+        @ovld
+        def perform(self, x: int):
+            return x + self.n
+
+    class M1:
+        def perform(self, x: float):
+            return x * self.n
+
+    class M2:
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+    cls = OvldMC.new("Test", (One, M1, M2))
+
+    g = cls(2)
+    assert g.perform(7) == 9
+    assert g.perform(7.0) == 14
+    assert g.perform("cheese") == "cheesess"
+
+
 def test_metaclass_dispatch():
     class One(metaclass=OvldMC):
         def __init__(self, n):

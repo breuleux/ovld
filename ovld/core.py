@@ -673,6 +673,11 @@ class OvldMC(type):
     """
 
     @classmethod
+    def new(cls, name, bases):
+        """Create a new class with overloadable methods."""
+        return cls(name, bases, cls.__prepare__(name, bases))
+
+    @classmethod
     def __prepare__(cls, name, bases):
         d = ovld_cls_dict()
 
@@ -685,6 +690,9 @@ class OvldMC(type):
             mixins = [v for v in values if isinstance(v, _Ovld)]
             if mixins:
                 o = mixins[0].copy(mixins=mixins[1:])
+                others = [v for v in values if not isinstance(v, _Ovld)]
+                for other in others:
+                    o.register(other)
                 o.rename(name)
                 d[name] = o
 
