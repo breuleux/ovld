@@ -693,7 +693,7 @@ class OvldMC(type):
 
 def _find_overload(fn, **kwargs):
     mod = __import__(fn.__module__, fromlist="_")
-    dispatch = getattr(mod, fn.__name__, None)
+    dispatch = getattr(mod, fn.__qualname__, None)
     if dispatch is None:
         dispatch = _fresh(_Ovld)(**kwargs)
     elif kwargs:  # pragma: no cover
