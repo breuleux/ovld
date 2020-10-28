@@ -246,6 +246,8 @@ class _Ovld:
             types to a handler (default: MultiTypeMap).
         linkback: Whether to keep a pointer in the parent mixins to this
             ovld so that updates can be propagated. (default: False)
+        allow_replacement: Allow replacing a method by another with the
+            same signature. (default: True)
     """
 
     def __init__(
@@ -260,6 +262,7 @@ class _Ovld:
         name=None,
         mapper=MultiTypeMap,
         linkback=False,
+        allow_replacement=True,
     ):
         """Initialize an Ovld."""
         self._compiled = False
@@ -271,6 +274,7 @@ class _Ovld:
         self.type_error = type_error
         self.initial_state = initial_state
         self.postprocess = postprocess
+        self.allow_replacement = allow_replacement
         self.bootstrap_class = OvldCall
         if self.initial_state or self.postprocess:
             assert bootstrap is not False
@@ -503,7 +507,10 @@ class _Ovld:
             t if isinstance(t, tuple) else (t,) for t in typelist
         )
         for tl in itertools.product(*typelist_tups):
-            self._defns[tuple(tl), req_pos, max_pos, bool(argspec.varargs)] = fn
+            sig = (tuple(tl), req_pos, max_pos, bool(argspec.varargs))
+            if not self.allow_replacement and sig in self._defns:
+                raise TypeError(f"There is already a method for {tl}")
+            self._defns[(*sig,)] = fn
 
         self._make_signature()
         self._update()
