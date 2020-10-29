@@ -119,6 +119,20 @@ def exactly(base_cls):
     return check
 
 
+def strict_subclass(base_cls):
+    """Match subclasses but not the base class."""
+
+    @meta
+    def check(cls):
+        return (
+            isinstance(cls, type)
+            and issubclass(cls, base_cls)
+            and cls is not base_cls
+        )
+
+    return check
+
+
 __all__ = [
     "BOOTSTRAP",
     "MISSING",
@@ -127,4 +141,5 @@ __all__ = [
     "exactly",
     "meta",
     "keyword_decorator",
+    "strict_subclass",
 ]
