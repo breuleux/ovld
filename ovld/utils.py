@@ -109,11 +109,22 @@ def deferred(ref):
     return check
 
 
+def exactly(base_cls):
+    """Match the class but not its subclasses."""
+
+    @meta
+    def check(cls):
+        return cls is base_cls
+
+    return check
+
+
 __all__ = [
     "BOOTSTRAP",
     "MISSING",
     "Named",
     "deferred",
+    "exactly",
     "meta",
     "keyword_decorator",
 ]

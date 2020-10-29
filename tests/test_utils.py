@@ -1,6 +1,6 @@
 import sys
 
-from ovld import deferred, meta, ovld
+from ovld import deferred, exactly, meta, ovld
 
 
 def test_meta():
@@ -71,3 +71,22 @@ def test_deferred():
     assert f(blessed.Terminal()) == "Terminal"
 
     assert "blessed" in sys.modules
+
+
+def test_exactly():
+    class Fruit:
+        pass
+
+    class Apple(Fruit):
+        pass
+
+    @ovld
+    def f(x: exactly(Fruit)):
+        return "yes"
+
+    @f.register
+    def f(x: object):
+        return "no"
+
+    assert f(Fruit()) == "yes"
+    assert f(Apple()) == "no"
