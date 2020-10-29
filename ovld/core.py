@@ -634,6 +634,10 @@ class OvldCall:
         """Find the right method to call for the given arguments."""
         return self[tuple(map(self.map.transform, args))]
 
+    def call(self, *args):
+        """Call the right method for the given arguments."""
+        return self[tuple(map(self.map.transform, args))](*args)
+
     def with_state(self, **state):
         """Return a new OvldCall using the given state."""
         return type(self)(self.map, state, BOOTSTRAP)
