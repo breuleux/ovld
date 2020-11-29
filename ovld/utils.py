@@ -133,12 +133,23 @@ def strict_subclass(base_cls):
     return check
 
 
+def has_attribute(*attrs):
+    """Match classes with the given attributes."""
+
+    @meta
+    def check(cls):
+        return all(hasattr(cls, a) for a in attrs)
+
+    return check
+
+
 __all__ = [
     "BOOTSTRAP",
     "MISSING",
     "Named",
     "deferred",
     "exactly",
+    "has_attribute",
     "meta",
     "keyword_decorator",
     "strict_subclass",

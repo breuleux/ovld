@@ -1,6 +1,6 @@
 import sys
 
-from ovld import deferred, exactly, meta, ovld, strict_subclass
+from ovld import deferred, exactly, has_attribute, meta, ovld, strict_subclass
 
 
 def test_meta():
@@ -109,3 +109,31 @@ def test_strict_subclass():
 
     assert f(Fruit()) == "no"
     assert f(Apple()) == "yes"
+
+
+def test_has_attribute():
+    class Duck:
+        def quack(self):
+            pass
+
+    class SuperDuck:
+        pass
+
+    class Cat:
+        pass
+
+    @ovld
+    def f(x: has_attribute("quack")):
+        return "yes"
+
+    @f.register
+    def f(x: SuperDuck):
+        return "oh boy"
+
+    @f.register
+    def f(x: object):
+        return "no"
+
+    assert f(Cat()) == "no"
+    assert f(Duck()) == "yes"
+    assert f(SuperDuck()) == "oh boy"
