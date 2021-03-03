@@ -560,6 +560,10 @@ class _Ovld:
             return ov
 
     @_compile_first
+    def get_map(self):
+        return self.map
+
+    @_compile_first
     def instantiate(self, **state):
         return self.ocls(map=self.map, state=state, bind_to=BOOTSTRAP)
 
@@ -571,7 +575,12 @@ class _Ovld:
             state = self.initial_state
         else:
             state = self.initial_state()
-        return self.ocls(map=self.map, state=state, bind_to=obj)
+        return self.ocls(
+            map=self.map,
+            state=state,
+            bind_to=obj,
+            super=self.mixins[0] if len(self.mixins) == 1 else None,
+        )
 
     @_compile_first
     def __getitem__(self, t):
@@ -617,9 +626,10 @@ class _Ovld:
 class OvldCall:
     """Context for an Ovld call."""
 
-    def __init__(self, map, state, bind_to):
+    def __init__(self, map, state, bind_to, super=None):
         """Initialize an OvldCall."""
         self.map = map
+        self._parent = super
         if state is not None:
             self.__dict__.update(state)
         self.obj = self if bind_to is BOOTSTRAP else bind_to
@@ -629,6 +639,12 @@ class OvldCall:
         if not isinstance(t, tuple):
             t = (t,)
         return self.map[t].__get__(self.obj)
+
+    def super(self, *args, **kwargs):
+        """Use the parent ovld's method for this call."""
+        pmap = self._parent.get_map()
+        method = pmap[tuple(map(pmap.transform, args))]
+        return method.__get__(self.obj)(*args, **kwargs)
 
     def resolve(self, *args):
         """Find the right method to call for the given arguments."""

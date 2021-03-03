@@ -810,3 +810,29 @@ def test_disallow_replacement():
         @f.register
         def f2(x: int):
             pass
+
+
+def test_super():
+    @ovld
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    @f.register
+    def f(self, x: int):
+        return x * x
+
+    @f.variant
+    def f2(self, x: int):
+        return 0 if x < 0 else self.super(x)
+
+    @f2.variant
+    def f3(self, xs: list):
+        return ["=>", *self.super(xs)]
+
+    @f3.register
+    def f3(self, x: int):
+        return x
+
+    assert f3([-2, -1, 0, 1, 2, 3]) == ["=>", -2, -1, 0, 1, 2, 3]
+    assert f2([-2, -1, 0, 1, 2, 3]) == [0, 0, 0, 1, 4, 9]
+    assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
