@@ -27,6 +27,7 @@ class TypeMap(dict):
     def __init__(self):
         self.entries = {}
         self.types = set()
+        self.__functions__ = set()
 
     def register(self, obj_t, handler):
         """Register a handler for the given object type."""
@@ -34,6 +35,7 @@ class TypeMap(dict):
         self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
+        self.__functions__.add(handler)
 
     def __missing__(self, obj_t):
         """Get the handler for the given type.
@@ -79,6 +81,7 @@ class MultiTypeMap(dict):
         self.empty = MISSING
         self.transform = type
         self.key_error = key_error
+        self.__functions__ = set()
 
     def register(self, obj_t_tup, nargs, handler):
         """Register a handler for a tuple of argument types.
@@ -107,6 +110,8 @@ class MultiTypeMap(dict):
         if vararg:
             tm = self.maps.setdefault(-1, TypeMap())
             tm.register(object, entry)
+
+        self.__functions__.add(handler)
 
     def __missing__(self, obj_t_tup):
         specificities = {}
@@ -621,6 +626,10 @@ class _Ovld:
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
+
+    @property
+    def __functions__(self):
+        return self.map.__functions__
 
 
 class OvldCall:
