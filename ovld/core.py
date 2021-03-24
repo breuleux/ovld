@@ -474,10 +474,23 @@ class _Ovld:
         """Find the correct method to call for the given arguments."""
         return self.map[tuple(map(self.map.transform, args))]
 
-    def register_signature(self, key, fn):
+    def register_signature(self, key, orig_fn):
         """Register a function for the given signature."""
+
+        def conform(new_fn):
+            if new_fn is None:
+                self.unregister(orig_fn)
+            elif inspect.signature(orig_fn) != inspect.signature(new_fn):
+                self.unregister(orig_fn)
+                self.register(new_fn)
+            else:
+                orig_fn.__code__ = fn.__code__ = new_fn.__code__
+
         sig, min, max, vararg = key
-        fn = rename_function(fn, f"{self.__name__}[{self._sig_string(sig)}]")
+        fn = rename_function(
+            orig_fn, f"{self.__name__}[{self._sig_string(sig)}]"
+        )
+        fn.__conform__ = conform
         self.map.register(sig, (min, max, vararg), fn)
         return self
 
@@ -519,13 +532,19 @@ class _Ovld:
 
         self._make_signature()
         self._update()
-        for child in self.children:
-            child._update()
         return self
+
+    def unregister(self, fn):
+        """Unregister a function."""
+        self._attempt_modify()
+        self._defns = {sig: f for sig, f in self._defns.items() if f is not fn}
+        self._update()
 
     def _update(self):
         if self._compiled:
             self.compile()
+        for child in self.children:
+            child._update()
 
     def copy(
         self,
@@ -853,9 +872,11 @@ def rename_function(fn, newname):
         co.co_freevars,
         co.co_cellvars,
     )
-    return FunctionType(
+    new_fn = FunctionType(
         newcode, fn.__globals__, newname, fn.__defaults__, fn.__closure__
     )
+    new_fn.__annotations__ = fn.__annotations__
+    return new_fn
 
 
 __all__ = [
