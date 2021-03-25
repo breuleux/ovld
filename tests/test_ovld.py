@@ -836,3 +836,65 @@ def test_super():
     assert f3([-2, -1, 0, 1, 2, 3]) == ["=>", -2, -1, 0, 1, 2, 3]
     assert f2([-2, -1, 0, 1, 2, 3]) == [0, 0, 0, 1, 4, 9]
     assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
+
+
+def test_unregister():
+    @ovld
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    def intf(self, x: int):
+        return x * x
+
+    f.register(intf)
+    assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
+    f.unregister(intf)
+
+    with pytest.raises(TypeError):
+        f([-2, -1, 0, 1, 2, 3])
+
+
+def test_conform():
+    @ovld
+    def f(xs: list):
+        return [f(x) for x in xs]
+
+    def intf(x: int):
+        return x * x
+
+    def intf2(x: int):
+        return x * x if x > 0 else 0
+
+    f.register(intf)
+    assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
+
+    f[int].__conform__(intf2)
+    assert f([-2, -1, 0, 1, 2, 3]) == [0, 0, 0, 1, 4, 9]
+
+    f[int].__conform__(None)
+    with pytest.raises(TypeError):
+        f([-2, -1, 0, 1, 2, 3])
+
+
+def test_conform_2():
+    @ovld
+    def f(xs: list):
+        return [f(x) for x in xs]
+
+    def intf(x: int):
+        return x * x
+
+    def floatf(x: float):
+        return x - 1
+
+    f.register(intf)
+    assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
+
+    assert f.__functions__ == {f[list], f[int]}
+    f[int].__conform__(floatf)
+    assert f.__functions__ == {f[list], f[float]}
+
+    with pytest.raises(TypeError):
+        f([-2, -1, 0, 1, 2, 3])
+
+    assert f([-2.0, 5.5]) == [-3.0, 4.5]
