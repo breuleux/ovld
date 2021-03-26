@@ -72,7 +72,7 @@ assert add([1, 2], [3, 4]) == [4, 6]
 assert mul([1, 2], [3, 4]) == [3, 8]
 ```
 
-A `variant` of a function is a copy which inherits all of the original's implementations but may define new ones. And because `self` is bound to the function that's called at the top level, the implementations for `list`, `tuple` and `dict` will bind `self` to `add` or `mul` depending on which one was called.
+A `variant` of a function is a copy which inherits all of the original's implementations but may define new ones. And because `self` is bound to the function that's called at the top level, the implementations for `list`, `tuple` and `dict` will bind `self` to `add` or `mul` depending on which one was called. You may also call `self.super(*args)` to invoke the parent implementation for that type.
 
 ## State
 
