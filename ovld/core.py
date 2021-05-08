@@ -1,6 +1,5 @@
 """Utilities to overload functions for multiple types."""
 
-
 import inspect
 import itertools
 import math
@@ -27,7 +26,6 @@ class TypeMap(dict):
     def __init__(self):
         self.entries = {}
         self.types = set()
-        self.__functions__ = set()
 
     def register(self, obj_t, handler):
         """Register a handler for the given object type."""
@@ -35,7 +33,6 @@ class TypeMap(dict):
         self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
-        self.__functions__.add(handler)
 
     def __missing__(self, obj_t):
         """Get the handler for the given type.
@@ -81,7 +78,6 @@ class MultiTypeMap(dict):
         self.empty = MISSING
         self.transform = type
         self.key_error = key_error
-        self.__functions__ = set()
 
     def register(self, obj_t_tup, nargs, handler):
         """Register a handler for a tuple of argument types.
@@ -110,8 +106,6 @@ class MultiTypeMap(dict):
         if vararg:
             tm = self.maps.setdefault(-1, TypeMap())
             tm.register(object, entry)
-
-        self.__functions__.add(handler)
 
     def __missing__(self, obj_t_tup):
         specificities = {}
@@ -476,21 +470,13 @@ class _Ovld:
 
     def register_signature(self, key, orig_fn):
         """Register a function for the given signature."""
-
-        def conform(new_fn):
-            if new_fn is None:
-                self.unregister(orig_fn)
-            elif inspect.signature(orig_fn) != inspect.signature(new_fn):
-                self.unregister(orig_fn)
-                self.register(new_fn)
-            else:
-                orig_fn.__code__ = fn.__code__ = new_fn.__code__
-
         sig, min, max, vararg = key
         fn = rename_function(
             orig_fn, f"{self.__name__}[{self._sig_string(sig)}]"
         )
-        fn.__conform__ = conform
+        # We just need to keep the Conformer pointer alive for jurigged
+        # to find it, if jurigged is used with ovld
+        fn._conformer = Conformer(self, orig_fn, fn)
         self.map.register(sig, (min, max, vararg), fn)
         return self
 
@@ -568,9 +554,7 @@ class _Ovld:
             linkback=linkback,
         )
 
-    def variant(
-        self, fn=None, **kwargs,
-    ):
+    def variant(self, fn=None, **kwargs):
         """Decorator to create a variant of this Ovld.
 
         New functions can be registered to the variant without affecting the
@@ -645,10 +629,6 @@ class _Ovld:
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
-
-    @property
-    def __functions__(self):
-        return self.map.__functions__
 
 
 class OvldCall:
@@ -846,32 +826,75 @@ def ovld_dispatch(dispatch, **kwargs):
 ovld.dispatch = ovld_dispatch
 
 
+class Conformer:
+    __slots__ = ("code", "orig_fn", "renamed_fn", "ovld", "code2")
+
+    def __init__(self, ovld, orig_fn, renamed_fn):
+        self.ovld = ovld
+        self.orig_fn = orig_fn
+        self.renamed_fn = renamed_fn
+        self.code = orig_fn.__code__
+
+    def __conform__(self, new):
+        if isinstance(new, FunctionType):
+            new_fn = new
+            new_code = new.__code__
+        else:
+            new_fn = None
+            new_code = new
+
+        if new_code is None:
+            self.ovld.unregister(self.orig_fn)
+
+        elif new_fn is None:  # pragma: no cover
+            # Not entirely sure if this ever happens
+            self.renamed_fn.__code__ = new_code
+
+        elif inspect.signature(self.orig_fn) != inspect.signature(new_fn):
+            self.ovld.unregister(self.orig_fn)
+            self.ovld.register(new_fn)
+
+        else:
+            self.renamed_fn.__code__ = rename_code(
+                new_code, self.renamed_fn.__code__.co_name
+            )
+
+        try:  # pragma: no cover
+            from jurigged import db
+
+            db.update_cache_entry(self, self.code, new_code)
+        except ImportError:
+            pass
+
+        self.code = new_code
+
+
+def rename_code(co, newname):  # pragma: no cover
+    if hasattr(co, "replace"):
+        return co.replace(co_name=newname)
+    else:
+        return type(co)(
+            co.co_argcount,
+            co.co_kwonlyargcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            newname,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_freevars,
+            co.co_cellvars,
+        )
+
+
 def rename_function(fn, newname):
     """Create a copy of the function with a different name."""
-    co = fn.__code__
-
-    extra_args = []
-    if hasattr(co, "co_posonlyargcount"):  # pragma: no cover
-        extra_args.append(co.co_posonlyargcount)
-
-    newcode = type(co)(
-        co.co_argcount,
-        *extra_args,
-        co.co_kwonlyargcount,
-        co.co_nlocals,
-        co.co_stacksize,
-        co.co_flags,
-        co.co_code,
-        co.co_consts,
-        co.co_names,
-        co.co_varnames,
-        co.co_filename,
-        newname,
-        co.co_firstlineno,
-        co.co_lnotab,
-        co.co_freevars,
-        co.co_cellvars,
-    )
+    newcode = rename_code(fn.__code__, newname)
     new_fn = FunctionType(
         newcode, fn.__globals__, newname, fn.__defaults__, fn.__closure__
     )

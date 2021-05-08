@@ -868,10 +868,10 @@ def test_conform():
     f.register(intf)
     assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
 
-    f[int].__conform__(intf2)
+    f[int]._conformer.__conform__(intf2)
     assert f([-2, -1, 0, 1, 2, 3]) == [0, 0, 0, 1, 4, 9]
 
-    f[int].__conform__(None)
+    f[int]._conformer.__conform__(None)
     with pytest.raises(TypeError):
         f([-2, -1, 0, 1, 2, 3])
 
@@ -890,9 +890,10 @@ def test_conform_2():
     f.register(intf)
     assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
 
-    assert f.__functions__ == {f[list], f[int]}
-    f[int].__conform__(floatf)
-    assert f.__functions__ == {f[list], f[float]}
+    with pytest.raises(TypeError):
+        f([-2.0, 5.5])
+
+    f[int]._conformer.__conform__(floatf)
 
     with pytest.raises(TypeError):
         f([-2, -1, 0, 1, 2, 3])
