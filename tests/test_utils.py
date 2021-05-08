@@ -1,3 +1,4 @@
+import os
 import sys
 
 from ovld import deferred, exactly, has_attribute, meta, ovld, strict_subclass
@@ -52,25 +53,24 @@ def test_deferred_builtins():
 
 
 def test_deferred():
-    assert "blessed" not in sys.modules
+    assert "gingerbread" not in sys.modules
+    sys.path.append(os.path.join(os.path.dirname(__file__), "modules"))
 
     @ovld
-    def f(x: deferred("blessed.Terminal")):
-        return "Terminal"
+    def f(x: deferred("gingerbread.House")):
+        return "Gingerbread house!"
 
     @f.register
     def f(x):
         return "object"
 
-    assert "blessed" not in sys.modules
+    assert "gingerbread" not in sys.modules
 
-    # This is an arbitrary choice of an external module that has a class in it
-    # that we can load just to test deferred.
-    import blessed
+    import gingerbread
 
-    assert f(blessed.Terminal()) == "Terminal"
+    assert f(gingerbread.House()) == "Gingerbread house!"
 
-    assert "blessed" in sys.modules
+    assert "gingerbread" in sys.modules
 
 
 def test_exactly():
