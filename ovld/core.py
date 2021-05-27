@@ -859,12 +859,9 @@ class Conformer:
                 new_code, self.renamed_fn.__code__.co_name
             )
 
-        try:  # pragma: no cover
-            from jurigged import db
+        from codefind import code_registry
 
-            db.update_cache_entry(self, self.code, new_code)
-        except ImportError:
-            pass
+        code_registry.update_cache_entry(self, self.code, new_code)
 
         self.code = new_code
 

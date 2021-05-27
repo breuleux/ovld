@@ -854,6 +854,9 @@ def test_unregister():
         f([-2, -1, 0, 1, 2, 3])
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 8), reason="requires python3.8 or higher"
+)
 def test_conform():
     @ovld
     def f(xs: list):
@@ -876,6 +879,9 @@ def test_conform():
         f([-2, -1, 0, 1, 2, 3])
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 8), reason="requires python3.8 or higher"
+)
 def test_conform_2():
     @ovld
     def f(xs: list):

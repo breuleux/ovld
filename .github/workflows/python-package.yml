@@ -41,4 +41,5 @@ jobs:
       run: poetry run pytest --cov=ovld --cov-report term-missing
 
     - name: Verify coverage
+      if: ${{ matrix.python-version >= '3.8' }}
       run: poetry run coverage report | tail -1 | egrep "TOTAL +[0-9]+ +0 +100%"
