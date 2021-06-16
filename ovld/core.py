@@ -4,6 +4,7 @@ import inspect
 import itertools
 import math
 import textwrap
+import typing
 from types import FunctionType
 
 from .mro import compose_mro
@@ -482,6 +483,22 @@ class _Ovld:
 
     def register(self, fn):
         """Register a function."""
+
+        def _normalize_type(t, force_tuple=False):
+            origin = getattr(t, "__origin__", None)
+            if origin is typing.Union:
+                return _normalize_type(t.__args__)
+            elif origin is not None:
+                raise TypeError(
+                    "ovld does not accept generic types except Union or Optional"
+                )
+            elif isinstance(t, tuple):
+                return tuple(_normalize_type(t2) for t2 in t)
+            elif force_tuple:
+                return (t,)
+            else:
+                return t
+
         self._attempt_modify()
 
         self._set_attrs_from(fn)
@@ -508,7 +525,7 @@ class _Ovld:
         req_pos = max_pos - len(argspec.defaults or ())
 
         typelist_tups = tuple(
-            t if isinstance(t, tuple) else (t,) for t in typelist
+            _normalize_type(t, force_tuple=True) for t in typelist
         )
         for tl in itertools.product(*typelist_tups):
             sig = (tuple(tl), req_pos, max_pos, bool(argspec.varargs))

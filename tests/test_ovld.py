@@ -1,4 +1,5 @@
 import sys
+import typing
 
 import pytest
 
@@ -258,6 +259,62 @@ def test_typetuple_override():
 
     assert f(1) == "i"
     assert f(1.0) == "if"
+
+
+def test_union():
+    o = Ovld()
+
+    @o.register
+    def f(x, y):
+        return "oo"
+
+    @o.register
+    def f(x: typing.Union[int, float], y):
+        return "io"
+
+    @o.register
+    def f(x, y: typing.Union[int, float]):
+        return "oi"
+
+    @o.register
+    def f(x: typing.Union[int, float], y: typing.Union[int, float]):
+        return "ii"
+
+    assert f(1, 1) == "ii"
+    assert f(1.0, 1.0) == "ii"
+
+    assert f(1, "x") == "io"
+    assert f("x", 1) == "oi"
+
+
+def test_optional():
+    o = Ovld()
+
+    @o.register
+    def f(x: typing.Optional[int]):
+        return "iN"
+
+    @o.register
+    def f(x: float):
+        return "f"
+
+    @o.register
+    def f(x: object):
+        return "o"
+
+    assert f(1) == "iN"
+    assert f(None) == "iN"
+    assert f(1.0) == "f"
+
+
+def test_no_generics():
+    o = Ovld()
+
+    with pytest.raises(TypeError):
+
+        @o.register
+        def f(x: typing.List[int]):
+            return "hmm"
 
 
 @pytest.mark.skipif(
