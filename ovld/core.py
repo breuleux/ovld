@@ -313,10 +313,13 @@ class _Ovld:
         for mixin in mixins:
             if self.linkback:
                 mixin.children.append(self)
-            assert mixin.bootstrap is not None
-            if self.bootstrap is None:
-                self.bootstrap = mixin.bootstrap
-            assert mixin.bootstrap is self.bootstrap
+            if mixin._defns:
+                assert mixin.bootstrap is not None
+                if self.bootstrap is None:
+                    self.bootstrap = mixin.bootstrap
+                assert mixin.bootstrap is self.bootstrap
+            if mixin._dispatch:
+                self._dispatch = mixin._dispatch
         self.mixins += mixins
 
     def _sig_string(self, type_tuple):
@@ -724,6 +727,8 @@ class ovld_cls_dict(dict):
             prev = self[attr]
         elif is_ovld(value) and getattr(value, "_extend_super", False):
             prev = getattr(self._mock, attr, None)
+            if is_ovld(prev):
+                prev = prev.copy()
         else:
             prev = None
 
@@ -733,7 +738,8 @@ class ovld_cls_dict(dict):
 
             if is_ovld(prev):
                 if is_ovld(value):
-                    value.add_mixins(prev)
+                    prev.add_mixins(value)
+                    value = prev
                 elif inspect.isfunction(value):
                     prev.register(value)
                     value = prev

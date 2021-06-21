@@ -750,6 +750,34 @@ def test_metaclass_dispatch():
 
         @ovld.dispatch
         def perform(ovld_call, x):
+            return ovld_call.call(x) * 2
+
+        def perform(self, x: int):
+            return x + self.n
+
+        def perform(self, xs: list):
+            return [self.perform(x) for x in xs]
+
+    x = One(1)
+    assert x.perform([1, 2, 3]) == [4, 6, 8, 4, 6, 8]
+
+    class Two(One):
+        @extend_super
+        def perform(self, x: float):
+            return x * self.n
+
+    x2 = Two(2)
+    assert x2.perform([1, 2, 3]) == [6, 8, 10, 6, 8, 10]
+    assert x2.perform([1.5, 2.5]) == [6.0, 10.0, 6.0, 10.0]
+
+
+def test_metaclass_dispatch_2():
+    class One(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+        @ovld.dispatch
+        def perform(ovld_call, x):
             return ovld_call.call(x)
 
         def perform(self, x: int):
