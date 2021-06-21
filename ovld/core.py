@@ -651,6 +651,11 @@ class _Ovld:
         return f"<Ovld {self.name or hex(id(self))}>"
 
 
+def is_ovld(x):
+    """Return whether the argument is an ovld function/method."""
+    return isinstance(x, _Ovld)
+
+
 class OvldCall:
     """Context for an Ovld call."""
 
@@ -770,13 +775,12 @@ class OvldMC(type):
 
         for name in names:
             values = [getattr(base, name, None) for base in bases]
+            ovlds = [v for v in values if is_ovld(v)]
             mixins = [
-                v
-                for v in values
-                if is_ovld(v) and getattr(v, "_extend_super", False)
+                v for v in ovlds[1:] if getattr(v, "_extend_super", False)
             ]
             if mixins:
-                o = mixins[0].copy(mixins=mixins[1:])
+                o = ovlds[0].copy(mixins=mixins)
                 others = [v for v in values if v is not None and not is_ovld(v)]
                 for other in others:
                     o.register(other)
@@ -784,6 +788,10 @@ class OvldMC(type):
                 d[name] = o
 
         return d
+
+
+class OvldBase(metaclass=OvldMC):
+    """Base class that allows overloading of methods."""
 
 
 def _find_overload(fn, **kwargs):
@@ -946,14 +954,10 @@ def rename_function(fn, newname):
     return new_fn
 
 
-def is_ovld(x):
-    """Return whether the argument is an ovld function/method."""
-    return isinstance(x, _Ovld)
-
-
 __all__ = [
     "MultiTypeMap",
     "Ovld",
+    "OvldBase",
     "OvldCall",
     "OvldMC",
     "TypeMap",

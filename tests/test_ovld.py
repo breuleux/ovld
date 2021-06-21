@@ -3,7 +3,7 @@ import typing
 
 import pytest
 
-from ovld import Ovld, OvldCall, OvldMC, extend_super, is_ovld, ovld
+from ovld import Ovld, OvldBase, OvldCall, OvldMC, extend_super, is_ovld, ovld
 from ovld.utils import MISSING
 
 from .test_typemap import Animal, Bird, Mammal
@@ -797,6 +797,40 @@ def test_metaclass_dispatch_2():
 
     x2 = Two(1)
     assert x2.perform([1, 2, 3]) == [4, 6, 8, 4, 6, 8]
+
+
+def test_multiple_dispatch_3():
+    class One(OvldBase):
+        def __init__(self, n):
+            self.n = n
+
+        @ovld.dispatch
+        def perform(ovld_call, x):
+            return ovld_call.call(x) * 2
+
+        def perform(self, xs: list):
+            return [self.perform(x) for x in xs]
+
+    class M1:
+        @extend_super
+        def perform(self, x: int):
+            return x + self.n
+
+    class M2(OvldBase):
+        @extend_super
+        def perform(self, x: float):
+            return x * self.n
+
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+    cls = One.create_subclass(M1, M2, name="Test")
+
+    g = cls(2)
+    assert g.perform(7) == 18
+    assert g.perform(7.0) == 28
+    assert g.perform("cheese") == "cheesesscheesess"
+    assert g.perform([1, 2.0]) == [6, 8.0, 6, 8.0]
 
 
 def test_error():
