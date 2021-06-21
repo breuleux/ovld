@@ -177,17 +177,17 @@ print(Stuff(2).calc([1, 2, 3]))  # [4, 6, 8, 4, 6, 8]
 
 ### Mixins in subclasses
 
-The `@mixin` decorator on a method will combine the method with the definition on the superclass:
+The `@extend_super` decorator on a method will combine the method with the definition on the superclass:
 
 ```python
-from ovld import OvldMC, mixin
+from ovld import OvldMC, extend_super
 
 class One(metaclass=OvldMC):
     def f(self, x: int):
         return "an integer"
 
 class Two(One):
-    @mixin
+    @extend_super
     def f(self, x: str):
         return "a string"
 

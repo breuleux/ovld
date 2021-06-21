@@ -698,10 +698,15 @@ def Ovld(*args, **kwargs):
     return _fresh(_Ovld)(*args, **kwargs)
 
 
-def mixin(fn):
-    if not isinstance(fn, _Ovld):
+def extend_super(fn):
+    """Declare that this method extends the super method with more types.
+
+    This produces an ovld using the superclass method of the same name,
+    plus this definition and others with the same name.
+    """
+    if not is_ovld(fn):
         fn = ovld(fn)
-    fn._is_mixin = True
+    fn._extend_super = True
     return fn
 
 
@@ -717,7 +722,7 @@ class ovld_cls_dict(dict):
     def __setitem__(self, attr, value):
         if attr in self:
             prev = self[attr]
-        elif isinstance(value, _Ovld) and getattr(value, "_is_mixin", False):
+        elif is_ovld(value) and getattr(value, "_extend_super", False):
             prev = getattr(self._mock, attr, None)
         else:
             prev = None
@@ -726,8 +731,8 @@ class ovld_cls_dict(dict):
             if inspect.isfunction(prev):
                 prev = ovld(prev)
 
-            if isinstance(prev, _Ovld):
-                if isinstance(value, _Ovld):
+            if is_ovld(prev):
+                if is_ovld(value):
                     value.add_mixins(prev)
                 elif inspect.isfunction(value):
                     prev.register(value)
@@ -762,15 +767,11 @@ class OvldMC(type):
             mixins = [
                 v
                 for v in values
-                if isinstance(v, _Ovld) and getattr(v, "_is_mixin", False)
+                if is_ovld(v) and getattr(v, "_extend_super", False)
             ]
             if mixins:
                 o = mixins[0].copy(mixins=mixins[1:])
-                others = [
-                    v
-                    for v in values
-                    if v is not None and not isinstance(v, _Ovld)
-                ]
+                others = [v for v in values if v is not None and not is_ovld(v)]
                 for other in others:
                     o.register(other)
                 o.rename(name)
@@ -786,7 +787,7 @@ def _find_overload(fn, **kwargs):
         dispatch = _fresh(_Ovld)(**kwargs)
     elif kwargs:  # pragma: no cover
         raise TypeError("Cannot configure an overload that already exists")
-    if not isinstance(dispatch, _Ovld):  # pragma: no cover
+    if not is_ovld(dispatch):  # pragma: no cover
         raise TypeError("@ovld requires Ovld instance")
     return dispatch
 
@@ -939,13 +940,19 @@ def rename_function(fn, newname):
     return new_fn
 
 
+def is_ovld(x):
+    """Return whether the argument is an ovld function/method."""
+    return isinstance(x, _Ovld)
+
+
 __all__ = [
     "MultiTypeMap",
     "Ovld",
     "OvldCall",
     "OvldMC",
     "TypeMap",
-    "mixin",
+    "extend_super",
+    "is_ovld",
     "ovld",
     "ovld_dispatch",
 ]

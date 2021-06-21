@@ -3,7 +3,7 @@ import typing
 
 import pytest
 
-from ovld import Ovld, OvldCall, OvldMC, mixin, ovld
+from ovld import Ovld, OvldCall, OvldMC, extend_super, is_ovld, ovld
 from ovld.utils import MISSING
 
 from .test_typemap import Animal, Bird, Mammal
@@ -21,6 +21,8 @@ def test_Ovld():
     def f(x: float):
         """Floats!"""
         return "float"
+
+    assert is_ovld(o)
 
     assert f(2) == "int"
     assert f(2.0) == "float"
@@ -665,7 +667,7 @@ def test_metaclass_inherit():
             return x + self.n
 
     class Greatestifier(Greatifier):
-        @mixin
+        @extend_super
         def perform(self, x: str):
             return x + "s" * self.n
 
@@ -688,7 +690,7 @@ def test_metaclass_multiple_inherit():
             self.n = n
 
     class Two(One):
-        @mixin
+        @extend_super
         def perform(self, x: int):
             return x + self.n
 
@@ -696,7 +698,7 @@ def test_metaclass_multiple_inherit():
             return x * self.n
 
     class Three(One):
-        @mixin
+        @extend_super
         def perform(self, x: str):
             return x + "s" * self.n
 
@@ -724,12 +726,12 @@ def test_multiple_inherit_2():
             return x + self.n
 
     class M1:
-        @mixin
+        @extend_super
         def perform(self, x: float):
             return x * self.n
 
     class M2:
-        @mixin
+        @extend_super
         def perform(self, x: str):
             return x + "s" * self.n
 
@@ -760,7 +762,7 @@ def test_metaclass_dispatch():
     assert x.perform([1, 2, 3]) == [2, 3, 4]
 
     class Two(One):
-        @mixin
+        @extend_super
         @ovld.dispatch
         def perform(ovld_call, x):
             return ovld_call.call(x) * 2
