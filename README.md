@@ -137,10 +137,9 @@ Note that intermediate, bootstrapped recursive calls (recursive calls using `sel
 Use the `OvldMC` metaclass to use multiple dispatch on methods. In this case there is no bootstrapping as described above and `self` is simply bound to the class instance.
 
 ```python
-from ovld import OvldMC, ovld
+from ovld import OvldMC
 
 class Cat(metaclass=OvldMC):
-    @ovld
     def interact(self, x: Mouse):
         return "catch"
 
@@ -174,6 +173,26 @@ class Stuff(metaclass=OvldMC):
         return [self.calc(x) for x in xs]
 
 print(Stuff(2).calc([1, 2, 3]))  # [4, 6, 8, 4, 6, 8]
+```
+
+### Mixins in subclasses
+
+The `@mixin` decorator on a method will combine the method with the definition on the superclass:
+
+```python
+from ovld import OvldMC, mixin
+
+class One(metaclass=OvldMC):
+    def f(self, x: int):
+        return "an integer"
+
+class Two(One):
+    @mixin
+    def f(self, x: str):
+        return "a string"
+
+assert Two().f(1) == "an integer"
+assert Two().f("s") == "a string"
 ```
 
 ## Ambiguous calls

@@ -698,15 +698,34 @@ def Ovld(*args, **kwargs):
     return _fresh(_Ovld)(*args, **kwargs)
 
 
+def mixin(fn):
+    if not isinstance(fn, _Ovld):
+        fn = ovld(fn)
+    fn._is_mixin = True
+    return fn
+
+
 class ovld_cls_dict(dict):
     """A dict for use with OvldMC.__prepare__.
 
     Setting a key that already corresponds to an Olvd extends that Ovld.
     """
 
+    def __init__(self, bases):
+        self._mock = type("MockSuper", bases, {})
+
     def __setitem__(self, attr, value):
         if attr in self:
             prev = self[attr]
+        elif isinstance(value, _Ovld) and getattr(value, "_is_mixin", False):
+            prev = getattr(self._mock, attr, None)
+        else:
+            prev = None
+
+        if prev is not None:
+            if inspect.isfunction(prev):
+                prev = ovld(prev)
+
             if isinstance(prev, _Ovld):
                 if isinstance(value, _Ovld):
                     value.add_mixins(prev)
@@ -732,7 +751,7 @@ class OvldMC(type):
 
     @classmethod
     def __prepare__(cls, name, bases):
-        d = ovld_cls_dict()
+        d = ovld_cls_dict(bases)
 
         names = set()
         for base in bases:
@@ -740,7 +759,11 @@ class OvldMC(type):
 
         for name in names:
             values = [getattr(base, name, None) for base in bases]
-            mixins = [v for v in values if isinstance(v, _Ovld)]
+            mixins = [
+                v
+                for v in values
+                if isinstance(v, _Ovld) and getattr(v, "_is_mixin", False)
+            ]
             if mixins:
                 o = mixins[0].copy(mixins=mixins[1:])
                 others = [
@@ -922,6 +945,7 @@ __all__ = [
     "OvldCall",
     "OvldMC",
     "TypeMap",
+    "mixin",
     "ovld",
     "ovld_dispatch",
 ]
