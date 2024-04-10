@@ -11,7 +11,6 @@ try:
     def pluralize(x: str):
         return x + "s"
 
-
 except Exception as exc:
     _ovld_exc = exc
 
@@ -34,7 +33,6 @@ try:
     @ovld
     def roesti(self, xs: list, _):
         return [self(x) for x in xs]
-
 
 except Exception as exc:
     _ovld_dispatch_exc = exc

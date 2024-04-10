@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v2
@@ -28,14 +28,11 @@ jobs:
         pip install poetry
         poetry install
 
-    - name: Lint with flake8
-      run: poetry run flake8
+    - name: Lint with ruff
+      run: poetry run ruff check
 
     - name: Check formatting with black
       run: poetry run black --check .
-
-    - name: Sort imports
-      run: poetry run isort -c --df .
 
     - name: Test with pytest
       run: poetry run pytest --cov=ovld --cov-report term-missing

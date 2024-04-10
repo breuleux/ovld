@@ -9,15 +9,14 @@ homepage = "https://github.com/breuleux/ovld"
 repository = "https://github.com/breuleux/ovld"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.8"
 
 [tool.poetry.dev-dependencies]
-black = "^19.10b0"
-codefind = {version = "^0.1.0", python = "^3.8"}
+black = "^24.3.0"
+ruff = "^0.3.5"
+codefind = "^0.1.0"
 pytest = "^6.0.1"
-flake8 = "^3.8.3"
 pytest-cov = "^2.10.0"
-isort = "^5.4.2"
 
 [tool.black]
 line-length = 80
@@ -32,3 +31,13 @@ combine_as_imports = true
 [build-system]
 requires = ["poetry-core>=1.0.8"]
 build-backend = "poetry.masonry.api"
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+extend-select = ["I"]
+ignore = ["E241", "F722", "E501", "E203", "F811", "F821"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
