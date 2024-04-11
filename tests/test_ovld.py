@@ -1027,3 +1027,36 @@ def test_conform_2():
         f([-2, -1, 0, 1, 2, 3])
 
     assert f([-2.0, 5.5]) == [-3.0, 4.5]
+
+
+def test_type_argument():
+    class One:
+        pass
+
+    class Two(One):
+        pass
+
+    class Three(One):
+        pass
+
+    @ovld
+    def f(t: type[int], x):
+        return x * x
+
+    @f.register
+    def _f(t: type[str], x):
+        return f"hello, {x}"
+
+    @f.register
+    def _f(t: type[One], x):
+        return 1
+
+    @f.register
+    def _f(t: type[Three], x):
+        return 3
+
+    assert f(int, 5) == 25
+    assert f(str, 5) == "hello, 5"
+    assert f(Three, 5) == 3
+    assert f(Two, 5) == 1
+    assert f(One, 5) == 1

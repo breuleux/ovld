@@ -11,6 +11,10 @@ from .mro import compose_mro
 from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 
+def is_type_of_type(t):
+    return getattr(t, "__origin__", None) is type
+
+
 class TypeMap(dict):
     """Represents a mapping from types to handlers.
 
@@ -31,7 +35,8 @@ class TypeMap(dict):
     def register(self, obj_t, handler):
         """Register a handler for the given object type."""
         self.clear()
-        self.types.add(obj_t)
+        if not is_type_of_type(obj_t):
+            self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
 
@@ -42,7 +47,10 @@ class TypeMap(dict):
         the next time getitem is called.
         """
         results = {}
-        mro = compose_mro(obj_t, self.types)
+        if is_type_of_type(obj_t):
+            mro = [type[t] for t in compose_mro(obj_t.__args__[0], self.types)]
+        else:
+            mro = compose_mro(obj_t, self.types)
         for lvl, cls in enumerate(reversed(mro)):
             handlers = self.entries.get(cls, None)
             if handlers:
@@ -77,8 +85,13 @@ class MultiTypeMap(dict):
     def __init__(self, key_error=KeyError):
         self.maps = {}
         self.empty = MISSING
-        self.transform = type
         self.key_error = key_error
+
+    def transform(self, obj):
+        if isinstance(obj, type):
+            return type[obj]
+        else:
+            return type(obj)
 
     def register(self, obj_t_tup, nargs, handler):
         """Register a handler for a tuple of argument types.
@@ -326,6 +339,9 @@ class _Ovld:
         def clsname(cls):
             if cls is object:
                 return "*"
+            elif is_type_of_type(cls):
+                arg = clsname(cls.__args__[0])
+                return f"type[{arg}]"
             elif hasattr(cls, "__name__"):
                 return cls.__name__
             else:
@@ -489,11 +505,13 @@ class _Ovld:
 
         def _normalize_type(t, force_tuple=False):
             origin = getattr(t, "__origin__", None)
-            if origin is typing.Union:
+            if origin is type:
+                return (t,) if force_tuple else t
+            elif origin is typing.Union:
                 return _normalize_type(t.__args__)
             elif origin is not None:
                 raise TypeError(
-                    "ovld does not accept generic types except Union or Optional"
+                    "ovld does not accept generic types except type, Union or Optional"
                 )
             elif isinstance(t, tuple):
                 return tuple(_normalize_type(t2) for t2 in t)
