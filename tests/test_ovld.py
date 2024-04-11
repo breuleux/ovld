@@ -289,6 +289,9 @@ def test_union():
     assert f("x", 1) == "oi"
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10), reason="union syntax requires python3.10 or higher"
+)
 def test_union_pipe_syntax():
     o = Ovld()
 
