@@ -948,7 +948,10 @@ class Conformer:
 
 def rename_code(co, newname):  # pragma: no cover
     if hasattr(co, "replace"):
-        return co.replace(co_name=newname)
+        if hasattr(co, "co_qualname"):
+            return co.replace(co_name=newname, co_qualname=newname)
+        else:
+            return co.replace(co_name=newname)
     else:
         return type(co)(
             co.co_argcount,
