@@ -7,6 +7,11 @@ import textwrap
 import typing
 from types import FunctionType
 
+try:
+    from types import UnionType
+except ImportError:
+    UnionType = None
+
 from .mro import compose_mro
 from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
@@ -505,7 +510,9 @@ class _Ovld:
 
         def _normalize_type(t, force_tuple=False):
             origin = getattr(t, "__origin__", None)
-            if origin is type:
+            if UnionType and isinstance(t, UnionType):
+                return _normalize_type(t.__args__)
+            elif origin is type:
                 return (t,) if force_tuple else t
             elif origin is typing.Union:
                 return _normalize_type(t.__args__)
