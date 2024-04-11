@@ -290,7 +290,8 @@ def test_union():
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 10), reason="union syntax requires python3.10 or higher"
+    sys.version_info < (3, 10),
+    reason="union syntax requires python3.10 or higher",
 )
 def test_union_pipe_syntax():
     o = Ovld()
@@ -1058,6 +1059,10 @@ def test_conform_2():
     assert f([-2.0, 5.5]) == [-3.0, 4.5]
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
 def test_type_argument():
     class One:
         pass

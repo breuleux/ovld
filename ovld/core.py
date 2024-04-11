@@ -9,7 +9,7 @@ from types import FunctionType
 
 try:
     from types import UnionType
-except ImportError:
+except ImportError:  # pragma: no cover
     UnionType = None
 
 from .mro import compose_mro

@@ -29,14 +29,16 @@ jobs:
         poetry install
 
     - name: Lint with ruff
+      if: ${{ matrix.python-version == '3.12' }}
       run: poetry run ruff check
 
     - name: Check formatting with black
+      if: ${{ matrix.python-version == '3.12' }}
       run: poetry run black --check .
 
     - name: Test with pytest
       run: poetry run pytest --cov=ovld --cov-report term-missing
 
     - name: Verify coverage
-      if: ${{ matrix.python-version >= '3.8' }}
+      if: ${{ matrix.python-version == '3.12' }}
       run: poetry run coverage report | tail -1 | egrep "TOTAL +[0-9]+ +0 +100%"
