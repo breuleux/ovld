@@ -56,6 +56,8 @@ class TypeMap(dict):
         results = {}
         if is_type_of_type(obj_t):
             mro = [type[t] for t in compose_mro(obj_t.__args__[0], self.types)]
+            mro.append(type)
+            mro.append(object)
         else:
             mro = compose_mro(obj_t, self.types)
         for lvl, cls in enumerate(reversed(mro)):
@@ -95,10 +97,10 @@ class MultiTypeMap(dict):
         self.key_error = key_error
 
     def transform(self, obj):
-        if isinstance(obj, type):
-            return type[obj]
-        elif isinstance(obj, GenericAlias):
+        if isinstance(obj, GenericAlias):
             return type[obj.__origin__]
+        elif isinstance(obj, type):
+            return type[obj]
         else:
             return type(obj)
 

@@ -1114,3 +1114,26 @@ def test_generic_type_argument():
 
     assert f(dict) == "dict"
     assert f(dict[str, int]) == "dict"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
+def test_plain_type_argument():
+    @ovld
+    def f(t: type[list]):
+        return "list"
+
+    @f.register
+    def f(t: type):
+        return "other type"
+
+    @f.register
+    def f(t: object):
+        return "other anything"
+
+    assert f(list) == "list"
+    assert f(list[int]) == "list"
+    assert f(dict) == "other type"
+    assert f(1234) == "other anything"
