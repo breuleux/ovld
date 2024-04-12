@@ -39,6 +39,9 @@ class TypeMap(dict):
 
     def register(self, obj_t, handler):
         """Register a handler for the given object type."""
+        if isinstance(obj_t, str):
+            obj_t = eval(obj_t, getattr(handler[0], "__globals__", {}))
+
         self.clear()
         if is_type_of_type(obj_t):
             self.types.add(obj_t.__args__[0])

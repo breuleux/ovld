@@ -1137,3 +1137,25 @@ def test_plain_type_argument():
     assert f(list[int]) == "list"
     assert f(dict) == "other type"
     assert f(1234) == "other anything"
+
+
+class Booboo:
+    pass
+
+
+def test_string_annotation():
+    @ovld
+    def f(t: "int"):
+        return "int"
+
+    @f.register
+    def f(t: "list"):
+        return "list"
+
+    @f.register
+    def f(t: "Booboo"):
+        return "boo"
+
+    assert f(1234) == "int"
+    assert f([1, 2, 3, 4]) == "list"
+    assert f(Booboo()) == "boo"
