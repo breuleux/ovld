@@ -2,6 +2,8 @@ import os
 import sys
 from dataclasses import dataclass
 
+import pytest
+
 from ovld import deferred, exactly, has_attribute, meta, ovld, strict_subclass
 from ovld.utils import Dataclass
 
@@ -141,6 +143,10 @@ def test_has_attribute():
     assert f(SuperDuck()) == "oh boy"
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
 def test_Dataclass():
     @dataclass
     class Point:

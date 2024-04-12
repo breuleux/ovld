@@ -5,12 +5,20 @@ import itertools
 import math
 import textwrap
 import typing
-from types import FunctionType, GenericAlias
+from types import FunctionType
 
 try:
-    from types import UnionType
+    from types import GenericAlias, UnionType
 except ImportError:  # pragma: no cover
     UnionType = None
+
+    class GenericAliasMC(type):
+        def __instancecheck__(cls, obj):
+            return hasattr(obj, "__origin__")
+
+    class GenericAlias(metaclass=GenericAliasMC):
+        pass
+
 
 from .mro import compose_mro
 from .utils import BOOTSTRAP, MISSING, keyword_decorator
