@@ -1,7 +1,9 @@
 import os
 import sys
+from dataclasses import dataclass
 
 from ovld import deferred, exactly, has_attribute, meta, ovld, strict_subclass
+from ovld.utils import Dataclass
 
 
 def test_meta():
@@ -137,3 +139,31 @@ def test_has_attribute():
     assert f(Cat()) == "no"
     assert f(Duck()) == "yes"
     assert f(SuperDuck()) == "oh boy"
+
+
+def test_Dataclass():
+    @dataclass
+    class Point:
+        x: int
+        y: int
+
+    @ovld
+    def f(x: Dataclass):
+        return "yes"
+
+    @f.register
+    def f(x: object):
+        return "no"
+
+    @f.register
+    def f(x: type[Dataclass]):
+        return "type, yes"
+
+    @f.register
+    def f(x: type[object]):
+        return "type, no"
+
+    assert f(Point(1, 2)) == "yes"
+    assert f(1234) == "no"
+    assert f(Point) == "type, yes"
+    assert f(int) == "type, no"

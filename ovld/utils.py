@@ -2,6 +2,8 @@
 
 import functools
 import sys
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
 
 class Named:
@@ -143,9 +145,20 @@ def has_attribute(*attrs):
     return check
 
 
+@runtime_checkable
+@dataclass
+class Dataclass(Protocol):
+    @classmethod
+    def __subclasshook__(cls, subclass):
+        return hasattr(subclass, "__dataclass_fields__") and hasattr(
+            subclass, "__dataclass_params__"
+        )
+
+
 __all__ = [
     "BOOTSTRAP",
     "MISSING",
+    "Dataclass",
     "Named",
     "deferred",
     "exactly",
