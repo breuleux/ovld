@@ -5,7 +5,7 @@ import itertools
 import math
 import textwrap
 import typing
-from types import FunctionType
+from types import FunctionType, GenericAlias
 
 try:
     from types import UnionType
@@ -97,6 +97,8 @@ class MultiTypeMap(dict):
     def transform(self, obj):
         if isinstance(obj, type):
             return type[obj]
+        elif isinstance(obj, GenericAlias):
+            return type[obj.__origin__]
         else:
             return type(obj)
 

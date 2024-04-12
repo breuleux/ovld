@@ -1094,3 +1094,23 @@ def test_type_argument():
     assert f(Three, 5) == 3
     assert f(Two, 5) == 1
     assert f(One, 5) == 1
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
+def test_generic_type_argument():
+    @ovld
+    def f(t: type[list]):
+        return "list"
+
+    @f.register
+    def f(t: type[dict]):
+        return "dict"
+
+    assert f(list) == "list"
+    assert f(list[int]) == "list"
+
+    assert f(dict) == "dict"
+    assert f(dict[str, int]) == "dict"
