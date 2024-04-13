@@ -421,7 +421,6 @@ def test_default_args():
 
 
 def test_mixins():
-
     f = Ovld()
 
     @f.register
@@ -449,7 +448,6 @@ def test_mixins():
 
 
 def test_bootstrap():
-
     f = Ovld()
 
     @f.register
@@ -517,7 +515,6 @@ def test_bootstrap_custom_ovcall():
 
 
 def test_Ovld_dispatch():
-
     f = Ovld()
 
     @f.dispatch
@@ -546,7 +543,6 @@ def test_Ovld_dispatch():
 
 
 def test_Ovld_dispatch_bootstrap():
-
     f = Ovld()
 
     @f.dispatch
@@ -569,7 +565,6 @@ def test_Ovld_dispatch_bootstrap():
 
 
 def test_stateful():
-
     f = Ovld(initial_state=lambda: {"state": -1})
 
     @f.dispatch
@@ -608,7 +603,6 @@ def test_stateful():
 
 
 def test_with_state():
-
     f = Ovld(initial_state=lambda: {"state": 0})
 
     @f.register
@@ -875,7 +869,6 @@ def test_error():
 
 
 def test_repr():
-
     humptydumpty = Ovld()
 
     @humptydumpty.register

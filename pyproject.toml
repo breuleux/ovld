@@ -12,28 +12,17 @@ repository = "https://github.com/breuleux/ovld"
 python = "^3.8"
 
 [tool.poetry.dev-dependencies]
-black = "^24.3.0"
 ruff = "^0.3.5"
 codefind = "^0.1.0"
 pytest = "^6.0.1"
 pytest-cov = "^2.10.0"
-
-[tool.black]
-line-length = 80
-
-[tool.isort]
-known_first_party = "ovld"
-known_third_party = ""
-multi_line_output = 3
-include_trailing_comma = true
-combine_as_imports = true
 
 [build-system]
 requires = ["poetry-core>=1.0.8"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-line-length = 99
+line-length = 80
 
 [tool.ruff.lint]
 extend-select = ["I"]
