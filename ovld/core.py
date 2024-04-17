@@ -8,9 +8,14 @@ import typing
 from types import FunctionType
 
 try:
-    from types import GenericAlias, UnionType
+    from types import UnionType
 except ImportError:  # pragma: no cover
     UnionType = None
+
+
+try:
+    from types import GenericAlias
+except ImportError:  # pragma: no cover
 
     class GenericAliasMC(type):
         def __instancecheck__(cls, obj):
