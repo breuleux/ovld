@@ -17,6 +17,10 @@ jobs:
       uses: actions/checkout@v3
     - name: Install rye
       uses: eifinger/setup-rye@v4
+    - name: Pin Python version
+      run: rye pin ${{ matrix.python-version }}
+    - name: Sync dependencies
+      run: rye sync
     - name: Lint check
       run: rye check
     - name: Check formatting
