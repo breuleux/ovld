@@ -3,7 +3,6 @@ import sys
 from dataclasses import dataclass
 
 import pytest
-
 from ovld import deferred, exactly, has_attribute, meta, ovld, strict_subclass
 from ovld.utils import Dataclass
 
