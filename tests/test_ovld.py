@@ -2,7 +2,6 @@ import sys
 import typing
 
 import pytest
-
 from ovld import Ovld, OvldBase, OvldCall, OvldMC, extend_super, is_ovld, ovld
 from ovld.utils import MISSING
 

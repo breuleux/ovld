@@ -25,10 +25,6 @@ jobs:
       run: rye check
     - name: Check formatting
       run: rye format --check
-    - name: Lint check
-      run: ruff check
-    - name: Check formatting
-      run: ruff format --check
 
   test:
     runs-on: ubuntu-latest
