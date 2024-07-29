@@ -19,9 +19,10 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "codefind>=0.1.6",
+    "codefind~=0.1.6",
     "pytest>=8.3.2",
     "pytest-cov>=5.0.0",
+    "uv>=0.2.30",
 ]
 
 [tool.hatch.metadata]
