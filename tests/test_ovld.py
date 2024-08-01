@@ -1112,6 +1112,22 @@ def test_generic_type_argument():
     sys.version_info < (3, 9),
     reason="type[...] syntax requires python3.9 or higher",
 )
+def test_any():
+    @ovld
+    def f(t: type[dict]):
+        return "no"
+
+    @ovld
+    def f(t: type[object]):
+        return "yes"
+
+    assert f(typing.Any) == "yes"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
 def test_plain_type_argument():
     @ovld
     def f(t: type[list]):

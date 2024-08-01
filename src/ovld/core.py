@@ -115,6 +115,8 @@ class MultiTypeMap(dict):
     def transform(self, obj):
         if isinstance(obj, GenericAlias):
             return type[obj.__origin__]
+        elif obj is typing.Any:
+            return type[object]
         elif isinstance(obj, type):
             return type[obj]
         else:
