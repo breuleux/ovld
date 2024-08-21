@@ -72,13 +72,23 @@ class TypeMap(dict):
         the next time getitem is called.
         """
         results = {}
+        abscollect = set()
         if is_type_of_type(obj_t):
-            mro = [type[t] for t in compose_mro(obj_t.__args__[0], self.types)]
+            mro = [
+                type[t]
+                for t in compose_mro(obj_t.__args__[0], self.types, abscollect)
+            ]
             mro.append(type)
             mro.append(object)
         else:
-            mro = compose_mro(obj_t, self.types)
-        for lvl, cls in enumerate(reversed(mro)):
+            mro = compose_mro(obj_t, self.types, abscollect)
+
+        lvl = -1
+        prev_is_abstract = False
+        for cls in reversed(mro):
+            if cls not in abscollect or not prev_is_abstract:
+                lvl += 1
+            prev_is_abstract = cls in abscollect
             handlers = self.entries.get(cls, None)
             if handlers:
                 results.update({h: lvl for h in handlers})
@@ -165,7 +175,7 @@ class MultiTypeMap(dict):
             if obj_t_tup in self:
                 return self[obj_t_tup]
             else:
-                raise self.key_error(obj_t_tup[1:], [])
+                raise self.key_error(obj_t_tup[1:], ())
 
         specificities = {}
         candidates = None
@@ -243,9 +253,7 @@ class MultiTypeMap(dict):
             # No candidate dominates all the others => key_error
             # As second argument, we provide the minimal set of candidates
             # that no other candidate can dominate
-            raise self.key_error(
-                obj_t_tup, [result for result, _, _ in results]
-            )
+            raise self.key_error(obj_t_tup, results)
         else:
             ((result, _, _),) = results
             self[obj_t_tup] = result
@@ -412,12 +420,13 @@ class _Ovld:
             )
         else:
             hlp = ""
-            for p in possibilities:
-                hlp += f"* {p.__name__}\n"
+            for p, prio, spc in possibilities:
+                hlp += f"* {p.__name__}  (priority: {prio}, specificity: {list(spc)})\n"
             raise self.type_error(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
-                "Candidates are:\n" + hlp
+                f"Candidates are:\n{hlp}"
+                "Note: you can use @ovld(priority=X) to give higher priority to an overload."
             )
 
     def rename(self, name):

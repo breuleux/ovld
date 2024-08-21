@@ -32,7 +32,7 @@ def _c3_merge(sequences):  # pragma: no cover
                 del seq[0]
 
 
-def _c3_mro(cls, abcs=None):  # pragma: no cover
+def _c3_mro(cls, abcs=None, abscollect=None):  # pragma: no cover
     """Computes the method resolution order using extended C3 linearization.
     If no *abcs* are given, the algorithm works exactly like the built-in C3
     linearization used for method resolution.
@@ -65,9 +65,18 @@ def _c3_mro(cls, abcs=None):  # pragma: no cover
             abstract_bases.append(base)
     for base in abstract_bases:
         abcs.remove(base)
-    explicit_c3_mros = [_c3_mro(base, abcs=abcs) for base in explicit_bases]
-    abstract_c3_mros = [_c3_mro(base, abcs=abcs) for base in abstract_bases]
-    other_c3_mros = [_c3_mro(base, abcs=abcs) for base in other_bases]
+    abscollect.update(abstract_bases)
+    explicit_c3_mros = [
+        _c3_mro(base, abcs=abcs, abscollect=abscollect)
+        for base in explicit_bases
+    ]
+    abstract_c3_mros = [
+        _c3_mro(base, abcs=abcs, abscollect=abscollect)
+        for base in abstract_bases
+    ]
+    other_c3_mros = [
+        _c3_mro(base, abcs=abcs, abscollect=abscollect) for base in other_bases
+    ]
     return _c3_merge(
         [[cls]]
         + explicit_c3_mros
@@ -79,7 +88,7 @@ def _c3_mro(cls, abcs=None):  # pragma: no cover
     )
 
 
-def compose_mro(cls, types):  # pragma: no cover
+def compose_mro(cls, types, abscollect):  # pragma: no cover
     """Calculates the method resolution order for a given class *cls*.
     Includes relevant abstract base classes (with their respective bases) from
     the *types* iterable. Uses a modified C3 linearization algorithm.
@@ -123,4 +132,4 @@ def compose_mro(cls, types):  # pragma: no cover
             for subcls in sub:
                 if subcls not in mro:
                     mro.append(subcls)
-    return _c3_mro(cls, abcs=mro)
+    return _c3_mro(cls, abcs=mro, abscollect=abscollect)
