@@ -127,6 +127,8 @@ class MultiTypeMap(dict):
         self.empty = MISSING
         self.key_error = key_error
         self.transform = type
+        self.all = {}
+        self.errors = {}
 
     def _transform(self, obj):
         if isinstance(obj, GenericAlias):
@@ -171,23 +173,10 @@ class MultiTypeMap(dict):
             tm = self.maps.setdefault(-1, TypeMap())
             tm.register(object, entry)
 
-    def __missing__(self, obj_t_tup):
-        if obj_t_tup and isinstance(obj_t_tup[0], CodeType):
-            self[obj_t_tup[1:]]
-            if obj_t_tup in self:
-                return self[obj_t_tup]
-            else:
-                raise self.key_error(obj_t_tup[1:], ())
-
+    def resolve(self, obj_t_tup):
         specificities = {}
         candidates = None
         nargs = len(obj_t_tup)
-
-        if not obj_t_tup:
-            if self.empty is MISSING:
-                raise self.key_error(obj_t_tup, ())
-            else:
-                return self.empty[0]
 
         for i, cls in enumerate(obj_t_tup):
             try:
@@ -236,36 +225,73 @@ class MultiTypeMap(dict):
         # Note: priority is always more important than specificity
         candidates.sort(key=lambda cspc: (cspc[1], sum(cspc[2])), reverse=True)
 
-        results = [candidates[0]]
-        for c2, p2, spc2 in candidates[1:]:
-            # Evaluate candidate 2
-            for c1, p1, spc1 in results:
+        self.all[obj_t_tup] = {
+            getattr(c[0], "__code__", None) for c in candidates
+        }
+
+        def _pull(candidates):
+            if not candidates:
+                return
+            rval = [candidates[0]]
+            c1, p1, spc1 = candidates[0]
+            for c2, p2, spc2 in candidates[1:]:
                 if p1 > p2 or (
                     spc1 != spc2 and all(s1 >= s2 for s1, s2 in zip(spc1, spc2))
                 ):
-                    # Candidate 1 dominates candidate 2, therefore we can
-                    # reject candidate 2.
-                    break
-            else:
-                # Candidate 2 cannot be dominated, so we move it to the results
-                # list
-                results.append((c2, p2, spc2))
+                    # Candidate 1 dominates candidate 2
+                    continue
+                else:
+                    # Candidate 1 does not dominate candidate 2, so we add it
+                    # to the list.
+                    rval.append((c2, p2, spc2))
+            yield rval
+            if len(rval) == 1:
+                # Only groups of length 1 are correct and reachable, so we don't
+                # care about the rest.
+                yield from _pull(candidates[1:])
 
-        if len(results) != 1:
-            # No candidate dominates all the others => key_error
-            # As second argument, we provide the minimal set of candidates
-            # that no other candidate can dominate
-            raise self.key_error(obj_t_tup, results)
+        results = list(_pull(candidates))
+        parent = None
+        for group in results:
+            tup = obj_t_tup if parent is None else (parent, *obj_t_tup)
+            if len(group) != 1:
+                self.errors[tup] = self.key_error(obj_t_tup, group)
+                break
+            else:
+                ((fn, _, _),) = group
+                self[tup] = fn
+                if hasattr(fn, "__code__"):
+                    parent = fn.__code__
+                else:
+                    break
+
+        return True
+
+    def __missing__(self, obj_t_tup):
+        if obj_t_tup and isinstance(obj_t_tup[0], CodeType):
+            real_tup = obj_t_tup[1:]
+            self[real_tup]
+            if obj_t_tup[0] not in self.all[real_tup]:
+                return self[real_tup]
+            elif obj_t_tup in self.errors:
+                raise self.errors[obj_t_tup]
+            elif obj_t_tup in self:  # pragma: no cover
+                # PROBABLY not reachable
+                return self[obj_t_tup]
+            else:
+                raise self.key_error(real_tup, ())
+
+        if not obj_t_tup:
+            if self.empty is MISSING:
+                raise self.key_error(obj_t_tup, ())
+            else:
+                return self.empty[0]
+
+        self.resolve(obj_t_tup)
+        if obj_t_tup in self.errors:
+            raise self.errors[obj_t_tup]
         else:
-            ((result, _, _),) = results
-            self[obj_t_tup] = result
-            for (c, _, _), (next_c, _, _) in zip(
-                candidates[:-1], candidates[1:]
-            ):
-                # These keys will be consulted by the .next() method
-                if hasattr(c, "__code__"):
-                    self[c.__code__, *obj_t_tup] = next_c
-            return result
+            return self[obj_t_tup]
 
 
 def _fresh(t):
@@ -417,14 +443,14 @@ class _Ovld:
     def _key_error(self, key, possibilities=None):
         typenames = self._sig_string(key)
         if not possibilities:
-            raise self.type_error(
+            return self.type_error(
                 f"No method in {self} for argument types [{typenames}]"
             )
         else:
             hlp = ""
             for p, prio, spc in possibilities:
                 hlp += f"* {p.__name__}  (priority: {prio}, specificity: {list(spc)})\n"
-            raise self.type_error(
+            return self.type_error(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
                 f"Candidates are:\n{hlp}"

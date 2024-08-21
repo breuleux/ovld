@@ -1,8 +1,19 @@
 import sys
 import typing
+from dataclasses import dataclass
 
 import pytest
-from ovld import Ovld, OvldBase, OvldCall, OvldMC, extend_super, is_ovld, ovld
+
+from ovld import (
+    Dataclass,
+    Ovld,
+    OvldBase,
+    OvldCall,
+    OvldMC,
+    extend_super,
+    is_ovld,
+    ovld,
+)
 from ovld.utils import MISSING
 
 from .test_typemap import Animal, Bird, Mammal
@@ -370,6 +381,76 @@ def test_abstract_types():
     assert f((1, [2, 3])) == ("o", ["o", "o"])
 
 
+@typing.runtime_checkable
+class CanFly(typing.Protocol):
+    def fly(self): ...
+
+
+@dataclass
+class Oiseau:
+    feathers: int
+
+    def fly(self):
+        return "fly!!"
+
+
+def test_protocol():
+    o = Ovld()
+
+    @o.register
+    def f(x: CanFly):
+        return "f"
+
+    @o.register
+    def f(x):
+        return "o"
+
+    assert f(1) == "o"
+    assert f(Oiseau(feathers=13)) == "f"
+
+
+def test_abstract_ambiguity():
+    o = Ovld()
+
+    @o.register
+    def f(x: CanFly):
+        return "f"
+
+    @o.register
+    def f(x: Dataclass):
+        return "dc"
+
+    @o.register
+    def f(x):
+        return "o"
+
+    with pytest.raises(TypeError):
+        f(Oiseau(feathers=13))
+
+
+def test_next_abstract_ambiguity():
+    o = Ovld()
+
+    @o.register(priority=10)
+    def f(x: object):
+        return f.next(x)
+
+    @o.register
+    def f(x: CanFly):
+        return "f"
+
+    @o.register
+    def f(x: Dataclass):
+        return "dc"
+
+    @o.register
+    def f(x):
+        return "o"
+
+    with pytest.raises(TypeError):
+        f(Oiseau(feathers=13))
+
+
 def test_varargs():
     o = Ovld()
 
@@ -532,6 +613,60 @@ def test_next():
         return "OBJECT"
 
     assert f([-1, 0, 1]) == ["OBJECT", 0, 1]
+
+
+def test_next_long_chain():
+    f = Ovld()
+
+    @f.register
+    def f(self, x: int):
+        return ["A", self.next(x)]
+
+    @f.register
+    def f(self, x: object):
+        return ["B", self.next(x)]
+
+    @f.register(priority=-1)
+    def f(self, x: object):
+        return ["C", self.next(x)]
+
+    @f.register(priority=-2)
+    def f(self, x: object):
+        return ["D", x]
+
+    assert f(12) == ["A", ["B", ["C", ["D", 12]]]]
+
+
+def test_next_bottom():
+    f = Ovld()
+
+    @f.register
+    def f(self, x: int):
+        if x >= 0:
+            return x
+        else:
+            return self.next(x)
+
+    @f.register
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    with pytest.raises(TypeError):
+        f([-1, 0, 1])
+
+
+def test_next_different():
+    f = Ovld()
+
+    @f.register
+    def f(x: int):
+        return f.next(str(x))
+
+    @f.register
+    def f(x: str):
+        return x * 2
+
+    assert f(5) == "55"
 
 
 def test_next_nodispatch():
