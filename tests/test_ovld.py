@@ -513,6 +513,70 @@ def test_bootstrap_custom_ovcall():
     assert f([1, 2, 3]) == [2, 3, 4]
 
 
+def test_next():
+    f = Ovld()
+
+    @f.register
+    def f(self, x: int):
+        if x >= 0:
+            return x
+        else:
+            return self.next(x)
+
+    @f.register
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    @f.register
+    def f(self, x: object):
+        return "OBJECT"
+
+    assert f([-1, 0, 1]) == ["OBJECT", 0, 1]
+
+
+def test_next_nodispatch():
+    f = Ovld()
+
+    @f.register
+    def f(x: int):
+        if x >= 0:
+            return x
+        else:
+            return f.next(x)
+
+    @f.register
+    def f(xs: list):
+        return [f(x) for x in xs]
+
+    @f.register
+    def f(x: object):
+        return "OBJECT"
+
+    assert f([-1, 0, 1]) == ["OBJECT", 0, 1]
+
+
+def test_priority():
+    f = Ovld()
+
+    @f.register(priority=1)
+    def f(self, x: object):
+        return ["TOP", self.next(x)]
+
+    @f.register
+    def f(self, xs: list):
+        return [self(x) for x in xs]
+
+    @f.register
+    def f(self, x: int):
+        return x + 1
+
+    @f.register
+    def f(self, x: object):
+        return "BOTTOM"
+
+    assert f([1, "x"]) == ["TOP", [["TOP", 2], ["TOP", "BOTTOM"]]]
+
+
 def test_Ovld_dispatch():
     f = Ovld()
 

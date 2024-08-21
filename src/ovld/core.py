@@ -3,9 +3,10 @@
 import inspect
 import itertools
 import math
+import sys
 import textwrap
 import typing
-from types import FunctionType
+from types import CodeType, FunctionType
 
 try:
     from types import UnionType
@@ -151,6 +152,13 @@ class MultiTypeMap(dict):
             tm.register(object, entry)
 
     def __missing__(self, obj_t_tup):
+        if obj_t_tup and isinstance(obj_t_tup[0], CodeType):
+            self[obj_t_tup[1:]]
+            if obj_t_tup in self:
+                return self[obj_t_tup]
+            else:
+                raise self.key_error(obj_t_tup[1:], [])
+
         specificities = {}
         candidates = None
         nargs = len(obj_t_tup)
@@ -225,6 +233,10 @@ class MultiTypeMap(dict):
         else:
             ((result, _),) = results
             self[obj_t_tup] = result
+            for (c, _), (next_c, _) in zip(candidates[:-1], candidates[1:]):
+                # These keys will be consulted by the .next() method
+                if hasattr(c, "__code__"):
+                    self[c.__code__, *obj_t_tup] = next_c
             return result
 
 
@@ -665,6 +677,15 @@ class _Ovld:
         method = self.map[key]
         return method(*args, **kwargs)
 
+    @_compile_first
+    @_setattrs(rename="next")
+    def next(self, *args, **kwargs):
+        """Call the next matching method after the caller, in terms of priority or specificity."""
+        fr = sys._getframe(1)
+        key = (fr.f_code, *map(self.map.transform, args))
+        method = self.map[key]
+        return method(*args, **kwargs)
+
     @__call__.setalt
     @_setattrs(rename="entry")
     def __ovldcall__(self, *args, **kwargs):
@@ -703,6 +724,13 @@ class OvldCall:
         if not isinstance(t, tuple):
             t = (t,)
         return self.map[t].__get__(self.obj)
+
+    def next(self, *args, **kwargs):
+        """Call the next matching method after the caller, in terms of priority or specificity."""
+        fr = sys._getframe(1)
+        key = (fr.f_code, *map(self.map.transform, args))
+        method = self.map[key]
+        return method(self.obj, *args, **kwargs)
 
     def super(self, *args, **kwargs):
         """Use the parent ovld's method for this call."""
