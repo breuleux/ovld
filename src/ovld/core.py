@@ -273,8 +273,6 @@ class _Ovld:
     Arguments:
         dispatch: A function to use as the entry point. It must find the
             function to dispatch to and call it.
-        initial_state: A function returning the initial state, or None if
-            there is no state.
         postprocess: A function to call on the return value. It is not called
             after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
@@ -296,7 +294,6 @@ class _Ovld:
         self,
         *,
         dispatch=None,
-        initial_state=None,
         postprocess=None,
         type_error=TypeError,
         mixins=[],
@@ -314,11 +311,10 @@ class _Ovld:
         self.linkback = linkback
         self.children = []
         self.type_error = type_error
-        self.initial_state = initial_state
         self.postprocess = postprocess
         self.allow_replacement = allow_replacement
         self.bootstrap_class = OvldCall
-        if self.initial_state or self.postprocess:
+        if self.postprocess:
             assert bootstrap is not False
             self.bootstrap = True
         elif isinstance(bootstrap, type):
@@ -604,7 +600,6 @@ class _Ovld:
     def copy(
         self,
         dispatch=MISSING,
-        initial_state=None,
         postprocess=None,
         mixins=[],
         linkback=False,
@@ -618,7 +613,6 @@ class _Ovld:
             bootstrap=self.bootstrap,
             dispatch=self._dispatch if dispatch is MISSING else dispatch,
             mixins=[self, *mixins],
-            initial_state=initial_state or self.initial_state,
             postprocess=postprocess or self.postprocess,
             linkback=linkback,
         )
@@ -641,20 +635,11 @@ class _Ovld:
         return self.map
 
     @_compile_first
-    def instantiate(self, **state):
-        return self.ocls(map=self.map, state=state, bind_to=BOOTSTRAP)
-
-    @_compile_first
     def __get__(self, obj, cls):
         if obj is None:
             return self
-        if self.initial_state is None or isinstance(self.initial_state, dict):
-            state = self.initial_state
-        else:
-            state = self.initial_state()
         return self.ocls(
             map=self.map,
-            state=state,
             bind_to=obj,
             super=self.mixins[0] if len(self.mixins) == 1 else None,
         )
@@ -685,9 +670,8 @@ class _Ovld:
     def __ovldcall__(self, *args, **kwargs):
         """Call the overloaded function.
 
-        This version of __call__ is used when bootstrap is True. It creates an
-        OvldCall instance to contain the state. This function is only called
-        once at the entry point: recursive calls will will be to
+        This version of __call__ is used when bootstrap is True. This function is
+        only called once at the entry point: recursive calls will will be to
         OvldCall.__call__.
         """
         ovc = self.__get__(BOOTSTRAP, None)
@@ -708,12 +692,10 @@ def is_ovld(x):
 class OvldCall:
     """Context for an Ovld call."""
 
-    def __init__(self, map, state, bind_to, super=None):
+    def __init__(self, map, bind_to, super=None):
         """Initialize an OvldCall."""
         self.map = map
         self._parent = super
-        if state is not None:
-            self.__dict__.update(state)
         self.obj = self if bind_to is BOOTSTRAP else bind_to
 
     def __getitem__(self, t):
@@ -735,10 +717,6 @@ class OvldCall:
     def call(self, *args):
         """Call the right method for the given arguments."""
         return self[tuple(map(self.map.transform, args))](*args)
-
-    def with_state(self, **state):
-        """Return a new OvldCall using the given state."""
-        return type(self)(self.map, state, BOOTSTRAP)
 
     def __call__(self, *args, **kwargs):
         """Call this overloaded function.
@@ -872,8 +850,6 @@ def ovld(fn, **kwargs):
         fn: The function to register.
         dispatch: A function to use as the entry point. It must find the
             function to dispatch to and call it.
-        initial_state: A function returning the initial state, or None if
-            there is no state.
         postprocess: A function to call on the return value. It is not called
             after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
@@ -907,8 +883,6 @@ def ovld_dispatch(dispatch, **kwargs):
     Arguments:
         dispatch: The function to use as the entry point. It must find the
             function to dispatch to and call it.
-        initial_state: A function returning the initial state, or None if
-            there is no state.
         postprocess: A function to call on the return value. It is not called
             after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this

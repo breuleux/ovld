@@ -9,7 +9,7 @@ Other features of `ovld`:
 
 * Multiple dispatch for methods (with `metaclass=ovld.OvldMC`)
 * Create variants of functions
-* Built-in support for extensible, stateful recursion
+* Built-in support for extensible recursion
 * Function wrappers
 * Function postprocessors
 * Nice stack traces
@@ -74,22 +74,6 @@ assert mul([1, 2], [3, 4]) == [3, 8]
 
 A `variant` of a function is a copy which inherits all of the original's implementations but may define new ones. And because `self` is bound to the function that's called at the top level, the implementations for `list`, `tuple` and `dict` will bind `self` to `add` or `mul` depending on which one was called. You may also call `self.super(*args)` to invoke the parent implementation for that type.
 
-## State
-
-You can pass `initial_state` to `@ovld` or `variant`. The initial state must be a function that takes no arguments. Its return value will be available in `self.state`. The state is initialized at the top level call, but recursive calls to `self` will preserve it.
-
-In other words, you can do something like this:
-
-```python
-@add.variant(initial_state=lambda: 0)
-def count(self, x, y):
-    self.state += 1
-    return (f"#{self.state}", x + y)
-
-assert count([1, 2, 3], [4, 5, 6]) == [("#1", 5), ("#2", 7), ("#3", 9)]
-```
-
-The initial_state function can return any object and you can use the state to any purpose (e.g. cache or memoization).
 
 ## Custom dispatch
 
@@ -124,7 +108,7 @@ assert add_default([1, 2, "alouette"]) == [2, 4, "alouettealouette"]
 
 There are other uses for this feature, e.g. memoization.
 
-The normal functions may also have a `self`, which works the same as bootstrapping, and you can give an `initial_state` to `@ovld.dispatch` as well.
+The normal functions may also have a `self`, which works the same as bootstrapping.
 
 ## Postprocess
 
