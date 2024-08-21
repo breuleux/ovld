@@ -6,6 +6,7 @@ import math
 import sys
 import textwrap
 import typing
+from functools import partial
 from types import CodeType, FunctionType
 
 try:
@@ -110,6 +111,7 @@ class MultiTypeMap(dict):
 
     def __init__(self, key_error=KeyError):
         self.maps = {}
+        self.priorities = {}
         self.empty = MISSING
         self.key_error = key_error
 
@@ -138,11 +140,13 @@ class MultiTypeMap(dict):
         """
         self.clear()
 
-        amin, amax, vararg = nargs
+        amin, amax, vararg, priority = nargs
 
         entry = (handler, amin, amax, vararg)
         if not obj_t_tup:
             self.empty = entry
+
+        self.priorities[handler] = priority
 
         for i, cls in enumerate(obj_t_tup):
             tm = self.maps.setdefault(i, TypeMap())
@@ -204,36 +208,46 @@ class MultiTypeMap(dict):
         if not candidates:
             raise self.key_error(obj_t_tup, ())
 
-        candidates = [(c, tuple(specificities[c])) for c in candidates]
+        candidates = [
+            (c, self.priorities.get(c, 0), tuple(specificities[c]))
+            for c in candidates
+        ]
 
         # The sort ensures that if candidate A dominates candidate B, A will
         # appear before B in the list. That's because it must dominate all
         # other possibilities on all arguments, so the sum of all specificities
         # has to be greater.
-        candidates.sort(key=lambda cspc: sum(cspc[1]), reverse=True)
+        # Note: priority is always more important than specificity
+        candidates.sort(key=lambda cspc: (cspc[1], sum(cspc[2])), reverse=True)
 
         results = [candidates[0]]
-        for c2, spc2 in candidates[1:]:
+        for c2, p2, spc2 in candidates[1:]:
             # Evaluate candidate 2
-            for c1, spc1 in results:
-                if spc1 != spc2 and all(s1 >= s2 for s1, s2 in zip(spc1, spc2)):
+            for c1, p1, spc1 in results:
+                if p1 > p2 or (
+                    spc1 != spc2 and all(s1 >= s2 for s1, s2 in zip(spc1, spc2))
+                ):
                     # Candidate 1 dominates candidate 2, therefore we can
                     # reject candidate 2.
                     break
             else:
                 # Candidate 2 cannot be dominated, so we move it to the results
                 # list
-                results.append((c2, spc2))
+                results.append((c2, p2, spc2))
 
         if len(results) != 1:
             # No candidate dominates all the others => key_error
             # As second argument, we provide the minimal set of candidates
             # that no other candidate can dominate
-            raise self.key_error(obj_t_tup, [result for result, _ in results])
+            raise self.key_error(
+                obj_t_tup, [result for result, _, _ in results]
+            )
         else:
-            ((result, _),) = results
+            ((result, _, _),) = results
             self[obj_t_tup] = result
-            for (c, _), (next_c, _) in zip(candidates[:-1], candidates[1:]):
+            for (c, _, _), (next_c, _, _) in zip(
+                candidates[:-1], candidates[1:]
+            ):
                 # These keys will be consulted by the .next() method
                 if hasattr(c, "__code__"):
                     self[c.__code__, *obj_t_tup] = next_c
@@ -527,17 +541,23 @@ class _Ovld:
 
     def register_signature(self, key, orig_fn):
         """Register a function for the given signature."""
-        sig, min, max, vararg = key
+        sig, min, max, vararg, priority = key
         fn = rename_function(
             orig_fn, f"{self.__name__}[{self._sig_string(sig)}]"
         )
         # We just need to keep the Conformer pointer alive for jurigged
         # to find it, if jurigged is used with ovld
         fn._conformer = Conformer(self, orig_fn, fn)
-        self.map.register(sig, (min, max, vararg), fn)
+        self.map.register(sig, (min, max, vararg, priority), fn)
         return self
 
-    def register(self, fn):
+    def register(self, fn=None, priority=0):
+        """Register a function."""
+        if fn is None:
+            return partial(self._register, priority=priority)
+        return self._register(fn, priority)
+
+    def _register(self, fn, priority):
         """Register a function."""
 
         def _normalize_type(t, force_tuple=False):
@@ -588,7 +608,7 @@ class _Ovld:
             _normalize_type(t, force_tuple=True) for t in typelist
         )
         for tl in itertools.product(*typelist_tups):
-            sig = (tuple(tl), req_pos, max_pos, bool(argspec.varargs))
+            sig = (tuple(tl), req_pos, max_pos, bool(argspec.varargs), priority)
             if not self.allow_replacement and sig in self._defns:
                 raise TypeError(f"There is already a method for {tl}")
             self._defns[(*sig,)] = fn
@@ -862,7 +882,7 @@ def _find_overload(fn, **kwargs):
 
 
 @keyword_decorator
-def ovld(fn, **kwargs):
+def ovld(fn, priority=0, **kwargs):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -893,7 +913,7 @@ def ovld(fn, **kwargs):
             ovld so that updates can be propagated. (default: False)
     """
     dispatch = _find_overload(fn, **kwargs)
-    return dispatch.register(fn)
+    return dispatch.register(fn, priority=priority)
 
 
 @keyword_decorator
