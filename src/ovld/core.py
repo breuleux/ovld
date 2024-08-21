@@ -114,8 +114,9 @@ class MultiTypeMap(dict):
         self.priorities = {}
         self.empty = MISSING
         self.key_error = key_error
+        self.transform = type
 
-    def transform(self, obj):
+    def _transform(self, obj):
         if isinstance(obj, GenericAlias):
             return type[obj.__origin__]
         elif obj is typing.Any:
@@ -139,6 +140,9 @@ class MultiTypeMap(dict):
             handler: A function to handle the tuple.
         """
         self.clear()
+
+        if any(isinstance(x, GenericAlias) for x in obj_t_tup):
+            self.transform = self._transform
 
         amin, amax, vararg, priority = nargs
 
