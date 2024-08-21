@@ -527,15 +527,12 @@ class _Ovld:
                 repl = self._maybe_rename(repl)
                 setattr(cls, method, repl)
 
+        target = self.ocls if self.bootstrap else cls
         if self._dispatch:
-            if self.bootstrap:
-                self.ocls.__call__ = self._dispatch
-            else:
-                cls.__call__ = self._dispatch
+            target.__call__ = self._dispatch
 
         # Rename the dispatch
-        if self._dispatch:
-            self._dispatch = rename_function(self._dispatch, f"{name}.dispatch")
+        target.__call__ = rename_function(target.__call__, f"{name}.dispatch")
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
