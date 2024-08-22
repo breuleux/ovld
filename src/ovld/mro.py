@@ -6,6 +6,39 @@
 # assume they have already been properly tested.
 
 
+def _issubclass(c1, c2):
+    if hasattr(c1, "__origin__") or hasattr(c2, "__origin__"):
+        o1 = getattr(c1, "__origin__", c1)
+        o2 = getattr(c2, "__origin__", c2)
+        if issubclass(o1, o2):
+            if o2 is c2:  # pragma: no cover
+                return True
+            else:
+                args1 = getattr(c1, "__args__", ())
+                args2 = getattr(c2, "__args__", ())
+                if len(args1) != len(args2):
+                    return False
+                return all(_issubclass(a1, a2) for a1, a2 in zip(args1, args2))
+        else:
+            return False
+    else:
+        return issubclass(c1, c2)
+
+
+def _mro(cls):
+    if hasattr(cls, "__mro__"):
+        return set(cls.__mro__)
+    elif hasattr(cls, "__origin__"):
+        return set(cls.__origin__.__mro__)
+    else:  # pragma: no cover
+        return {cls}
+
+
+def _subclasses(cls):
+    scf = getattr(cls, "__subclasses__", ())
+    return scf and scf()
+
+
 def _c3_merge(sequences):  # pragma: no cover
     """Merges MROs in *sequences* to a single MRO using the C3 algorithm.
     Adapted from http://www.python.org/download/releases/2.3/mro/.
@@ -46,19 +79,22 @@ def _c3_mro(cls, abcs=None, abscollect=None):  # pragma: no cover
     MRO of said class. If two implicit ABCs end up next to each other in the
     resulting MRO, their ordering depends on the order of types in *abcs*.
     """
-    for i, base in enumerate(reversed(cls.__bases__)):
+    bases = getattr(cls, "__bases__", ())
+    if hasattr(cls, "__origin__"):
+        bases = [cls.__origin__, *bases]
+    for i, base in enumerate(reversed(bases)):
         if hasattr(base, "__abstractmethods__"):
-            boundary = len(cls.__bases__) - i
+            boundary = len(bases) - i
             break  # Bases up to the last explicit ABC are considered first.
     else:
         boundary = 0
     abcs = list(abcs) if abcs else []
-    explicit_bases = list(cls.__bases__[:boundary])
+    explicit_bases = list(bases[:boundary])
     abstract_bases = []
-    other_bases = list(cls.__bases__[boundary:])
+    other_bases = list(bases[boundary:])
     for base in abcs:
-        if issubclass(cls, base) and not any(
-            issubclass(b, base) for b in cls.__bases__
+        if _issubclass(cls, base) and not any(
+            _issubclass(b, base) for b in bases
         ):
             # If *cls* is the class that introduces behaviour described by
             # an ABC *base*, insert said ABC to its MRO.
@@ -93,15 +129,11 @@ def compose_mro(cls, types, abscollect):  # pragma: no cover
     Includes relevant abstract base classes (with their respective bases) from
     the *types* iterable. Uses a modified C3 linearization algorithm.
     """
-    bases = set(cls.__mro__)
+    bases = _mro(cls)
 
     # Remove entries which are already present in the __mro__ or unrelated.
     def is_related(typ):
-        return (
-            typ not in bases
-            and hasattr(typ, "__mro__")
-            and issubclass(cls, typ)
-        )
+        return typ not in bases and _issubclass(cls, typ)
 
     types = [n for n in types if is_related(n)]
 
@@ -109,7 +141,7 @@ def compose_mro(cls, types, abscollect):  # pragma: no cover
     # in the MRO anyway.
     def is_strict_base(typ):
         for other in types:
-            if typ != other and typ in other.__mro__:
+            if typ != other and typ in _mro(other):
                 return True
         return False
 
@@ -119,9 +151,11 @@ def compose_mro(cls, types, abscollect):  # pragma: no cover
     type_set = set(types)
     mro = []
     for typ in types:
+        if typ is object:
+            continue
         found = []
-        for sub in typ.__subclasses__():
-            if sub not in bases and issubclass(cls, sub):
+        for sub in _subclasses(typ):
+            if sub not in bases and _issubclass(cls, sub):
                 found.append([s for s in sub.__mro__ if s in type_set])
         if not found:
             mro.append(typ)

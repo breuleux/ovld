@@ -17,16 +17,13 @@ except ImportError:  # pragma: no cover
     UnionType = None
 
 
-try:
-    from types import GenericAlias
-except ImportError:  # pragma: no cover
+class GenericAliasMC(type):
+    def __instancecheck__(cls, obj):
+        return hasattr(obj, "__origin__")
 
-    class GenericAliasMC(type):
-        def __instancecheck__(cls, obj):
-            return hasattr(obj, "__origin__")
 
-    class GenericAlias(metaclass=GenericAliasMC):
-        pass
+class GenericAlias(metaclass=GenericAliasMC):
+    pass
 
 
 from .mro import compose_mro
@@ -132,7 +129,7 @@ class MultiTypeMap(dict):
 
     def _transform(self, obj):
         if isinstance(obj, GenericAlias):
-            return type[obj.__origin__]
+            return type[obj]
         elif obj is typing.Any:
             return type[object]
         elif isinstance(obj, type):
@@ -167,11 +164,13 @@ class MultiTypeMap(dict):
         self.priorities[handler] = priority
 
         for i, cls in enumerate(obj_t_tup):
-            tm = self.maps.setdefault(i, TypeMap())
-            tm.register(cls, entry)
+            if i not in self.maps:
+                self.maps[i] = TypeMap()
+            self.maps[i].register(cls, entry)
         if vararg:
-            tm = self.maps.setdefault(-1, TypeMap())
-            tm.register(object, entry)
+            if -1 not in self.maps:
+                self.maps[-1] = TypeMap()
+            self.maps[-1].register(object, entry)
 
     def resolve(self, obj_t_tup):
         specificities = {}
@@ -608,7 +607,7 @@ class _Ovld:
                 return _normalize_type(t.__args__)
             elif origin is not None:
                 raise TypeError(
-                    "ovld does not accept generic types except type, Union or Optional"
+                    f"ovld does not accept generic types except type, Union or Optional, not {t}"
                 )
             elif isinstance(t, tuple):
                 return tuple(_normalize_type(t2) for t2 in t)

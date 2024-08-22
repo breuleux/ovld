@@ -1263,6 +1263,64 @@ def test_plain_type_argument():
     assert f(1234) == "other anything"
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
+def test_parametrized():
+    @ovld
+    def f(t: type[list[int]]):
+        return "list of int"
+
+    @f.register
+    def f(t: type[list[str]]):
+        return "list of str"
+
+    @f.register
+    def f(t: type[list]):
+        return "list"
+
+    assert f(list[int]) == "list of int"
+    assert f(list[str]) == "list of str"
+    assert f(list[object]) == "list"
+    assert f(list) == "list"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 9),
+    reason="type[...] syntax requires python3.9 or higher",
+)
+def test_parametrized_protocols():
+    @ovld
+    def f(t: type[typing.Iterable[object]]):
+        return "iterable"
+
+    # @f.register
+    # def f(t: type[typing.Iterable[Animal]]):
+    #     return "iterable of animals"
+
+    assert f(list[int]) == "iterable"
+    # assert f(list[Animal]) == "iterable of animals"
+    # assert f(list[Mammal]) == "iterable of animals"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason="Generic type syntax requires python3.12 or higher",
+)
+def test_parametrized_class():
+    code = """class Thing[T]: ..."""
+    exec(code, globals(), globals())
+
+    Thing = globals()["Thing"]
+
+    @ovld
+    def f(t: type[Thing[Animal]]):
+        return "thingy"
+
+    assert f(Thing[Mammal]) == "thingy"
+
+
 class Booboo:
     pass
 
