@@ -7,6 +7,8 @@
 
 
 def _issubclass(c1, c2):
+    c1 = getattr(c1, "__proxy_for__", c1)
+    c2 = getattr(c2, "__proxy_for__", c2)
     if hasattr(c1, "__origin__") or hasattr(c2, "__origin__"):
         o1 = getattr(c1, "__origin__", c1)
         o2 = getattr(c2, "__origin__", c2)
