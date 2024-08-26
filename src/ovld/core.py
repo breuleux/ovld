@@ -9,7 +9,9 @@ import typing
 from functools import partial
 from types import CodeType
 
+from .mro import compose_mro
 from .recode import Conformer, rename_function
+from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 try:
     from types import UnionType
@@ -24,10 +26,6 @@ class GenericAliasMC(type):
 
 class GenericAlias(metaclass=GenericAliasMC):
     pass
-
-
-from .mro import compose_mro
-from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 
 def is_type_of_type(t):
