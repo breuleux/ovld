@@ -710,54 +710,28 @@ def test_priority():
     assert f([1, "x"]) == ["TOP", [["TOP", 2], ["TOP", "BOTTOM"]]]
 
 
-def test_Ovld_dispatch():
+def test_resolve():
     f = Ovld()
 
-    @f.dispatch
-    def f(self, x):
-        f1 = self.resolve(x, x)
-        f2 = self[type(x), type(x)]
-        assert f1 == f2
-        return f1(x, x)
-
-    with pytest.raises(TypeError):
-
-        @f.dispatch
-        def f(self, x):
-            return self.map[(type(x), type(x))](x, x)
-
     @f.register
-    def f(x: int, y: int):
-        return x + y
+    def f(x: int):
+        return x * 2
 
-    @f.register
-    def f(xs: tuple, ys: tuple):
-        return tuple(f(x) for x in xs)
-
-    assert f(1) == 2
-    assert f((4, 5)) == (8, 10)
+    assert f.resolve(8)("hello") == "hellohello"
 
 
-def test_Ovld_dispatch_bootstrap():
-    f = Ovld()
+def test_method_resolve():
+    class C(OvldBase):
+        def __init__(self, n):
+            self.n = n
 
-    @f.dispatch
-    def f(self, x):
-        f1 = self.resolve(x, x)
-        f2 = self[type(x), type(x)]
-        assert f1 == f2
-        return f1(x, x)
+        @ovld
+        def f(self, x: int):
+            return x * self.n
 
-    @f.register
-    def f(self, x: int, y: int):
-        return x + y
+    c = C(2)
 
-    @f.register
-    def f(self, xs: tuple, ys: tuple):
-        return tuple(self(x) for x in xs)
-
-    assert f(1) == 2
-    assert f((4, 5)) == (8, 10)
+    assert c.f.resolve(8)("hello") == "hellohello"
 
 
 def test_method():
@@ -896,9 +870,9 @@ def test_metaclass_dispatch():
         def __init__(self, n):
             self.n = n
 
-        @ovld.dispatch
-        def perform(ovld_call, x):
-            return ovld_call.call(x) * 2
+        @ovld(priority=1000)
+        def perform(self, x):
+            return self.perform.next(x) * 2
 
         def perform(self, x: int):
             return x + self.n
@@ -924,10 +898,7 @@ def test_metaclass_dispatch_2():
         def __init__(self, n):
             self.n = n
 
-        @ovld.dispatch
-        def perform(ovld_call, x):
-            return ovld_call.call(x)
-
+        @ovld
         def perform(self, x: int):
             return x + self.n
 
@@ -939,9 +910,9 @@ def test_metaclass_dispatch_2():
 
     class Two(One):
         @extend_super
-        @ovld.dispatch
-        def perform(ovld_call, x):
-            return ovld_call.call(x) * 2
+        @ovld(priority=1000)
+        def perform(self, x):
+            return self.perform.next(x) * 2
 
     x2 = Two(1)
     assert x2.perform([1, 2, 3]) == [4, 6, 8, 4, 6, 8]
@@ -952,9 +923,9 @@ def test_multiple_dispatch_3():
         def __init__(self, n):
             self.n = n
 
-        @ovld.dispatch
-        def perform(ovld_call, x):
-            return ovld_call.call(x) * 2
+        @ovld(priority=1000)
+        def perform(self, x):
+            return self.perform.next(x) * 2
 
         def perform(self, xs: list):
             return [self.perform(x) for x in xs]

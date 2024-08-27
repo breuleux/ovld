@@ -1,4 +1,4 @@
-from ovld import ovld, ovld_dispatch
+from ovld import ovld
 
 _ovld_exc = None
 try:
@@ -18,9 +18,9 @@ except Exception as exc:
 _ovld_dispatch_exc = None
 try:
 
-    @ovld_dispatch
+    @ovld
     def roesti(self, x):
-        return self.resolve(x, x)(x, x)
+        return self(x, x)
 
     @ovld
     def roesti(self, x: int, y: int):
