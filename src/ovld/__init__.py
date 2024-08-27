@@ -6,7 +6,6 @@ from .core import (
     extend_super,
     is_ovld,
     ovld,
-    ovld_dispatch,
 )
 from .typemap import (
     MultiTypeMap,
@@ -36,7 +35,6 @@ __all__ = [
     "extend_super",
     "is_ovld",
     "ovld",
-    "ovld_dispatch",
     "BOOTSTRAP",
     "MISSING",
     "Dataclass",

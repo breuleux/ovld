@@ -9,7 +9,7 @@ from functools import partial
 
 from .recode import Conformer, rename_function
 from .typemap import MultiTypeMap, is_type_of_type
-from .utils import BOOTSTRAP, MISSING, keyword_decorator
+from .utils import BOOTSTRAP, keyword_decorator
 
 try:
     from types import UnionType
@@ -60,8 +60,6 @@ class _Ovld:
     function should annotate the same parameter.
 
     Arguments:
-        dispatch: A function to use as the entry point. It must find the
-            function to dispatch to and call it.
         postprocess: A function to call on the return value. It is not called
             after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
@@ -82,7 +80,6 @@ class _Ovld:
     def __init__(
         self,
         *,
-        dispatch=None,
         postprocess=None,
         type_error=TypeError,
         mixins=[],
@@ -94,7 +91,6 @@ class _Ovld:
     ):
         """Initialize an Ovld."""
         self._compiled = False
-        self._dispatch = dispatch
         self.maindoc = None
         self.mapper = mapper
         self.linkback = linkback
@@ -145,8 +141,6 @@ class _Ovld:
                 if self.bootstrap is None:
                     self.bootstrap = mixin.bootstrap
                 assert mixin.bootstrap is self.bootstrap
-            if mixin._dispatch:
-                self._dispatch = mixin._dispatch
         self.mixins += mixins
 
     def _sig_string(self, type_tuple):
@@ -220,16 +214,15 @@ class _Ovld:
         else:
             self.__signature__ = inspect.signature(modelA)
 
-    def _set_attrs_from(self, fn, dispatch=False):
+    def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
         if self.bootstrap is None:
             sign = inspect.signature(fn)
             params = list(sign.parameters.values())
-            if not dispatch:
-                if params and params[0].name == "self":
-                    self.bootstrap = True
-                else:
-                    self.bootstrap = False
+            if params and params[0].name == "self":
+                self.bootstrap = True
+            else:
+                self.bootstrap = False
 
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
@@ -279,8 +272,6 @@ class _Ovld:
                 setattr(cls, method, repl)
 
         target = self.ocls if self.bootstrap else cls
-        if self._dispatch:
-            target.__call__ = self._dispatch
 
         # Rename the dispatch
         target.__call__ = rename_function(target.__call__, f"{name}.dispatch")
@@ -288,14 +279,7 @@ class _Ovld:
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
 
-    def dispatch(self, dispatch):
-        """Set a dispatch function."""
-        if self._dispatch is not None:
-            raise TypeError(f"dispatch for {self} is already set")
-        self._dispatch = dispatch
-        self._set_attrs_from(dispatch, dispatch=True)
-        return self
-
+    @_compile_first
     def resolve(self, *args):
         """Find the correct method to call for the given arguments."""
         return self.map[tuple(map(self.map.transform, args))]
@@ -394,7 +378,6 @@ class _Ovld:
 
     def copy(
         self,
-        dispatch=MISSING,
         postprocess=None,
         mixins=[],
         linkback=False,
@@ -406,7 +389,6 @@ class _Ovld:
         """
         return _fresh(_Ovld)(
             bootstrap=self.bootstrap,
-            dispatch=self._dispatch if dispatch is MISSING else dispatch,
             mixins=[self, *mixins],
             postprocess=postprocess or self.postprocess,
             linkback=linkback,
@@ -532,10 +514,6 @@ class OvldCall:
     def resolve(self, *args):
         """Find the right method to call for the given arguments."""
         return self[tuple(map(self.map.transform, args))]
-
-    def call(self, *args):
-        """Call the right method for the given arguments."""
-        return self[tuple(map(self.map.transform, args))](*args)
 
     def __call__(self, *args, **kwargs):
         """Call this overloaded function.
@@ -667,8 +645,6 @@ def ovld(fn, priority=0, **kwargs):
 
     Arguments:
         fn: The function to register.
-        dispatch: A function to use as the entry point. It must find the
-            function to dispatch to and call it.
         postprocess: A function to call on the return value. It is not called
             after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
@@ -687,42 +663,6 @@ def ovld(fn, priority=0, **kwargs):
     return dispatch.register(fn, priority=priority)
 
 
-@keyword_decorator
-def ovld_dispatch(dispatch, **kwargs):
-    """Overload a function using the decorated function as a dispatcher.
-
-    The dispatch is the entry point for the function and receives a `self`
-    which is an Ovld or OvldCall instance, and the rest of the arguments.
-    It may call `self.resolve(arg1, arg2, ...)` to get the right method to
-    call.
-
-    The decorator optionally takes keyword arguments, *only* on the first
-    use.
-
-    Arguments:
-        dispatch: The function to use as the entry point. It must find the
-            function to dispatch to and call it.
-        postprocess: A function to call on the return value. It is not called
-            after recursive calls.
-        mixins: A list of Ovld instances that contribute functions to this
-            Ovld.
-        type_error: The error type to raise when no function can be found to
-            dispatch to (default: TypeError).
-        name: Optional name for the Ovld. If not provided, it will be
-            gotten automatically from the first registered function or
-            dispatch.
-        mapper: Class implementing a mapping interface from a tuple of
-            types to a handler (default: MultiTypeMap).
-        linkback: Whether to keep a pointer in the parent mixins to this
-            ovld so that updates can be propagated. (default: False)
-    """
-    ov = _find_overload(dispatch, **kwargs)
-    return ov.dispatch(dispatch)
-
-
-ovld.dispatch = ovld_dispatch
-
-
 __all__ = [
     "Ovld",
     "OvldBase",
@@ -731,5 +671,4 @@ __all__ = [
     "extend_super",
     "is_ovld",
     "ovld",
-    "ovld_dispatch",
 ]
