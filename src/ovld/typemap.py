@@ -290,34 +290,26 @@ class MultiTypeMap(dict):
     def wrap_dependent(self, tup, handlers, group):
         handlers = list(handlers)
 
+        def find_method(args):
+            matches = [
+                h
+                for h in handlers
+                if dependent_match(self.type_tuples[h], args)
+            ]
+            if len(matches) == 0:
+                return self[(handlers[0].__code__, *tup)]
+            elif len(matches) > 1:
+                raise self.key_error(tup, group)
+            return matches[0]
+
         if inspect.getfullargspec(handlers[0]).args[0] == "self":
 
             def dispatch(slf, *args, **kwargs):
-                matches = [
-                    h
-                    for h in handlers
-                    if dependent_match(self.type_tuples[h], args)
-                ]
-                if len(matches) == 0:
-                    return self[(handlers[0].__code__, *tup)](
-                        slf, *args, **kwargs
-                    )
-                elif len(matches) > 1:
-                    raise self.key_error(tup, group)
-                return matches[0](slf, *args, **kwargs)
+                return find_method(args)(slf, *args, **kwargs)
         else:
 
             def dispatch(*args, **kwargs):
-                matches = [
-                    h
-                    for h in handlers
-                    if dependent_match(self.type_tuples[h], args)
-                ]
-                if len(matches) == 0:
-                    return self[(handlers[0].__code__, *tup)](*args, **kwargs)
-                elif len(matches) > 1:
-                    raise self.key_error(tup, group)
-                return matches[0](*args, **kwargs)
+                return find_method(args)(*args, **kwargs)
 
         return dispatch
 
