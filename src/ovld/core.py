@@ -9,9 +9,10 @@ import typing
 from functools import partial
 from types import CodeType
 
+from .dependent import DependentType, dependent_match
 from .mro import sort_types
 from .recode import Conformer, rename_function
-from .utils import BOOTSTRAP, MISSING, DependentType, keyword_decorator
+from .utils import BOOTSTRAP, MISSING, keyword_decorator
 
 try:
     from types import UnionType
@@ -129,82 +130,7 @@ class MultiTypeMap(dict):
         else:
             return type(obj)
 
-    def register(self, obj_t_tup, nargs, handler):
-        """Register a handler for a tuple of argument types.
-
-        Arguments:
-            obj_t_tup: A tuple of argument types.
-            nargs: A (amin, amax, varargs) tuple where amin is the minimum
-                number of arguments needed to match this tuple (if there are
-                default arguments, it is possible that amin < len(obj_t_tup)),
-                amax is the maximum number of arguments, and varargs is a
-                boolean indicating whether there can be an arbitrary number
-                of arguments.
-            handler: A function to handle the tuple.
-        """
-        self.clear()
-
-        if any(isinstance(x, GenericAlias) for x in obj_t_tup):
-            self.transform = self._transform
-
-        amin, amax, vararg, priority = nargs
-
-        entry = (handler, amin, amax, vararg)
-        if not obj_t_tup:
-            self.empty = entry
-
-        self.priorities[handler] = priority
-        self.type_tuples[handler] = obj_t_tup
-        self.dependent[handler] = any(
-            isinstance(t, DependentType) for t in obj_t_tup
-        )
-
-        for i, cls in enumerate(obj_t_tup):
-            if i not in self.maps:
-                self.maps[i] = TypeMap()
-            self.maps[i].register(cls, entry)
-        if vararg:
-            if -1 not in self.maps:
-                self.maps[-1] = TypeMap()
-            self.maps[-1].register(object, entry)
-
-    def wrap_dependent(self, tup, handlers, group):
-        handlers = list(handlers)
-
-        def match(tup, args):
-            for t, a in zip(tup, args):
-                if isinstance(t, DependentType) and not t.check(a):
-                    return False
-            return True
-
-        if inspect.getfullargspec(handlers[0]).args[0] == "self":
-
-            def dispatch(slf, *args, **kwargs):
-                matches = [
-                    h for h in handlers if match(self.type_tuples[h], args)
-                ]
-                if len(matches) == 0:
-                    return self[(handlers[0].__code__, *tup)](
-                        slf, *args, **kwargs
-                    )
-                elif len(matches) > 1:
-                    raise self.key_error(tup, group)
-                return matches[0](slf, *args, **kwargs)
-        else:
-
-            def dispatch(*args, **kwargs):
-                matches = [
-                    h for h in handlers if match(self.type_tuples[h], args)
-                ]
-                if len(matches) == 0:
-                    return self[(handlers[0].__code__, *tup)](*args, **kwargs)
-                elif len(matches) > 1:
-                    raise self.key_error(tup, group)
-                return matches[0](*args, **kwargs)
-
-        return dispatch
-
-    def resolve(self, obj_t_tup):
+    def mro(self, obj_t_tup):
         specificities = {}
         candidates = None
         nargs = len(obj_t_tup)
@@ -240,9 +166,6 @@ class MultiTypeMap(dict):
                 candidates &= results.keys()
             for c in candidates:
                 specificities.setdefault(c, []).append(results[c])
-
-        if not candidates:
-            raise self.key_error(obj_t_tup, ())
 
         candidates = [
             (c, self.priorities.get(c, 0), tuple(specificities[c]))
@@ -285,7 +208,134 @@ class MultiTypeMap(dict):
             if len(rval) >= 1:
                 yield from _pull(candidates[1:])
 
-        results = list(_pull(candidates))
+        return list(_pull(candidates))
+
+    def register(self, obj_t_tup, nargs, handler):
+        """Register a handler for a tuple of argument types.
+
+        Arguments:
+            obj_t_tup: A tuple of argument types.
+            nargs: A (amin, amax, varargs) tuple where amin is the minimum
+                number of arguments needed to match this tuple (if there are
+                default arguments, it is possible that amin < len(obj_t_tup)),
+                amax is the maximum number of arguments, and varargs is a
+                boolean indicating whether there can be an arbitrary number
+                of arguments.
+            handler: A function to handle the tuple.
+        """
+        self.clear()
+
+        if any(isinstance(x, GenericAlias) for x in obj_t_tup):
+            self.transform = self._transform
+
+        amin, amax, vararg, priority = nargs
+
+        entry = (handler, amin, amax, vararg)
+        if not obj_t_tup:
+            self.empty = entry
+
+        self.priorities[handler] = priority
+        self.type_tuples[handler] = obj_t_tup
+        self.dependent[handler] = any(
+            isinstance(t, DependentType) for t in obj_t_tup
+        )
+
+        for i, cls in enumerate(obj_t_tup):
+            if i not in self.maps:
+                self.maps[i] = TypeMap()
+            self.maps[i].register(cls, entry)
+        if vararg:
+            if -1 not in self.maps:
+                self.maps[-1] = TypeMap()
+            self.maps[-1].register(object, entry)
+
+    def display_methods(self):
+        for h, prio in sorted(self.priorities.items(), key=lambda kv: -kv[1]):
+            prio = f"[{prio}]"
+            width = 6
+            print(f"{prio:{width}} \033[1m{h.__name__}\033[0m")
+            co = h.__code__
+            print(f"{'':{width-2}} @ {co.co_filename}:{co.co_firstlineno}")
+
+    def display_resolution(self, *args):
+        message = "No method will be called."
+        argt = map(self.transform, args)
+        finished = False
+        rank = 1
+        for grp in self.mro(tuple(argt)):
+            match = [
+                dependent_match(self.type_tuples[handler], args)
+                for handler, _, _ in grp
+            ]
+            ambiguous = len([m for m in match if m]) > 1
+            for m, (handler, prio, spec) in zip(match, grp):
+                color = "\033[0m"
+                if finished:
+                    bullet = "--"
+                    color = "\033[1;90m"
+                elif not m:
+                    bullet = "!="
+                    color = "\033[1;90m"
+                elif ambiguous:
+                    bullet = "=="
+                    color = "\033[1;31m"
+                else:
+                    bullet = f"#{rank}"
+                    if rank == 1:
+                        message = f"{handler.__name__} will be called first."
+                        color = "\033[1;32m"
+                    rank += 1
+                spec = ".".join(map(str, spec))
+                lvl = f"[{prio}:{spec}]"
+                width = 2 * len(args) + 6
+                print(f"{color}{bullet} {lvl:{width}} {handler.__name__}")
+                co = handler.__code__
+                print(
+                    f"   {'':{width-1}}@ {co.co_filename}:{co.co_firstlineno}\033[0m"
+                )
+            if ambiguous:
+                message += " There is ambiguity between multiple matching methods, marked '=='."
+                finished = True
+        print("Resolution:", message)
+
+    def wrap_dependent(self, tup, handlers, group):
+        handlers = list(handlers)
+
+        if inspect.getfullargspec(handlers[0]).args[0] == "self":
+
+            def dispatch(slf, *args, **kwargs):
+                matches = [
+                    h
+                    for h in handlers
+                    if dependent_match(self.type_tuples[h], args)
+                ]
+                if len(matches) == 0:
+                    return self[(handlers[0].__code__, *tup)](
+                        slf, *args, **kwargs
+                    )
+                elif len(matches) > 1:
+                    raise self.key_error(tup, group)
+                return matches[0](slf, *args, **kwargs)
+        else:
+
+            def dispatch(*args, **kwargs):
+                matches = [
+                    h
+                    for h in handlers
+                    if dependent_match(self.type_tuples[h], args)
+                ]
+                if len(matches) == 0:
+                    return self[(handlers[0].__code__, *tup)](*args, **kwargs)
+                elif len(matches) > 1:
+                    raise self.key_error(tup, group)
+                return matches[0](*args, **kwargs)
+
+        return dispatch
+
+    def resolve(self, obj_t_tup):
+        results = self.mro(obj_t_tup)
+        if not results:
+            raise self.key_error(obj_t_tup, ())
         parents = []
         for group in results:
             tups = (
@@ -811,6 +861,14 @@ class _Ovld:
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
+
+    @_compile_first
+    def display_methods(self):
+        self.map.display_methods()
+
+    @_compile_first
+    def display_resolution(self, *args):
+        self.map.display_resolution(*args)
 
 
 def is_ovld(x):
