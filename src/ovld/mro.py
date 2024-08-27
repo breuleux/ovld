@@ -2,11 +2,13 @@ from itertools import product
 
 from graphlib import TopologicalSorter
 
-from .utils import DependentType
+from .dependent import DependentType
 
 
 def _issubclass(c1, c2):
-    if isinstance(c1, DependentType) or isinstance(c2, DependentType):
+    if isinstance(c1, DependentType) and isinstance(c2, DependentType):
+        return c1.bound != c2.bound and _issubclass(c1.bound, c2.bound)
+    elif isinstance(c1, DependentType) or isinstance(c2, DependentType):
         return False
     c1 = getattr(c1, "__proxy_for__", c1)
     c2 = getattr(c2, "__proxy_for__", c2)
@@ -32,7 +34,7 @@ def _may_cover(c1, c2):
     if isinstance(c1, DependentType):
         if isinstance(c2, DependentType):
             return False
-        return _issubclass(c1.bound(), c2)
+        return _issubclass(c2, c1.bound)
     return False
 
 
