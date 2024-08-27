@@ -159,8 +159,8 @@ def test_deeper_caching():
 
     assert _get(tm, Cat, Cat) == ["MM"]
 
-    assert m0[Cat] == {("MM", 2, 2, False): 2}
-    assert m1[Cat] == {("MM", 2, 2, False): 2}
+    assert m0[Cat] == {("MM", 2, 2, False): 0}
+    assert m1[Cat] == {("MM", 2, 2, False): 0}
 
 
 def test_cache_invalidation():

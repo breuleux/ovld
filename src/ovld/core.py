@@ -9,9 +9,9 @@ import typing
 from functools import partial
 from types import CodeType
 
-from .mro import compose_mro
+from .mro import sort_types
 from .recode import Conformer, rename_function
-from .utils import BOOTSTRAP, MISSING, keyword_decorator
+from .utils import BOOTSTRAP, MISSING, DependentType, keyword_decorator
 
 try:
     from types import UnionType
@@ -69,26 +69,18 @@ class TypeMap(dict):
         the next time getitem is called.
         """
         results = {}
-        abscollect = set()
-        if is_type_of_type(obj_t):
-            mro = [
-                type[t]
-                for t in compose_mro(obj_t.__args__[0], self.types, abscollect)
-            ]
-            mro.append(type)
-            mro.append(object)
+        if itot := is_type_of_type(obj_t):
+            groups = list(sort_types(obj_t.__args__[0], self.types))
         else:
-            mro = compose_mro(obj_t, self.types, abscollect)
+            groups = list(sort_types(obj_t, self.types))
 
-        lvl = -1
-        prev_is_abstract = False
-        for cls in reversed(mro):
-            if cls not in abscollect or not prev_is_abstract:
-                lvl += 1
-            prev_is_abstract = cls in abscollect
-            handlers = self.entries.get(cls, None)
-            if handlers:
-                results.update({h: lvl for h in handlers})
+        for lvl, grp in enumerate(reversed(groups)):
+            for cls in grp:
+                if itot:
+                    cls = type[cls]
+                handlers = self.entries.get(cls, None)
+                if handlers:
+                    results.update({h: lvl for h in handlers})
 
         if results:
             self[obj_t] = results
@@ -119,6 +111,8 @@ class MultiTypeMap(dict):
     def __init__(self, key_error=KeyError):
         self.maps = {}
         self.priorities = {}
+        self.dependent = {}
+        self.type_tuples = {}
         self.empty = MISSING
         self.key_error = key_error
         self.transform = type
@@ -160,6 +154,10 @@ class MultiTypeMap(dict):
             self.empty = entry
 
         self.priorities[handler] = priority
+        self.type_tuples[handler] = obj_t_tup
+        self.dependent[handler] = any(
+            isinstance(t, DependentType) for t in obj_t_tup
+        )
 
         for i, cls in enumerate(obj_t_tup):
             if i not in self.maps:
@@ -169,6 +167,42 @@ class MultiTypeMap(dict):
             if -1 not in self.maps:
                 self.maps[-1] = TypeMap()
             self.maps[-1].register(object, entry)
+
+    def wrap_dependent(self, tup, handlers, group):
+        handlers = list(handlers)
+
+        def match(tup, args):
+            for t, a in zip(tup, args):
+                if isinstance(t, DependentType) and not t.check(a):
+                    return False
+            return True
+
+        if inspect.getfullargspec(handlers[0]).args[0] == "self":
+
+            def dispatch(slf, *args, **kwargs):
+                matches = [
+                    h for h in handlers if match(self.type_tuples[h], args)
+                ]
+                if len(matches) == 0:
+                    return self[(handlers[0].__code__, *tup)](
+                        slf, *args, **kwargs
+                    )
+                elif len(matches) > 1:
+                    raise self.key_error(tup, group)
+                return matches[0](slf, *args, **kwargs)
+        else:
+
+            def dispatch(*args, **kwargs):
+                matches = [
+                    h for h in handlers if match(self.type_tuples[h], args)
+                ]
+                if len(matches) == 0:
+                    return self[(handlers[0].__code__, *tup)](*args, **kwargs)
+                elif len(matches) > 1:
+                    raise self.key_error(tup, group)
+                return matches[0](*args, **kwargs)
+
+        return dispatch
 
     def resolve(self, obj_t_tup):
         specificities = {}
@@ -226,7 +260,12 @@ class MultiTypeMap(dict):
             getattr(c[0], "__code__", None) for c in candidates
         }
 
+        processed = set()
+
         def _pull(candidates):
+            candidates = [
+                (c, a, b) for (c, a, b) in candidates if c not in processed
+            ]
             if not candidates:
                 return
             rval = [candidates[0]]
@@ -238,27 +277,39 @@ class MultiTypeMap(dict):
                     # Candidate 1 dominates candidate 2
                     continue
                 else:
+                    processed.add(c2)
                     # Candidate 1 does not dominate candidate 2, so we add it
                     # to the list.
                     rval.append((c2, p2, spc2))
             yield rval
-            if len(rval) == 1:
-                # Only groups of length 1 are correct and reachable, so we don't
-                # care about the rest.
+            if len(rval) >= 1:
                 yield from _pull(candidates[1:])
 
         results = list(_pull(candidates))
-        parent = None
+        parents = []
         for group in results:
-            tup = obj_t_tup if parent is None else (parent, *obj_t_tup)
-            if len(group) != 1:
-                self.errors[tup] = self.key_error(obj_t_tup, group)
+            tups = (
+                [obj_t_tup]
+                if not parents
+                else [(parent, *obj_t_tup) for parent in parents]
+            )
+            dependent = any(self.dependent[fn] for (fn, _, _) in group)
+            if dependent:
+                handlers = [fn for (fn, _, _) in group]
+                wrapped = self.wrap_dependent(obj_t_tup, handlers, group)
+                for tup in tups:
+                    self[tup] = wrapped
+                parents = [h.__code__ for h in handlers]
+            elif len(group) != 1:
+                for tup in tups:
+                    self.errors[tup] = self.key_error(obj_t_tup, group)
                 break
             else:
                 ((fn, _, _),) = group
-                self[tup] = fn
+                for tup in tups:
+                    self[tup] = fn
                 if hasattr(fn, "__code__"):
-                    parent = fn.__code__
+                    parents = [fn.__code__]
                 else:
                     break
 
@@ -596,6 +647,8 @@ class _Ovld:
         """Register a function."""
 
         def _normalize_type(t, force_tuple=False):
+            if t is type:
+                t = type[object]
             origin = getattr(t, "__origin__", None)
             if UnionType and isinstance(t, UnionType):
                 return _normalize_type(t.__args__)

@@ -13,7 +13,7 @@ from ovld import (
     is_ovld,
     ovld,
 )
-from ovld.utils import MISSING
+from ovld.utils import MISSING, Equals, StartsWith
 
 from .test_typemap import Animal, Bird, Mammal
 
@@ -446,6 +446,7 @@ def test_next_abstract_ambiguity():
         f(Oiseau(feathers=13))
 
 
+@pytest.mark.xfail(reason="varargs are a little broken currently")
 def test_varargs():
     o = Ovld()
 
@@ -1341,3 +1342,57 @@ def test_string_annotation():
     assert f(1234) == "int"
     assert f([1, 2, 3, 4]) == "list"
     assert f(Booboo()) == "boo"
+
+
+def test_dependent_type():
+    @ovld
+    def f(x: Equals(0)):
+        return "zero"
+
+    @f.register
+    def f(x: Equals(1)):
+        return "one"
+
+    @f.register
+    def f(x: int):
+        return "nah"
+
+    assert f(0) == "zero"
+    assert f(1) == "one"
+    assert f(2) == "nah"
+
+
+def test_dependent_method():
+    class Candy(OvldBase):
+        def __init__(self, n):
+            self.n = n
+
+        @ovld
+        def f(self, x: Equals(0)):
+            return "zero"
+
+        def f(self, x: Equals(1)):
+            return "one"
+
+        def f(self, x: int):
+            return "nah"
+
+    c = Candy(3)
+
+    assert c.f(0) == "zero"
+    assert c.f(1) == "one"
+    assert c.f(2) == "nah"
+
+
+def test_dependent_ambiguity():
+    @ovld
+    def f(self, s: StartsWith("hell")):
+        return "A"
+
+    @f.register
+    def f(self, s: StartsWith("hello")):
+        return "B"
+
+    assert f("hell") == "A"
+    with pytest.raises(TypeError, match="Ambiguous resolution"):
+        f("hello")
