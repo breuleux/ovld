@@ -137,7 +137,7 @@ __all__ = [
     "Length",
     "MinLength",
     "dependent_check",
-    "nonempty",
-    "truey",
-    "falsey",
+    "Nonempty",
+    "Truey",
+    "Falsey",
 ]

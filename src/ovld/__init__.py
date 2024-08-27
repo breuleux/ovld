@@ -1,14 +1,16 @@
 from .core import (
-    MultiTypeMap,
     Ovld,
     OvldBase,
     OvldCall,
     OvldMC,
-    TypeMap,
     extend_super,
     is_ovld,
     ovld,
     ovld_dispatch,
+)
+from .typemap import (
+    MultiTypeMap,
+    TypeMap,
 )
 from .utils import (
     BOOTSTRAP,
