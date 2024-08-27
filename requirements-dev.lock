@@ -21,5 +21,12 @@ pluggy==1.5.0
     # via pytest
 pytest==8.3.2
     # via pytest-cov
+    # via pytest-datadir
+    # via pytest-regressions
 pytest-cov==5.0.0
+pytest-datadir==1.5.0
+    # via pytest-regressions
+pytest-regressions==2.5.0
+pyyaml==6.0.2
+    # via pytest-regressions
 uv==0.2.30

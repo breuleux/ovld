@@ -251,6 +251,7 @@ class MultiTypeMap(dict):
         finished = False
         rank = 1
         for grp in self.mro(tuple(argt)):
+            grp.sort(key=lambda x: x[0].__name__)
             match = [
                 dependent_match(self.type_tuples[handler], args)
                 for handler, _, _ in grp

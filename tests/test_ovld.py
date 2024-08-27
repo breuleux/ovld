@@ -1,3 +1,4 @@
+import re
 import sys
 import typing
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from ovld import (
     is_ovld,
     ovld,
 )
+from ovld.dependent import Dependent, Equals, StartsWith
 from ovld.utils import MISSING
 
 from .test_typemap import Animal, Bird, Mammal
@@ -1342,3 +1344,56 @@ def test_string_annotation():
     assert f(1234) == "int"
     assert f([1, 2, 3, 4]) == "list"
     assert f(Booboo()) == "boo"
+
+
+def test_display(capsys, file_regression):
+    @ovld
+    def f(x: Dependent[int, Equals(0)]):
+        return "zero"
+
+    @f.register
+    def f(x: Dependent[int, Equals(1)]):
+        return "one"
+
+    @f.register
+    def f(x: Dependent[str, StartsWith("hell")]):
+        return "H"
+
+    @f.register
+    def f(x: Dependent[str, StartsWith("hello")]):
+        return "H"
+
+    @f.register
+    def f(x: int):
+        return "yes"
+
+    @f.register
+    def f(x: str):
+        return "yes"
+
+    @f.register
+    def f(x: object):
+        return "done"
+
+    @f.register(priority=10)
+    def f(x: object):
+        return "start"
+
+    f.display_methods()
+    for arg in (13, 0, 1, "hello"):
+        print("=" * 80)
+        print(f"Resolve f({arg!r})")
+        print("=" * 80)
+        f.display_resolution(arg)
+
+    out, err = capsys.readouterr()
+    assert not err
+    out = out.replace(__file__, "THIS_FILE")
+
+    def renumber(m):
+        return "THIS_FILE:" + str(
+            int(m[1]) - test_display.__code__.co_firstlineno
+        )
+
+    out = re.sub(string=out, pattern=r"THIS_FILE:([0-9]+)", repl=renumber)
+    file_regression.check(out)
