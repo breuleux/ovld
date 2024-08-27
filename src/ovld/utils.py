@@ -155,10 +155,52 @@ class Dataclass(Protocol):
         )
 
 
+class DependentType:
+    def bound(self):  # pragma: no cover
+        raise NotImplementedError()
+
+    def check(self, value):  # pragma: no cover
+        raise NotImplementedError()
+
+
+@dataclass(frozen=True)
+class Equals(DependentType):
+    value: object
+
+    def bound(self):
+        return type(self.value)
+
+    def check(self, value):
+        return value == self.value
+
+    def __str__(self):
+        return f"Equals({self.value!r})"
+
+    __repr__ = __str__
+
+
+@dataclass(frozen=True)
+class StartsWith(DependentType):
+    prefix: str
+
+    def bound(self):
+        return type(self.prefix)
+
+    def check(self, value):
+        return value.startswith(self.prefix)
+
+    def __str__(self):
+        return f"StartsWith({self.prefix!r})"
+
+    __repr__ = __str__
+
+
 __all__ = [
     "BOOTSTRAP",
     "MISSING",
     "Dataclass",
+    "DependentType",
+    "Equals",
     "Named",
     "deferred",
     "exactly",

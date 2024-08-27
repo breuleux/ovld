@@ -1,12 +1,13 @@
-# Code lifted from Python's functools module (written for
-# functools.singledispatch)
-# https://github.com/python/cpython/blob/3.8/Lib/functools.py
+from itertools import product
 
-# We do not cover the functions because they are part of Python's stdlib and we
-# assume they have already been properly tested.
+from graphlib import TopologicalSorter
+
+from .utils import DependentType
 
 
 def _issubclass(c1, c2):
+    if isinstance(c1, DependentType) or isinstance(c2, DependentType):
+        return False
     c1 = getattr(c1, "__proxy_for__", c1)
     c2 = getattr(c2, "__proxy_for__", c2)
     if hasattr(c1, "__origin__") or hasattr(c2, "__origin__"):
@@ -27,145 +28,30 @@ def _issubclass(c1, c2):
         return issubclass(c1, c2)
 
 
-def _mro(cls):
-    if hasattr(cls, "__mro__"):
-        return set(cls.__mro__)
-    elif hasattr(cls, "__origin__"):
-        return set(cls.__origin__.__mro__)
-    else:  # pragma: no cover
-        return {cls}
+def _may_cover(c1, c2):
+    if isinstance(c1, DependentType):
+        if isinstance(c2, DependentType):
+            return False
+        return _issubclass(c1.bound(), c2)
+    return False
 
 
-def _subclasses(cls):
-    scf = getattr(cls, "__subclasses__", ())
-    return scf and scf()
+def _refines(c1, c2):
+    return _issubclass(c1, c2) or _may_cover(c1, c2)
 
 
-def _c3_merge(sequences):  # pragma: no cover
-    """Merges MROs in *sequences* to a single MRO using the C3 algorithm.
-    Adapted from http://www.python.org/download/releases/2.3/mro/.
-    """
-    result = []
-    while True:
-        sequences = [s for s in sequences if s]  # purge empty sequences
-        if not sequences:
-            return result
-        for s1 in sequences:  # find merge candidates among seq heads
-            candidate = s1[0]
-            for s2 in sequences:
-                if candidate in s2[1:]:
-                    candidate = None
-                    break  # reject the current head, it appears later
-            else:
-                break
-        if candidate is None:
-            raise RuntimeError("Inconsistent hierarchy")
-        result.append(candidate)
-        # remove the chosen candidate
-        for seq in sequences:
-            if seq[0] == candidate:
-                del seq[0]
-
-
-def _c3_mro(cls, abcs=None, abscollect=None):  # pragma: no cover
-    """Computes the method resolution order using extended C3 linearization.
-    If no *abcs* are given, the algorithm works exactly like the built-in C3
-    linearization used for method resolution.
-    If given, *abcs* is a list of abstract base classes that should be inserted
-    into the resulting MRO. Unrelated ABCs are ignored and don't end up in the
-    result. The algorithm inserts ABCs where their functionality is introduced,
-    i.e. issubclass(cls, abc) returns True for the class itself but returns
-    False for all its direct base classes. Implicit ABCs for a given class
-    (either registered or inferred from the presence of a special method like
-    __len__) are inserted directly after the last ABC explicitly listed in the
-    MRO of said class. If two implicit ABCs end up next to each other in the
-    resulting MRO, their ordering depends on the order of types in *abcs*.
-    """
-    bases = getattr(cls, "__bases__", ())
-    if hasattr(cls, "__origin__"):
-        bases = [cls.__origin__, *bases]
-    for i, base in enumerate(reversed(bases)):
-        if hasattr(base, "__abstractmethods__"):
-            boundary = len(bases) - i
-            break  # Bases up to the last explicit ABC are considered first.
-    else:
-        boundary = 0
-    abcs = list(abcs) if abcs else []
-    explicit_bases = list(bases[:boundary])
-    abstract_bases = []
-    other_bases = list(bases[boundary:])
-    for base in abcs:
-        if _issubclass(cls, base) and not any(
-            _issubclass(b, base) for b in bases
-        ):
-            # If *cls* is the class that introduces behaviour described by
-            # an ABC *base*, insert said ABC to its MRO.
-            abstract_bases.append(base)
-    for base in abstract_bases:
-        abcs.remove(base)
-    abscollect.update(abstract_bases)
-    explicit_c3_mros = [
-        _c3_mro(base, abcs=abcs, abscollect=abscollect)
-        for base in explicit_bases
-    ]
-    abstract_c3_mros = [
-        _c3_mro(base, abcs=abcs, abscollect=abscollect)
-        for base in abstract_bases
-    ]
-    other_c3_mros = [
-        _c3_mro(base, abcs=abcs, abscollect=abscollect) for base in other_bases
-    ]
-    return _c3_merge(
-        [[cls]]
-        + explicit_c3_mros
-        + abstract_c3_mros
-        + other_c3_mros
-        + [explicit_bases]
-        + [abstract_bases]
-        + [other_bases]
-    )
-
-
-def compose_mro(cls, types, abscollect):  # pragma: no cover
-    """Calculates the method resolution order for a given class *cls*.
-    Includes relevant abstract base classes (with their respective bases) from
-    the *types* iterable. Uses a modified C3 linearization algorithm.
-    """
-    bases = _mro(cls)
-
-    # Remove entries which are already present in the __mro__ or unrelated.
-    def is_related(typ):
-        return typ not in bases and _issubclass(cls, typ)
-
-    types = [n for n in types if is_related(n)]
-
-    # Remove entries which are strict bases of other entries (they will end up
-    # in the MRO anyway.
-    def is_strict_base(typ):
-        for other in types:
-            if typ != other and typ in _mro(other):
-                return True
-        return False
-
-    types = [n for n in types if not is_strict_base(n)]
-    # Subclasses of the ABCs in *types* which are also implemented by
-    # *cls* can be used to stabilize ABC ordering.
-    type_set = set(types)
-    mro = []
-    for typ in types:
-        if typ is object:
-            continue
-        found = []
-        for sub in _subclasses(typ):
-            if sub not in bases and _issubclass(cls, sub):
-                found.append([s for s in sub.__mro__ if s in type_set])
-        if not found:
-            mro.append(typ)
-            continue
-        # Favor subclasses with the biggest number of useful bases
-        found.sort(key=len, reverse=True)
-        for sub in found:
-            for subcls in sub:
-                if subcls not in mro:
-                    mro.append(subcls)
-    return _c3_mro(cls, abcs=mro, abscollect=abscollect)
+def sort_types(cls, avail):
+    # We filter everything except subclasses and dependent types that *might* cover
+    # the object represented by cls.
+    avail = [t for t in avail if _refines(cls, t) or _may_cover(t, cls)]
+    deps = {t: set() for t in avail}
+    for t1, t2 in product(avail, avail):
+        if t1 is not t2 and _refines(t1, t2):
+            deps[t2].add(t1)
+    sorter = TopologicalSorter(deps)
+    sorter.prepare()
+    while sorter.is_active():
+        nodes = sorter.get_ready()
+        yield nodes
+        for n in nodes:
+            sorter.done(n)
