@@ -1,128 +1,144 @@
 
 # Ovld
 
-Multiple dispatch in Python, with some extra features.
+Fast multiple dispatch in Python, with many extra features.
 
 With ovld, you can write a version of the same function for every type signature using annotations instead of writing an awkward sequence of `isinstance` statements. Unlike Python `singledispatch`, it works for multiple arguments.
 
 Other features of `ovld`:
 
-* Multiple dispatch for methods (with `metaclass=ovld.OvldMC`)
-* Create variants of functions
-* Built-in support for extensible recursion
-* Function wrappers
-* Function postprocessors
-* Nice stack traces
+* **Fast:** Thanks to some automatic code rewriting, `ovld` is very fast.
+* **Extensible:** Easily define variants of recursive functions.
+* **Dependent types:** Overloaded functions can depend on more than argument types: they can depend on actual values.
+* **Nice stack traces:** Functions are renamed to reflect their type signature.
+* Multiple dispatch for **methods** (with `OvldBase` or `metaclass=ovld.OvldMC`)
 
 ## Example
 
 Here's a function that adds lists, tuples and dictionaries:
 
 ```python
-from ovld import ovld
+from ovld import ovld, recurse
 
 @ovld
 def add(x: list, y: list):
-    return [add(a, b) for a, b in zip(x, y)]
+    return [recurse(a, b) for a, b in zip(x, y)]
 
 @ovld
 def add(x: tuple, y: tuple):
-    return tuple(add(a, b) for a, b in zip(x, y))
+    return tuple(recurse(a, b) for a, b in zip(x, y))
 
 @ovld
 def add(x: dict, y: dict):
-    return {k: add(v, y[k]) for k, v in x.items()}
+    return {k: recurse(v, y[k]) for k, v in x.items()}
 
 @ovld
 def add(x: object, y: object):
     return x + y
+
+assert add([1, 2], [3, 4]) == [4, 6]
 ```
 
-## Bootstrapping and variants
+The `recurse` function is special: it will recursively call the current ovld object. You may ask: how is it different from simply calling `add`? The difference is that if you create a *variant* of `add`, `recurse` will automatically call the variant.
 
-Now, there is another way to do this using ovld's *auto-bootstrapping*. Simply list `self` as the first argument to the function, and `self` will be bound to the function itself, so you can call `self(x, y)` for the recursion instead of `add(x, y)`:
+For example:
 
 
-```python
-@ovld
-def add(self, x: list, y: list):
-    return [self(a, b) for a, b in zip(x, y)]
+## Variants
 
-@ovld
-def add(self, x: tuple, y: tuple):
-    return tuple(self(a, b) for a, b in zip(x, y))
-
-@ovld
-def add(self, x: dict, y: dict):
-    return {k: self(v, y[k]) for k, v in x.items()}
-
-@ovld
-def add(self, x: object, y: object):
-    return x + y
-```
-
-Why is this useful, though? Observe:
+A *variant* of an `ovld` is a copy of the `ovld`, with some methods added or changed. For example, let's take the definition of `add` above and make a variant that multiplies numbers instead:
 
 ```python
 @add.variant
 def mul(self, x: object, y: object):
     return x * y
 
-assert add([1, 2], [3, 4]) == [4, 6]
 assert mul([1, 2], [3, 4]) == [3, 8]
 ```
 
-A `variant` of a function is a copy which inherits all of the original's implementations but may define new ones. And because `self` is bound to the function that's called at the top level, the implementations for `list`, `tuple` and `dict` will bind `self` to `add` or `mul` depending on which one was called. You may also call `self.super(*args)` to invoke the parent implementation for that type.
+Simple! This means you can define one `ovld` that recursively walks generic data structures, and then specialize it in various ways.
 
 
-## Custom dispatch
+## Priority and call_next
 
-You can define your own dispatching function. The dispatcher's first argument is always `self`.
+In order to determine which of its methods to call on a list of arguments, `ovld` proceeds as follows:
 
-* `self.resolve(x, y)` to get the right function for the types of x and y
-* `self[type(x), type(y)]` will also return the right function for these types, but it works directly with the types.
+1. The matching method with highest user-defined **priority** is called first.
+2. In case of equal user-defined priority, the more **specific** method is called. In order of specificity, if `Cat` subclass of `Mammal` subclass of `Animal`, and `Meower` and `Woofer` are protocols:
+   * Single argument: `Cat > Mammal > Animal`
+   * Multiple arguments: `(Cat, Cat) > (Cat, Mammal) > (Animal, Mammal)`
+   * Multiple arguments: `(Cat, Mammal) <> (Animal, Cat)` (one argument more specific, the other less specific: unordered!)
+   * `Cat > Meower`, but `Meower <> Woofer` (protocols are unordered)
+   * If matching methods are unordered, an error will be raised
+3. If a method calls the special function `call_next`, they will call the next method in the list.
 
-For example, here is how you might define a function such that f(x) <=> f(x, x):
+You can define a numeric priority for each method (the default priority is 0):
 
 ```python
-@ovld.dispatch
-def add_default(self, x, y=None):
-    if y is None:
-        y = x
-    return self.resolve(x, y)(x, y)
+from ovld import call_next
+
+@ovld(priority=1000)
+def f(x: int):
+    return call_next(x + 1)
 
 @ovld
-def add_default(x: int, y: int):
-    return x + y
+def f(x: int):
+    return x * x
 
-@ovld
-def add_default(x: str, y: str):
-    return x + y
-
-@ovld
-def add_default(xs: list, ys: list):
-    return [add_default(x, y) for x, y in zip(xs, ys)]
-
-assert add_default([1, 2, "alouette"]) == [2, 4, "alouettealouette"]
+assert f(10) == 121
 ```
 
-There are other uses for this feature, e.g. memoization.
+Both definitions above have the same type signature, but since the first has higher priority, that is the one that will be called.
 
-The normal functions may also have a `self`, which works the same as bootstrapping.
+However, that does not mean there is no way to call the second one. Indeed, when the first function calls the special function `call_next(x + 1)`, it will call the next function in the list below itself.
 
-## Postprocess
+The pattern you see above is how you may wrap each call with some generic behavior. For instance, if you did something like that:
 
-`@ovld`, `@ovld.dispatch`, etc. take a `postprocess` argument which should be a function of one argument. That function will be called with the result of the call and must return the final result of the call.
+```python
+@f.variant(priority=1000)
+def f2(x: object)
+    print(f"f({x!r})")
+    return call_next(x)
+```
 
-Note that intermediate, bootstrapped recursive calls (recursive calls using `self()`) will **not** be postprocessed (if you want to wrap these calls, you can do so otherwise, like defining a custom dispatch). Only the result of the top level call is postprocessed.
+You would effectively be creating a clone of `f` that traces every call.
+
+
+## Dependent types
+
+A dependent type is a type that depends on a value. `ovld` supports this, either through `Literal[value]` or `Dependent[bound, check]`. For example, this definition of factorial:
+
+```python
+from typing import Literal
+from ovld import ovld, recurse, Dependent
+
+@ovld
+def fact(n: Literal[0]):
+    return 1
+
+@ovld
+def fact(n: Dependent[int, lambda n: n > 0]):
+    return n * recurse(n - 1)
+
+assert fact(5) == 120
+fact(-1)   # Error!
+```
+
+The first argument to `Dependent` must be a type bound. The bound must match before the logic is called, which also ensures we don't get a performance hit for unrelated types. For type checking purposes, `Dependent[T, A]` is equivalent to `Annotated[T, A]`.
+
+**Note:** It is important to write `n > 0` above and not `n >= 0`, because in the latter case there will be an ambiguity for `f(0)`, as both rules match `0`. It is of course possible to disambiguate using explicit priorities.
+
+**Note 2:** `Dependent` is considered more specific than the bound *and* any of the bound's subclasses, which means that `Dependent[object, ...]` will be called before `object`, `int`, `Cat`, protocols, and so on. I would argue this is usually the behavior you want, but it may throw you off if you are not careful. In any case, try to provide the tightest bound possible!
+
 
 ## Methods
 
-Use the `OvldMC` metaclass to use multiple dispatch on methods. In this case there is no bootstrapping as described above and `self` is simply bound to the class instance.
+Either inherit from `OvldBase` or use the `OvldMC` metaclass to use multiple dispatch on methods.
 
 ```python
-from ovld import OvldMC
+from ovld import OvldBase, OvldMC
 
+# class Cat(OvldBase):  <= Also an option
 class Cat(metaclass=OvldMC):
     def interact(self, x: Mouse):
         return "catch"
@@ -134,34 +150,10 @@ class Cat(metaclass=OvldMC):
         return "destroy"
 ```
 
-Subclasses of `Cat` will inherit the overloaded `interact` and it may define additional overloaded methods which will only be valid for the subclass.
+### Subclasses
 
-**Note:** It is possible to use `ovld.dispatch` on methods, but in this case be aware that the first argument for the dispatch method will not be the usual `self` but an `OvldCall` object. The `self` can be retrived as `ovldcall.obj`. Here's an example to make it all clear:
+Subclasses inherit overloaded methods. They may define additional overloads for these methods which will only be valid for the subclass, but they need to use the `@extend_super` decorator (this is required for clarity):
 
-```python
-class Stuff(metaclass=OvldMC):
-    def __init__(self, mul):
-        self.mul = mul
-
-    @ovld.dispatch
-    def calc(ovldcall, x):
-        # Wraps every call to self.calc, but we receive ovldcall instead of self
-        # ovldcall[type(x)] returns the right method to call
-        # ovldcall.obj is the self (the actual instance of Stuff)
-        return ovldcall[type(x)](x) * ovldcall.obj.mul
-
-    def calc(self, x: int):
-        return x + 1
-
-    def calc(self, xs: list):
-        return [self.calc(x) for x in xs]
-
-print(Stuff(2).calc([1, 2, 3]))  # [4, 6, 8, 4, 6, 8]
-```
-
-### Mixins in subclasses
-
-The `@extend_super` decorator on a method will combine the method with the definition on the superclass:
 
 ```python
 from ovld import OvldMC, extend_super
@@ -195,7 +187,7 @@ def ambig(x: object, y: int):
 ambig(8, 8)  # ???
 ```
 
-You may define an additional function with signature (int, int) to disambiguate:
+You may define an additional function with signature (int, int) to disambiguate, or define one of them with a higher priority:
 
 ```python
 @ovld
@@ -203,29 +195,22 @@ def ambig(x: int, y: int):
     print("ii")
 ```
 
+Other ambiguity situations are:
+
+* If multiple Protocols match the same type (and there is nothing more specific)
+* If multiple Dependent match
+* Multiple inheritance: a class that inherits from X and Y will ambiguously match rules for X and Y. Yes, Python's full mro order says X comes before Y, but `ovld` does not use it. This may change in the future or if this causes legitimate issues.
+
+
 ## Other features
 
-### meta
+### Dataclass
 
-To test arbitrary conditions, you can use `meta`:
+For your convenience, `ovld` exports `Dataclass` as a protocol:
 
 ```python
-from ovld import ovld, meta
-
-@meta
-def StartsWithT(cls):
-    return cls.__name__.startswith("T")
-
-@ovld
-def f(x: StartsWithT):
-    return "T"
-
-assert f(TypeError("xyz")) == "T"
-
-
-# Or: a useful example, since dataclasses have no common superclass:
-
-from dataclasses import dataclass, is_dataclass
+from dataclasses import dataclass
+from ovld import Dataclass
 
 @dataclass
 class Point:
@@ -233,11 +218,30 @@ class Point:
     y: int
 
 @ovld
-def f(x: meta(is_dataclass)):
+def f(x: Dataclass):
     return "dataclass"
 
 assert f(Point(1, 2)) == "dataclass"
 ```
+
+### Type arguments
+
+Use `type[t]` as an argument's type in order to match types given as arguments.
+
+```python
+@ovld
+def f(cls: type[list[object]], xs: list):
+    return [recurse(cls.__args__[0], x) for x in xs]
+
+@ovld
+def f(cls: type[int], x: int):
+    return x * 2
+
+assert f(list[int], [1, 2, 3]) == [2, 4, 6]
+f(list[int], [1, "X", 3])  # type error!
+```
+
+This lets you implement things like serialization based on type annotations, etc.
 
 
 ### deferred
@@ -264,32 +268,40 @@ assert f(numpy.arange(10)) == "ndarray"
 
 ### Tracebacks
 
-`ovld` automagically renames functions so that the stack trace is more informative:
+`ovld` automagically renames functions so that the stack trace is more informative. For instance, running the `add` function defined earlier on bad inputs:
 
 ```python
-@add.variant
-def bad(self, x: object, y: object):
-    raise Exception("Bad.")
-
-bad([1], [2])
-
-"""
-  File "/Users/breuleuo/code/ovld/ovld/core.py", line 148, in bad.entry
-    res = ovc(*args, **kwargs)
-  File "/Users/breuleuo/code/ovld/ovld/core.py", line 182, in bad.dispatch
-    return method(self.bind_to, *args, **kwargs)
-  File "example.py", line 6, in bad[list, list]
-    return [self(a, b) for a, b in zip(x, y)]
-  File "example.py", line 6, in <listcomp>
-    return [self(a, b) for a, b in zip(x, y)]
-  File "/Users/breuleuo/code/ovld/ovld/core.py", line 182, in bad.dispatch
-    return method(self.bind_to, *args, **kwargs)
-  File "example.py", line 26, in bad[*, *]
-    raise Exception("Bad.")
-  Exception: Bad.
-"""
+add([[[1]]], [[[[2]]]])
 ```
 
-The functions on the stack have names like `bad.entry`, `bad.dispatch`, `bad[list, list]` and `bad[*, *]` (`*` stands for `object`), which lets you better understand what happened just from the stack trace.
+Will produce the following traceback (Python 3.12):
 
-This also means profilers will be able to differentiate between these paths and between variants, even if they share code paths.
+```
+Traceback (most recent call last):
+  File "/Users/olivier/code/ovld/example.py", line 37, in <module>
+    add([[[1]]], [[[[2]]]])
+  File "/Users/olivier/code/ovld/src/ovld/core.py", line 46, in first_entry
+    return method(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/olivier/code/ovld/src/ovld/core.py", line 409, in add.dispatch
+    return method(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/olivier/code/ovld/example.py", line 18, in add[list, list]
+    return [recurse(a, b) for a, b in zip(x, y)]
+            ^^^^^^^^^^^^^
+  File "/Users/olivier/code/ovld/example.py", line 18, in add[list, list]
+    return [recurse(a, b) for a, b in zip(x, y)]
+            ^^^^^^^^^^^^^
+  File "/Users/olivier/code/ovld/example.py", line 18, in add[list, list]
+    return [recurse(a, b) for a, b in zip(x, y)]
+            ^^^^^^^^^^^^^
+  File "/Users/olivier/code/ovld/example.py", line 30, in add[*, *]
+    return x + y
+           ~~^~~
+TypeError: unsupported operand type(s) for +: 'int' and 'list'
+```
+
+* The functions on the stack have names like `add.dispatch`, `add[list, list]` and `add[*, *]` (`*` stands for `object`), which lets you better understand what happened just from the stack trace. It also helps distinguish various paths when profiling.
+* When calling `recurse` or `call_next`, the dispatch logic is inlined, leading to a flatter and less noisy stack. (This inlining also reduces `ovld`'s overhead.)
+
+Note: `first_entry` is only called the very first time you call the `ovld` and performs some setup, then it replaces itself with `add.dispatch`.
