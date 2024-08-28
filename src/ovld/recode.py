@@ -4,7 +4,7 @@ import textwrap
 from itertools import count
 from types import CodeType, FunctionType
 
-from .utils import Unusable
+from .utils import Unusable, UsageError
 
 recurse = Unusable(
     "recurse() can only be used from inside an @ovld-registered function."
@@ -18,7 +18,7 @@ _current = count()
 
 
 class Conformer:
-    __slots__ = ("code", "orig_fn", "renamed_fn", "ovld", "code2")
+    __slots__ = ("code", "orig_fn", "renamed_fn", "ovld")
 
     def __init__(self, ovld, orig_fn, renamed_fn):
         self.ovld = ovld
@@ -36,7 +36,7 @@ class Conformer:
 
         self.ovld.unregister(self.orig_fn)
 
-        if new_fn is None:
+        if new_fn is None:  # pragma: no cover
             if new_code is None:
                 return
             ofn = self.orig_fn
@@ -95,67 +95,92 @@ def rename_function(fn, newname):
 
 
 class NameConverter(ast.NodeTransformer):
-    def __init__(self, recurse_sym, mangled):
+    def __init__(
+        self, has_self, recurse_sym, call_next_sym, ovld_mangled, code_mangled
+    ):
+        self.has_self = has_self
         self.recurse_sym = recurse_sym
-        self.mangled = mangled
+        self.call_next_sym = call_next_sym
+        self.ovld_mangled = ovld_mangled
+        self.code_mangled = code_mangled
 
     def visit_Name(self, node):
         if node.id == self.recurse_sym:
             return ast.copy_location(
-                old_node=node, new_node=ast.Name(self.mangled, ctx=node.ctx)
+                old_node=node,
+                new_node=ast.Name(self.ovld_mangled, ctx=node.ctx),
             )
+        elif node.id == self.call_next_sym:
+            raise UsageError("call_next should be called right away")
         else:
             return node
 
     def visit_Call(self, node):
-        if isinstance(node.func, ast.Name) and node.func.id == self.recurse_sym:
-            new_args = [
-                ast.NamedExpr(
-                    target=ast.Name(id=f"__TMP{i}", ctx=ast.Store()),
-                    value=self.visit(arg),
-                )
-                for i, arg in enumerate(node.args)
-            ]
-            method = ast.Subscript(
-                value=ast.NamedExpr(
-                    target=ast.Name(id="__TMPM", ctx=ast.Store()),
-                    value=ast.Attribute(
-                        value=self.visit(node.func),
-                        attr="map",
-                        ctx=ast.Load(),
-                    ),
-                ),
-                slice=ast.Tuple(
-                    elts=[
-                        ast.Call(
-                            # func=ast.Name(id="type", ctx=ast.Load()), args=[arg]
-                            func=ast.Attribute(
-                                value=ast.Name(id="__TMPM", ctx=ast.Load()),
-                                attr="transform",
-                                ctx=ast.Load(),
-                            ),
-                            args=[self.visit(arg)],
-                            keywords=[],
-                        )
-                        for arg in new_args
-                    ],
+        if not isinstance(node.func, ast.Name) or node.func.id not in (
+            self.recurse_sym,
+            self.call_next_sym,
+        ):
+            return self.generic_visit(node)
+
+        cn = node.func.id == self.call_next_sym
+
+        new_args = [
+            ast.NamedExpr(
+                target=ast.Name(id=f"__TMP{i}", ctx=ast.Store()),
+                value=self.visit(arg),
+            )
+            for i, arg in enumerate(node.args)
+        ]
+        type_parts = [
+            ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(id="__TMPM", ctx=ast.Load()),
+                    attr="transform",
                     ctx=ast.Load(),
                 ),
+                args=[self.visit(arg)],
+                keywords=[],
+            )
+            for arg in new_args
+        ]
+        if cn:
+            type_parts.insert(0, ast.Name(id=self.code_mangled, ctx=ast.Load()))
+        method = ast.Subscript(
+            value=ast.NamedExpr(
+                target=ast.Name(id="__TMPM", ctx=ast.Store()),
+                value=ast.Attribute(
+                    # value=self.visit(node.func),
+                    value=ast.Name(id=self.ovld_mangled, ctx=ast.Load()),
+                    attr="map",
+                    ctx=ast.Load(),
+                ),
+            ),
+            slice=ast.Tuple(
+                elts=type_parts,
                 ctx=ast.Load(),
+            ),
+            ctx=ast.Load(),
+        )
+        if self.has_self:
+            method = ast.Call(
+                func=ast.Attribute(
+                    value=method,
+                    attr="__get__",
+                    ctx=ast.Load(),
+                ),
+                args=[ast.Name(id="self", ctx=ast.Load())],
+                keywords=[],
             )
 
-            new_node = ast.Call(
-                func=method,
-                args=[
-                    ast.Name(id=f"__TMP{i}", ctx=ast.Load())
-                    for i, arg in enumerate(node.args)
-                ],
-                keywords=[self.visit(k) for k in node.keywords],
-            )
-            return ast.copy_location(old_node=node, new_node=new_node)
-
-        else:
-            return self.generic_visit(node)
+        new_node = ast.Call(
+            func=method,
+            args=[
+                ast.Name(id=f"__TMP{i}", ctx=ast.Load())
+                for i, arg in enumerate(node.args)
+            ],
+            keywords=[self.visit(k) for k in node.keywords],
+        )
+        return ast.copy_location(old_node=node, new_node=new_node)
 
 
 def _search_name(co, value, glb):
@@ -172,16 +197,26 @@ def _search_name(co, value, glb):
 
 def adapt_function(fn, ovld, newname):
     """Create a copy of the function with a different name."""
-    if sym := _search_name(fn.__code__, recurse, fn.__globals__):
-        return recode(fn, ovld, sym, newname)
+    rec_sym = _search_name(fn.__code__, recurse, fn.__globals__)
+    cn_sym = _search_name(fn.__code__, call_next, fn.__globals__)
+    if rec_sym or cn_sym:
+        return recode(fn, ovld, rec_sym, cn_sym, newname)
     else:
         return rename_function(fn, newname)
 
 
-def recode(fn, ovld, recurse_sym, newname):
-    mangled = f"___OVLD{next(_current)}"
+def recode(fn, ovld, recurse_sym, call_next_sym, newname):
+    ovld_mangled = f"___OVLD{ovld.id}"
+    code_mangled = f"___CODE{next(_current)}"
     tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
-    new = NameConverter(recurse_sym, mangled).visit(tree)
+    argspec = inspect.getfullargspec(fn).args
+    new = NameConverter(
+        has_self=argspec and argspec[0] == "self",
+        recurse_sym=recurse_sym,
+        call_next_sym=call_next_sym,
+        ovld_mangled=ovld_mangled,
+        code_mangled=code_mangled,
+    ).visit(tree)
     new.body[0].decorator_list = []
     ast.fix_missing_locations(new)
     ast.increment_lineno(new, fn.__code__.co_firstlineno - 1)
@@ -193,5 +228,7 @@ def recode(fn, ovld, recurse_sym, newname):
         new_code, fn.__globals__, newname, fn.__defaults__, fn.__closure__
     )
     new_fn.__annotations__ = fn.__annotations__
-    new_fn.__globals__[mangled] = ovld
-    return rename_function(new_fn, newname)
+    new_fn = rename_function(new_fn, newname)
+    new_fn.__globals__[ovld_mangled] = ovld
+    new_fn.__globals__[code_mangled] = new_fn.__code__
+    return new_fn
