@@ -7,6 +7,7 @@ import textwrap
 import typing
 from functools import partial
 
+from .dependent import Equals
 from .recode import Conformer, adapt_function, rename_function
 from .typemap import MultiTypeMap, is_type_of_type
 from .utils import BOOTSTRAP, keyword_decorator
@@ -312,6 +313,8 @@ class _Ovld:
                 return (t,) if force_tuple else t
             elif origin is typing.Union:
                 return _normalize_type(t.__args__)
+            elif origin is typing.Literal:
+                return (Equals(t.__args__[0]),)
             elif origin is not None:
                 raise TypeError(
                     f"ovld does not accept generic types except type, Union or Optional, not {t}"
