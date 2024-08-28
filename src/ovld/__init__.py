@@ -18,17 +18,19 @@ from .typemap import (
     MultiTypeMap,
     TypeMap,
 )
-from .utils import (
-    BOOTSTRAP,
-    MISSING,
+from .types import (
     Dataclass,
     Deferred,
     Exactly,
-    Named,
     StrictSubclass,
     class_check,
-    keyword_decorator,
     parametrized_class_check,
+)
+from .utils import (
+    BOOTSTRAP,
+    MISSING,
+    Named,
+    keyword_decorator,
 )
 from .version import version as __version__
 
