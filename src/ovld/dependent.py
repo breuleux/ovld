@@ -1,5 +1,10 @@
 import math
-from typing import TYPE_CHECKING, Annotated, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, TypeVar
+
+try:
+    from typing import TypeAlias
+except ImportError:  # pragma: no cover
+    TypeAlias = None
 
 
 class DependentType:

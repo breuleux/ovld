@@ -526,7 +526,7 @@ def test_mixins():
     assert h("hello") == "HELLO"
 
 
-def test_bootstrap_recurse():
+def test_recurse():
     f = Ovld()
 
     @f.register
