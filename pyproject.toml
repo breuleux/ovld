@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 homepage = "https://github.com/breuleux/ovld"
 repository = "https://github.com/breuleux/ovld"
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 
 [build-system]
 requires = ["hatchling"]

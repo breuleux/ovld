@@ -31,8 +31,6 @@ jobs:
     strategy:
       matrix:
         settings:
-        - python: '3.8'
-          coverage: false
         - python: '3.9'
           coverage: false
         - python: '3.10'
