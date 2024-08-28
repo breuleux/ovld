@@ -221,7 +221,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     ast.fix_missing_locations(new)
     ast.increment_lineno(new, fn.__code__.co_firstlineno - 1)
     res = compile(new, mode="exec", filename=fn.__code__.co_filename)
-    (new_code,) = [
+    (*_, new_code) = [
         ct for ct in res.co_consts if isinstance(ct, type(fn.__code__))
     ]
     new_fn = FunctionType(

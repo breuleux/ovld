@@ -290,7 +290,7 @@ class MultiTypeMap(dict):
     def wrap_dependent(self, tup, handlers, group):
         handlers = list(handlers)
 
-        def find_method(args):
+        def dependent_find_method(args):
             matches = [
                 h
                 for h in handlers
@@ -304,14 +304,14 @@ class MultiTypeMap(dict):
 
         if inspect.getfullargspec(handlers[0]).args[0] == "self":
 
-            def dispatch(slf, *args, **kwargs):
-                return find_method(args)(slf, *args, **kwargs)
+            def dependent_dispatch(slf, *args, **kwargs):
+                return dependent_find_method(args)(slf, *args, **kwargs)
         else:
 
-            def dispatch(*args, **kwargs):
-                return find_method(args)(*args, **kwargs)
+            def dependent_dispatch(*args, **kwargs):
+                return dependent_find_method(args)(*args, **kwargs)
 
-        return dispatch
+        return dependent_dispatch
 
     def resolve(self, obj_t_tup):
         results = self.mro(obj_t_tup)
