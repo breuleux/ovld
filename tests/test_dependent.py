@@ -75,11 +75,11 @@ def test_dependent_method():
 
 def test_dependent_ambiguity():
     @ovld
-    def f(self, s: Dependent[str, StartsWith("hell")]):
+    def f(s: Dependent[str, StartsWith("hell")]):
         return "A"
 
     @f.register
-    def f(self, s: Dependent[str, StartsWith("hello")]):
+    def f(s: Dependent[str, StartsWith("hello")]):
         return "B"
 
     assert f("hell") == "A"
@@ -89,15 +89,15 @@ def test_dependent_ambiguity():
 
 def test_with_keys():
     @ovld
-    def f(self, d: Dependent[dict, HasKeys("a")]):
+    def f(d: Dependent[dict, HasKeys("a")]):
         return "a"
 
     @f.register
-    def f(self, d: Dependent[dict, HasKeys("b", "c")]):
+    def f(d: Dependent[dict, HasKeys("b", "c")]):
         return "b|c"
 
     @f.register
-    def f(self, d: dict):
+    def f(d: dict):
         return "other"
 
     assert f({"a": 1}) == "a"
@@ -109,19 +109,19 @@ def test_with_keys():
 
 def test_dependent_lists():
     @ovld
-    def f(self, li: Dependent[list, Nonempty]):
+    def f(li: Dependent[list, Nonempty]):
         return "nonempty"
 
     @f.register(priority=1)
-    def f(self, li: Dependent[list, Length(3)]):
+    def f(li: Dependent[list, Length(3)]):
         return "three"
 
     @f.register(priority=1)
-    def f(self, li: Dependent[list, MinLength(5)]):
+    def f(li: Dependent[list, MinLength(5)]):
         return ">=five"
 
     @f.register
-    def f(self, li: list):
+    def f(li: list):
         return "other"
 
     assert f([]) == "other"

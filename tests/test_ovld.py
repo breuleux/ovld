@@ -87,21 +87,6 @@ def test_getitem():
     assert f[float].__name__ == "f[float]"
 
 
-def test_bootstrap_getitem():
-    o = Ovld(name="f")
-
-    @o.register
-    def f(self, x: int):
-        return self[float]
-
-    @o.register  # noqa: F811
-    def f(self, x: float):
-        return self[int]
-
-    assert "f[int]" in str(f(1.0))
-    assert "f[float]" in str(f(111))
-
-
 def test_multimethod():
     o = Ovld()
 
@@ -527,6 +512,28 @@ def test_mixins():
     assert h("hello") == "HELLO"
 
 
+def test_mixin_through_variant():
+    f = Ovld()
+
+    @f.register
+    def f(t: int):
+        return t + 1
+
+    g = Ovld()
+
+    @g.register
+    def g(t: str):
+        return t.upper()
+
+    @g.variant(mixins=[f])
+    def h(t: object):
+        return "OBJ"
+
+    assert h(15) == 16
+    assert h("hello") == "HELLO"
+    assert h(1.5) == "OBJ"
+
+
 def test_recurse():
     f = Ovld()
 
@@ -613,31 +620,25 @@ def test_recurse_closure():
     assert f([1, 2, 3]) == [2, 3, 4]
 
 
-def test_bootstrap():
+def test_variant():
     f = Ovld()
 
     @f.register
-    def f(self, xs: list):
-        return [self(x) for x in xs]
+    def f(xs: list):
+        return [recurse(x) for x in xs]
 
     @f.register
-    def f(self, x: int):
+    def f(x: int):
         return x + 1
 
-    with pytest.raises(TypeError):
-
-        @f.register
-        def f(x: object):
-            return "missing self!"
-
     @f.register
-    def f(self, x: object):
+    def f(x: object):
         return "A"
 
     assert f([1, 2, "xxx", [3, 4]]) == [2, 3, "A", [4, 5]]
 
     @f.variant
-    def g(self, x: object):
+    def g(x: object):
         return "B"
 
     # This does not interfere with f
@@ -652,36 +653,22 @@ class CustomCall(OvldCall):
         return x + 1
 
 
-def test_bootstrap_custom_ovcall():
-    f = Ovld(bootstrap=CustomCall)
-
-    @f.register
-    def f(self, xs: list):
-        return [self(x) for x in xs]
-
-    @f.register
-    def f(self, x: int):
-        return self.inc(x)
-
-    assert f([1, 2, 3]) == [2, 3, 4]
-
-
 def test_next():
     f = Ovld()
 
     @f.register
-    def f(self, x: int):
+    def f(x: int):
         if x >= 0:
             return x
         else:
-            return self.next(x)
+            return f.next(x)
 
     @f.register
-    def f(self, xs: list):
-        return [self(x) for x in xs]
+    def f(xs: list):
+        return [f(x) for x in xs]
 
     @f.register
-    def f(self, x: object):
+    def f(x: object):
         return "OBJECT"
 
     assert f([-1, 0, 1]) == ["OBJECT", 0, 1]
@@ -691,19 +678,19 @@ def test_next_long_chain():
     f = Ovld()
 
     @f.register
-    def f(self, x: int):
-        return ["A", self.next(x)]
+    def f(x: int):
+        return ["A", f.next(x)]
 
     @f.register
-    def f(self, x: object):
-        return ["B", self.next(x)]
+    def f(x: object):
+        return ["B", f.next(x)]
 
     @f.register(priority=-1)
-    def f(self, x: object):
-        return ["C", self.next(x)]
+    def f(x: object):
+        return ["C", f.next(x)]
 
     @f.register(priority=-2)
-    def f(self, x: object):
+    def f(x: object):
         return ["D", x]
 
     assert f(12) == ["A", ["B", ["C", ["D", 12]]]]
@@ -713,15 +700,15 @@ def test_next_bottom():
     f = Ovld()
 
     @f.register
-    def f(self, x: int):
+    def f(x: int):
         if x >= 0:
             return x
         else:
-            return self.next(x)
+            return f.next(x)
 
     @f.register
-    def f(self, xs: list):
-        return [self(x) for x in xs]
+    def f(xs: list):
+        return [f(x) for x in xs]
 
     with pytest.raises(TypeError):
         f([-1, 0, 1])
@@ -766,19 +753,19 @@ def test_priority():
     f = Ovld()
 
     @f.register(priority=1)
-    def f(self, x: object):
-        return ["TOP", self.next(x)]
+    def f(x: object):
+        return ["TOP", f.next(x)]
 
     @f.register
-    def f(self, xs: list):
-        return [self(x) for x in xs]
+    def f(xs: list):
+        return [f(x) for x in xs]
 
     @f.register
-    def f(self, x: int):
+    def f(x: int):
         return x + 1
 
     @f.register
-    def f(self, x: object):
+    def f(x: object):
         return "BOTTOM"
 
     assert f([1, "x"]) == ["TOP", [["TOP", 2], ["TOP", "BOTTOM"]]]
@@ -827,9 +814,6 @@ def test_method():
     assert g.perform(7) == 9
     assert g.perform("cheese") == "cheesess"
 
-    with pytest.raises(TypeError):
-        assert Greatifier.perform(g, "cheese") == "cheesess"
-
 
 def test_metaclass():
     class Greatifier(metaclass=OvldMC):
@@ -849,9 +833,6 @@ def test_metaclass():
     assert g.perform(7) == 9
     assert g.perform("cheese") == "cheesess"
     assert g.perform(g) is g
-
-    with pytest.raises(TypeError):
-        assert Greatifier.perform(g, "cheese") == "cheesess"
 
 
 def test_metaclass_inherit():
@@ -1126,38 +1107,12 @@ def test_disallow_replacement():
             pass
 
 
-def test_super():
-    @ovld
-    def f(self, xs: list):
-        return [self(x) for x in xs]
-
-    @f.register
-    def f(self, x: int):
-        return x * x
-
-    @f.variant
-    def f2(self, x: int):
-        return 0 if x < 0 else self.super(x)
-
-    @f2.variant()
-    def f3(self, xs: list):
-        return ["=>", *self.super(xs)]
-
-    @f3.register
-    def f3(self, x: int):
-        return x
-
-    assert f3([-2, -1, 0, 1, 2, 3]) == ["=>", -2, -1, 0, 1, 2, 3]
-    assert f2([-2, -1, 0, 1, 2, 3]) == [0, 0, 0, 1, 4, 9]
-    assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
-
-
 def test_unregister():
     @ovld
-    def f(self, xs: list):
-        return [self(x) for x in xs]
+    def f(xs: list):
+        return [f(x) for x in xs]
 
-    def intf(self, x: int):
+    def intf(x: int):
         return x * x
 
     f.register(intf)
