@@ -1,5 +1,6 @@
-import pytest
+from typing import Literal
 
+import pytest
 from ovld.core import OvldBase, ovld
 from ovld.dependent import (
     Dependent,
@@ -21,6 +22,24 @@ def test_dependent_type():
 
     @f.register
     def f(x: Equals(1)):
+        return "one"
+
+    @f.register
+    def f(x: int):
+        return "nah"
+
+    assert f(0) == "zero"
+    assert f(1) == "one"
+    assert f(2) == "nah"
+
+
+def test_literal():
+    @ovld
+    def f(x: Literal[0]):
+        return "zero"
+
+    @f.register
+    def f(x: Literal[1]):
         return "one"
 
     @f.register
