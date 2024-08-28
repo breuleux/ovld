@@ -16,18 +16,13 @@ requires-python = ">= 3.9"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.rye]
-managed = true
+[tool.uv]
 dev-dependencies = [
     "codefind~=0.1.6",
     "pytest>=8.3.2",
     "pytest-cov>=5.0.0",
-    "uv>=0.2.30",
     "pytest-regressions>=2.5.0",
 ]
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ovld"]
