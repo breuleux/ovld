@@ -1170,10 +1170,6 @@ def test_conform_2():
     assert f([-2.0, 5.5]) == [-3.0, 4.5]
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_type_argument():
     class One:
         pass
@@ -1207,10 +1203,6 @@ def test_type_argument():
     assert f(One, 5) == 1
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_generic_type_argument():
     @ovld
     def f(t: type[list]):
@@ -1227,10 +1219,6 @@ def test_generic_type_argument():
     assert f(dict[str, int]) == "dict"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_any():
     @ovld
     def f(t: type[dict]):
@@ -1243,10 +1231,6 @@ def test_any():
     assert f(typing.Any) == "yes"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_plain_type_argument():
     @ovld
     def f(t: type[list]):
@@ -1266,10 +1250,6 @@ def test_plain_type_argument():
     assert f(1234) == "other anything"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_parametrized():
     @ovld
     def f(t: type[list[int]]):
@@ -1289,10 +1269,6 @@ def test_parametrized():
     assert f(list) == "list"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_parametrized_protocols():
     @ovld
     def f(t: type[typing.Iterable[object]]):
