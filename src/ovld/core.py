@@ -17,6 +17,9 @@ except ImportError:  # pragma: no cover
     UnionType = None
 
 
+_current_id = itertools.count()
+
+
 def _fresh(t):
     """Returns a new subclass of type t.
 
@@ -35,21 +38,21 @@ def _setattrs(fn, **kwargs):
 
 @keyword_decorator
 def _compile_first(fn, rename=None):
-    def deco(self, *args, **kwargs):
+    def first_entry(self, *args, **kwargs):
         self.compile()
         method = getattr(self, fn.__name__)
-        assert method is not deco
+        assert method is not first_entry
         return method(*args, **kwargs)
 
     def setalt(alt):
-        deco._alt = alt
+        first_entry._alt = alt
         return None
 
-    deco.setalt = setalt
-    deco._replace_by = fn
-    deco._alt = None
-    deco._rename = rename
-    return deco
+    first_entry.setalt = setalt
+    first_entry._replace_by = fn
+    first_entry._alt = None
+    first_entry._rename = rename
+    return first_entry
 
 
 class _Ovld:
@@ -87,6 +90,7 @@ class _Ovld:
         allow_replacement=True,
     ):
         """Initialize an Ovld."""
+        self.id = next(_current_id)
         self._compiled = False
         self.maindoc = None
         self.mapper = mapper

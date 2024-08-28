@@ -10,13 +10,14 @@ from ovld import (
     OvldBase,
     OvldCall,
     OvldMC,
+    call_next,
     extend_super,
     is_ovld,
     ovld,
     recurse,
 )
 from ovld.dependent import Dependent, Equals, StartsWith
-from ovld.utils import MISSING
+from ovld.utils import MISSING, UsageError
 
 from .test_typemap import Animal, Bird, Mammal
 
@@ -532,6 +533,78 @@ def test_recurse():
     @f.register
     def f(xs: list):
         return [recurse(x) for x in xs]
+
+    @f.register
+    def f(x: int):
+        return x + 1
+
+    assert f([1, 2, 3]) == [2, 3, 4]
+
+
+def test_recurse_method():
+    class C(OvldBase):
+        def f(self, xs: list):
+            return [recurse(x) for x in xs]
+
+        def f(self, x: int):
+            return x + 1
+
+    assert C().f([1, 2, 3]) == [2, 3, 4]
+
+
+def test_call_next():
+    f = Ovld()
+
+    @f.register
+    def f(x: int):
+        return call_next(x + 1)
+
+    @f.register
+    def f(x: object):
+        return x * 2
+
+    assert f(3) == 8
+
+
+def test_recurse_renamed():
+    f = Ovld()
+
+    @f.register
+    def f(xs: list):
+        rec = recurse
+        return [rec(x) for x in xs]
+
+    @f.register
+    def f(x: int):
+        return x + 1
+
+    assert f([1, 2, 3]) == [2, 3, 4]
+
+
+def test_call_next_must_be_called():
+    f = Ovld()
+
+    with pytest.raises(
+        UsageError, match="call_next should be called right away"
+    ):
+
+        @f.register
+        def f(xs: list):
+            cn = call_next
+            return [cn(x) for x in xs]
+
+        f.compile()
+
+
+def test_recurse_closure():
+    f = Ovld()
+
+    @f.register
+    def f(xs: list):
+        def inner():
+            return [recurse(x) for x in xs]
+
+        return inner()
 
     @f.register
     def f(x: int):
@@ -1066,7 +1139,7 @@ def test_super():
     def f2(self, x: int):
         return 0 if x < 0 else self.super(x)
 
-    @f2.variant
+    @f2.variant()
     def f3(self, xs: list):
         return ["=>", *self.super(xs)]
 

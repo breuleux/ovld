@@ -3,8 +3,17 @@ import sys
 from dataclasses import dataclass
 
 import pytest
-from ovld import deferred, exactly, has_attribute, meta, ovld, strict_subclass
-from ovld.utils import Dataclass
+from ovld import (
+    call_next,
+    deferred,
+    exactly,
+    has_attribute,
+    meta,
+    ovld,
+    recurse,
+    strict_subclass,
+)
+from ovld.utils import Dataclass, UsageError
 
 
 def test_meta():
@@ -172,3 +181,20 @@ def test_Dataclass():
     assert f(1234) == "no"
     assert f(Point) == "type, yes"
     assert f(int) == "type, no"
+
+
+def test_unusable():
+    with pytest.raises(
+        UsageError, match="recurse.. can only be used from inside an @ovld"
+    ):
+        recurse()
+
+    with pytest.raises(
+        UsageError, match="call_next.. can only be used from inside an @ovld"
+    ):
+        call_next()
+
+    with pytest.raises(
+        UsageError, match="recurse.. can only be used from inside an @ovld"
+    ):
+        recurse.next
