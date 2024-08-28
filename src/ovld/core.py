@@ -60,8 +60,6 @@ class _Ovld:
     function should annotate the same parameter.
 
     Arguments:
-        postprocess: A function to call on the return value. It is not called
-            after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
         type_error: The error type to raise when no function can be found to
@@ -80,7 +78,6 @@ class _Ovld:
     def __init__(
         self,
         *,
-        postprocess=None,
         type_error=TypeError,
         mixins=[],
         bootstrap=None,
@@ -96,13 +93,9 @@ class _Ovld:
         self.linkback = linkback
         self.children = []
         self.type_error = type_error
-        self.postprocess = postprocess
         self.allow_replacement = allow_replacement
         self.bootstrap_class = OvldCall
-        if self.postprocess:
-            assert bootstrap is not False
-            self.bootstrap = True
-        elif isinstance(bootstrap, type):
+        if isinstance(bootstrap, type):
             self.bootstrap_class = bootstrap
             self.bootstrap = True
         else:
@@ -376,12 +369,7 @@ class _Ovld:
         for child in self.children:
             child._update()
 
-    def copy(
-        self,
-        postprocess=None,
-        mixins=[],
-        linkback=False,
-    ):
+    def copy(self, mixins=[], linkback=False):
         """Create a copy of this Ovld.
 
         New functions can be registered to the copy without affecting the
@@ -390,7 +378,6 @@ class _Ovld:
         return _fresh(_Ovld)(
             bootstrap=self.bootstrap,
             mixins=[self, *mixins],
-            postprocess=postprocess or self.postprocess,
             linkback=linkback,
         )
 
@@ -461,10 +448,7 @@ class _Ovld:
         OvldCall.__call__.
         """
         ovc = self.__get__(BOOTSTRAP, None)
-        res = ovc(*args, **kwargs)
-        if self.postprocess:
-            res = self.postprocess(self, res)
-        return res
+        return ovc(*args, **kwargs)
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
@@ -645,8 +629,6 @@ def ovld(fn, priority=0, **kwargs):
 
     Arguments:
         fn: The function to register.
-        postprocess: A function to call on the return value. It is not called
-            after recursive calls.
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
         type_error: The error type to raise when no function can be found to
