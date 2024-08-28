@@ -1,10 +1,5 @@
 import math
-from typing import TYPE_CHECKING, Annotated, TypeVar
-
-if TYPE_CHECKING:  # pragma: no cover
-    from typing import TypeAlias
-else:
-    TypeAlias = None
+from typing import TYPE_CHECKING, TypeVar
 
 
 class DependentType:
@@ -127,6 +122,8 @@ class Dependent:
 
 
 if TYPE_CHECKING:  # pragma: no cover
+    from typing import Annotated, TypeAlias
+
     T = TypeVar("T")
     A = TypeVar("A")
     Dependent: TypeAlias = Annotated[T, A]

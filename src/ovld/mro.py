@@ -1,6 +1,5 @@
-from itertools import product
-
 from graphlib import TopologicalSorter
+from itertools import product
 
 from .dependent import DependentType
 
