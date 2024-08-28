@@ -7,6 +7,12 @@ from .core import (
     is_ovld,
     ovld,
 )
+from .dependent import (
+    Dependent,
+    DependentType,
+    SingleParameterDependentType,
+    dependent_check,
+)
 from .recode import call_next, recurse
 from .typemap import (
     MultiTypeMap,
@@ -36,6 +42,10 @@ __all__ = [
     "extend_super",
     "is_ovld",
     "ovld",
+    "Dependent",
+    "SingleParameterDependentType",
+    "DependentType",
+    "dependent_check",
     "BOOTSTRAP",
     "MISSING",
     "Dataclass",
