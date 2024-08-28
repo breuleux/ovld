@@ -34,21 +34,22 @@ class Conformer:
             new_fn = None
             new_code = new
 
-        if new_code is None:
-            self.ovld.unregister(self.orig_fn)
+        self.ovld.unregister(self.orig_fn)
 
-        elif new_fn is None:  # pragma: no cover
-            # Not entirely sure if this ever happens
-            self.renamed_fn.__code__ = new_code
-
-        elif inspect.signature(self.orig_fn) != inspect.signature(new_fn):
-            self.ovld.unregister(self.orig_fn)
-            self.ovld.register(new_fn)
-
-        else:
-            self.renamed_fn.__code__ = rename_code(
-                new_code, self.renamed_fn.__code__.co_name
+        if new_fn is None:
+            if new_code is None:
+                return
+            ofn = self.orig_fn
+            new_fn = FunctionType(
+                new_code,
+                ofn.__globals__,
+                ofn.__name__,
+                ofn.__defaults__,
+                ofn.__closure__,
             )
+            new_fn.__annotations__ = ofn.__annotations__
+
+        self.ovld.register(new_fn)
 
         from codefind import code_registry
 
@@ -134,6 +135,7 @@ class NameConverter(ast.NodeTransformer):
                                 ctx=ast.Load(),
                             ),
                             args=[self.visit(arg)],
+                            keywords=[],
                         )
                         for arg in new_args
                     ],
@@ -187,6 +189,9 @@ def recode(fn, ovld, recurse_sym, newname):
     (new_code,) = [
         ct for ct in res.co_consts if isinstance(ct, type(fn.__code__))
     ]
-    fn.__code__ = new_code
-    fn.__globals__[mangled] = ovld
-    return rename_function(fn, newname)
+    new_fn = FunctionType(
+        new_code, fn.__globals__, newname, fn.__defaults__, fn.__closure__
+    )
+    new_fn.__annotations__ = fn.__annotations__
+    new_fn.__globals__[mangled] = ovld
+    return rename_function(new_fn, newname)
