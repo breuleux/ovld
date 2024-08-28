@@ -210,7 +210,7 @@ For your convenience, `ovld` exports `Dataclass` as a protocol:
 
 ```python
 from dataclasses import dataclass
-from ovld import Dataclass
+from ovld.types import Dataclass
 
 @dataclass
 class Point:
@@ -244,17 +244,16 @@ f(list[int], [1, "X", 3])  # type error!
 This lets you implement things like serialization based on type annotations, etc.
 
 
-### deferred
+### Deferred
 
 You may define overloads for certain classes from external packages without
 having to import them:
 
-
 ```python
-from ovld import ovld, deferred
+from ovld import ovld, Deferred
 
 @ovld
-def f(x: deferred("numpy.ndarray")):
+def f(x: Deferred["numpy.ndarray"]):
     return "ndarray"
 
 # numpy is not imported
@@ -263,6 +262,28 @@ assert "numpy" not in sys.modules
 # But once we import it, the ovld works:
 import numpy
 assert f(numpy.arange(10)) == "ndarray"
+```
+
+
+### Exactly and StrictSubclass
+
+You can prevent matching of subclasses with `Exactly`, or prevent matching the bound with `StrictSubclass`:
+
+```python
+from ovld.types import Exactly, StrictSubclass
+
+@ovld
+def f(x: Exactly[BaseException]):
+    return "=BaseException"
+
+@ovld
+def f(x: StrictSubclass[Exception]):
+    return ">Exception"
+
+assert f(TypeError()) == ">Exception"
+assert f(BaseException()) == "=BaseException"
+
+f(Exception())  # ERROR!
 ```
 
 
