@@ -116,7 +116,7 @@ def Falsey(value):
 
 
 class Dependent:
-    def __class_getitem__(self, item):
+    def __class_getitem__(cls, item):
         bound, dt = item
         if not isinstance(dt, DependentType):
             dt = dependent_check(dt)

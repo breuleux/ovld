@@ -33,6 +33,21 @@ def test_dependent_type():
     assert f(2) == "nah"
 
 
+def test_dependent_func():
+    @ovld
+    def f(x: Dependent[int, lambda x: x >= 0]):
+        return "positive"
+
+    @f.register
+    def f(x: Dependent[int, lambda x: x < 0]):
+        return "negative"
+
+    assert f(0) == "positive"
+    assert f(1) == "positive"
+    assert f(2) == "positive"
+    assert f(-2) == "negative"
+
+
 def test_literal():
     @ovld
     def f(x: Literal[0]):

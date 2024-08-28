@@ -5,15 +5,18 @@ from dataclasses import dataclass
 import pytest
 from ovld import (
     call_next,
-    deferred,
-    exactly,
-    has_attribute,
-    meta,
     ovld,
     recurse,
-    strict_subclass,
 )
-from ovld.utils import Dataclass, UsageError
+from ovld.utils import (
+    Dataclass,
+    Deferred,
+    Exactly,
+    StrictSubclass,
+    UsageError,
+    class_check,
+    parametrized_class_check,
+)
 
 
 def test_meta():
@@ -32,9 +35,13 @@ def test_meta():
     class Cherry:
         pass
 
-    @meta
+    @class_check
     def B_(cls):
         return cls.__name__.startswith("B")
+
+    @parametrized_class_check
+    def ClassPrefix(cls, prefix):
+        return cls.__name__.startswith(prefix)
 
     @ovld
     def f(x):
@@ -52,7 +59,11 @@ def test_meta():
     def f(x: Butterscotch):
         return "Butterscotch"
 
-    assert f(Apple()) == "no B"
+    @f.register
+    def f(x: ClassPrefix["A"]):
+        return "Almost B"
+
+    assert f(Apple()) == "Almost B"
     assert f(Banana()) == "B!"
     assert f(Brownie()) == "Brownie"
     assert f(Butterscotch()) == "Butterscotch"
@@ -60,8 +71,8 @@ def test_meta():
 
 
 def test_deferred_builtins():
-    assert deferred("builtins.object") is object
-    assert deferred("builtins.TypeError") is TypeError
+    assert Deferred["builtins.object"] is object
+    assert Deferred["builtins.TypeError"] is TypeError
 
 
 def test_deferred():
@@ -69,7 +80,7 @@ def test_deferred():
     sys.path.append(os.path.join(os.path.dirname(__file__), "modules"))
 
     @ovld
-    def f(x: deferred("gingerbread.House")):
+    def f(x: Deferred["gingerbread.House"]):
         return "Gingerbread house!"
 
     @f.register
@@ -92,8 +103,10 @@ def test_exactly():
     class Apple(Fruit):
         pass
 
+    assert Exactly[Fruit].__name__ == "Exactly[Fruit]"
+
     @ovld
-    def f(x: exactly(Fruit)):
+    def f(x: Exactly[Fruit]):
         return "yes"
 
     @f.register
@@ -112,7 +125,7 @@ def test_strict_subclass():
         pass
 
     @ovld
-    def f(x: strict_subclass(Fruit)):
+    def f(x: StrictSubclass[Fruit]):
         return "yes"
 
     @f.register
@@ -123,38 +136,6 @@ def test_strict_subclass():
     assert f(Apple()) == "yes"
 
 
-def test_has_attribute():
-    class Duck:
-        def quack(self):
-            pass
-
-    class SuperDuck:
-        pass
-
-    class Cat:
-        pass
-
-    @ovld
-    def f(x: has_attribute("quack")):
-        return "yes"
-
-    @f.register
-    def f(x: SuperDuck):
-        return "oh boy"
-
-    @f.register
-    def f(x: object):
-        return "no"
-
-    assert f(Cat()) == "no"
-    assert f(Duck()) == "yes"
-    assert f(SuperDuck()) == "oh boy"
-
-
-@pytest.mark.skipif(
-    sys.version_info < (3, 9),
-    reason="type[...] syntax requires python3.9 or higher",
-)
 def test_Dataclass():
     @dataclass
     class Point:
