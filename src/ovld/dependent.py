@@ -1,9 +1,9 @@
 import math
 from typing import TYPE_CHECKING, Annotated, TypeVar
 
-try:
+if TYPE_CHECKING:  # pragma: no cover
     from typing import TypeAlias
-except ImportError:  # pragma: no cover
+else:
     TypeAlias = None
 
 

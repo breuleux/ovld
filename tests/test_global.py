@@ -1,4 +1,4 @@
-from ovld import ovld
+from ovld import ovld, recurse
 
 _ovld_exc = None
 try:
@@ -19,20 +19,20 @@ _ovld_dispatch_exc = None
 try:
 
     @ovld
-    def roesti(self, x):
-        return self(x, x)
+    def roesti(x):
+        return recurse(x, x)
 
     @ovld
-    def roesti(self, x: int, y: int):
+    def roesti(x: int, y: int):
         return x * y
 
     @ovld
-    def roesti(self, x: str, y: str):
+    def roesti(x: str, y: str):
         return x + y
 
     @ovld
-    def roesti(self, xs: list, _):
-        return [self(x) for x in xs]
+    def roesti(xs: list, _):
+        return [recurse(x) for x in xs]
 
 except Exception as exc:
     _ovld_dispatch_exc = exc

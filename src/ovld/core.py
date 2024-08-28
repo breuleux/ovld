@@ -45,15 +45,15 @@ def _compile_first(fn, rename=None):
         assert method is not first_entry
         return method(*args, **kwargs)
 
-    def setalt(alt):
-        first_entry._alt = alt
-        return None
-
-    first_entry.setalt = setalt
     first_entry._replace_by = fn
-    first_entry._alt = None
     first_entry._rename = rename
     return first_entry
+
+
+def arg0_is_self(fn):
+    sgn = inspect.signature(fn)
+    params = list(sgn.parameters.values())
+    return params and params[0].name == "self"
 
 
 class _Ovld:
@@ -99,19 +99,14 @@ class _Ovld:
         self.children = []
         self.type_error = type_error
         self.allow_replacement = allow_replacement
-        self.bootstrap_class = OvldCall
-        if isinstance(bootstrap, type):
-            self.bootstrap_class = bootstrap
-            self.bootstrap = True
-        else:
-            self.bootstrap = bootstrap
+        self.bootstrap = bootstrap
         self.name = name
         self.__name__ = name
         self._defns = {}
         self._locked = False
         self.mixins = []
         self.add_mixins(*mixins)
-        self.ocls = _fresh(self.bootstrap_class)
+        self.ocls = _fresh(OvldCall)
         self._make_signature()
 
     @property
@@ -134,11 +129,8 @@ class _Ovld:
         for mixin in mixins:
             if self.linkback:
                 mixin.children.append(self)
-            if mixin._defns:
-                assert mixin.bootstrap is not None
-                if self.bootstrap is None:
-                    self.bootstrap = mixin.bootstrap
-                assert mixin.bootstrap is self.bootstrap
+            if mixin._defns and self.bootstrap is None:
+                self.bootstrap = mixin.bootstrap
         self.mixins += mixins
 
     def _sig_string(self, type_tuple):
@@ -193,7 +185,7 @@ class _Ovld:
             if self.maindoc
             else f"Ovld with {len(self.defns)} methods.\n\n"
         )
-        for key, fn in self.defns.items():
+        for fn in self.defns.values():
             if fn in seen:
                 continue
             seen.add(fn)
@@ -215,12 +207,7 @@ class _Ovld:
     def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
         if self.bootstrap is None:
-            sign = inspect.signature(fn)
-            params = list(sign.parameters.values())
-            if params and params[0].name == "self":
-                self.bootstrap = True
-            else:
-                self.bootstrap = False
+            self.bootstrap = arg0_is_self(fn)
 
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
@@ -264,8 +251,6 @@ class _Ovld:
             value = getattr(cls, method)
             repl = getattr(value, "_replace_by", None)
             if repl:
-                if self.bootstrap and value._alt:
-                    repl = value._alt
                 repl = self._maybe_rename(repl)
                 setattr(cls, method, repl)
 
@@ -333,15 +318,11 @@ class _Ovld:
         ann = fn.__annotations__
         argspec = inspect.getfullargspec(fn)
         argnames = argspec.args
-        if self.bootstrap:
-            if argnames[0] != "self":
-                raise TypeError(
-                    "The first argument of the function must be named `self`"
-                )
+        if argnames and argnames[0] == "self":
             argnames = argnames[1:]
 
         typelist = []
-        for i, name in enumerate(argnames):
+        for name in argnames:
             t = ann.get(name, None)
             if t is None:
                 typelist.append(object)
@@ -402,24 +383,15 @@ class _Ovld:
             return ov
 
     @_compile_first
-    def get_map(self):
-        return self.map
-
-    @_compile_first
     def __get__(self, obj, cls):
         if obj is None:
             return self
-        return self.ocls(
-            map=self.map,
-            bind_to=obj,
-            super=self.mixins[0] if len(self.mixins) == 1 else None,
-        )
+        return self.ocls(map=self.map, bind_to=obj)
 
     @_compile_first
     def __getitem__(self, t):
         if not isinstance(t, tuple):
             t = (t,)
-        assert not self.bootstrap
         return self.map[t]
 
     @_compile_first
@@ -445,18 +417,6 @@ class _Ovld:
         method = self.map[key]
         return method(*args, **kwargs)
 
-    @__call__.setalt
-    @_setattrs(rename="entry")
-    def __ovldcall__(self, *args, **kwargs):
-        """Call the overloaded function.
-
-        This version of __call__ is used when bootstrap is True. This function is
-        only called once at the entry point: recursive calls will will be to
-        OvldCall.__call__.
-        """
-        ovc = self.__get__(BOOTSTRAP, None)
-        return ovc(*args, **kwargs)
-
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
 
@@ -477,17 +437,13 @@ def is_ovld(x):
 class OvldCall:
     """Context for an Ovld call."""
 
-    def __init__(self, map, bind_to, super=None):
+    def __init__(self, map, bind_to):
         """Initialize an OvldCall."""
+        # assert bind_to is not BOOTSTRAP
+        assert bind_to is not BOOTSTRAP
         self.map = map
         self._parent = super
-        self.obj = self if bind_to is BOOTSTRAP else bind_to
-
-    def __getitem__(self, t):
-        """Find the right method to call given a tuple of types."""
-        if not isinstance(t, tuple):
-            t = (t,)
-        return self.map[t].__get__(self.obj)
+        self.obj = bind_to
 
     def next(self, *args, **kwargs):
         """Call the next matching method after the caller, in terms of priority or specificity."""
@@ -496,15 +452,9 @@ class OvldCall:
         method = self.map[key]
         return method(self.obj, *args, **kwargs)
 
-    def super(self, *args, **kwargs):
-        """Use the parent ovld's method for this call."""
-        pmap = self._parent.get_map()
-        method = pmap[tuple(map(pmap.transform, args))]
-        return method.__get__(self.obj)(*args, **kwargs)
-
     def resolve(self, *args):
         """Find the right method to call for the given arguments."""
-        return self[tuple(map(self.map.transform, args))]
+        return self.map[tuple(map(self.map.transform, args))].__get__(self.obj)
 
     def __call__(self, *args, **kwargs):
         """Call this overloaded function.
