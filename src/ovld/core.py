@@ -369,7 +369,7 @@ class _Ovld:
             linkback=linkback,
         )
 
-    def variant(self, fn=None, **kwargs):
+    def variant(self, fn=None, priority=0, **kwargs):
         """Decorator to create a variant of this Ovld.
 
         New functions can be registered to the variant without affecting the
@@ -379,7 +379,7 @@ class _Ovld:
         if fn is None:
             return ov.register
         else:
-            ov.register(fn)
+            ov.register(fn, priority=priority)
             return ov
 
     @_compile_first

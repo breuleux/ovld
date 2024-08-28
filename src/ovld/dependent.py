@@ -118,6 +118,8 @@ def Falsey(value):
 class Dependent:
     def __class_getitem__(self, item):
         bound, dt = item
+        if not isinstance(dt, DependentType):
+            dt = dependent_check(dt)
         return dt.with_bound(bound)
 
 
