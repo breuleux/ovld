@@ -7,7 +7,7 @@ import textwrap
 import typing
 from functools import partial
 
-from .recode import Conformer, rename_function
+from .recode import Conformer, adapt_function, rename_function
 from .typemap import MultiTypeMap, is_type_of_type
 from .utils import BOOTSTRAP, keyword_decorator
 
@@ -280,8 +280,8 @@ class _Ovld:
     def register_signature(self, key, orig_fn):
         """Register a function for the given signature."""
         sig, min, max, vararg, priority = key
-        fn = rename_function(
-            orig_fn, f"{self.__name__}[{self._sig_string(sig)}]"
+        fn = adapt_function(
+            orig_fn, self, f"{self.__name__}[{self._sig_string(sig)}]"
         )
         # We just need to keep the Conformer pointer alive for jurigged
         # to find it, if jurigged is used with ovld

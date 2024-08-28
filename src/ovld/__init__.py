@@ -7,6 +7,7 @@ from .core import (
     is_ovld,
     ovld,
 )
+from .recode import call_next, recurse
 from .typemap import (
     MultiTypeMap,
     TypeMap,
@@ -44,5 +45,7 @@ __all__ = [
     "has_attribute",
     "meta",
     "keyword_decorator",
+    "call_next",
+    "recurse",
     "strict_subclass",
 ]

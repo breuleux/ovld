@@ -48,6 +48,21 @@ def keyword_decorator(deco):
     return new_deco
 
 
+class UsageError(Exception):
+    pass
+
+
+class Unusable:
+    def __init__(self, message):
+        self.__message = message
+
+    def __call__(self, *args, **kwargs):
+        raise UsageError(self.__message)
+
+    def __getattr__(self, attr):
+        raise UsageError(self.__message)
+
+
 class _MetaMC(type):
     def __subclasscheck__(cls, sub):
         return cls.chk(sub)
