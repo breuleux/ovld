@@ -13,6 +13,7 @@ from ovld import (
     extend_super,
     is_ovld,
     ovld,
+    recurse,
 )
 from ovld.dependent import Dependent, Equals, StartsWith
 from ovld.utils import MISSING
@@ -523,6 +524,20 @@ def test_mixins():
 
     assert h(15) == 16
     assert h("hello") == "HELLO"
+
+
+def test_bootstrap_recurse():
+    f = Ovld()
+
+    @f.register
+    def f(xs: list):
+        return [recurse(x) for x in xs]
+
+    @f.register
+    def f(x: int):
+        return x + 1
+
+    assert f([1, 2, 3]) == [2, 3, 4]
 
 
 def test_bootstrap():
