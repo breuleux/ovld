@@ -97,6 +97,7 @@ class _Ovld:
         self.allow_replacement = allow_replacement
         self.bootstrap = bootstrap
         self.name = name
+        self.shortname = name or f"__OVLD{self.id}"
         self.__name__ = name
         self._defns = {}
         self._locked = False
@@ -207,6 +208,7 @@ class _Ovld:
 
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
+            self.shortname = fn.__name__
             self.maindoc = fn.__doc__
             if self.maindoc and not self.maindoc.strip(" ").endswith("\n"):
                 self.maindoc += "\n"
@@ -397,7 +399,11 @@ class _Ovld:
     def __get__(self, obj, cls):
         if obj is None:
             return self
-        return self.ocls(map=self.map, bind_to=obj)
+        key = self.shortname
+        rval = obj.__dict__.get(key, None)
+        if rval is None:
+            obj.__dict__[key] = rval = self.ocls(self.map, obj)
+        return rval
 
     @_compile_first
     def __getitem__(self, t):
