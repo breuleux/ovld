@@ -2,6 +2,7 @@ import pytest
 from multimethod import multimethod as multimethod_dispatch
 from multipledispatch import dispatch as multipledispatch_dispatch
 from plum import dispatch as plum_dispatch
+from runtype import multidispatch as runtype_dispatch
 
 from ovld import ovld as ovld_dispatch
 from ovld import recurse
@@ -100,6 +101,37 @@ def add_plum(x: object, y: object):
 @pytest.mark.benchmark(group="add")
 def test_add_plum(benchmark):
     result = benchmark(add_plum, A, B)
+    assert result == C
+
+
+###########
+# runtype #
+###########
+
+
+@runtype_dispatch
+def add_runtype(x: list, y: list):
+    return [add_runtype(a, b) for a, b in zip(x, y)]
+
+
+@runtype_dispatch
+def add_runtype(x: tuple, y: tuple):
+    return tuple(add_runtype(a, b) for a, b in zip(x, y))
+
+
+@runtype_dispatch
+def add_runtype(x: dict, y: dict):
+    return {k: add_runtype(v, y[k]) for k, v in x.items()}
+
+
+@runtype_dispatch
+def add_runtype(x: object, y: object):
+    return x + y
+
+
+@pytest.mark.benchmark(group="add")
+def test_add_runtype(benchmark):
+    result = benchmark(add_runtype, A, B)
     assert result == C
 
 
