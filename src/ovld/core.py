@@ -10,7 +10,7 @@ from functools import partial
 from .dependent import Equals
 from .recode import Conformer, adapt_function, rename_function
 from .typemap import MultiTypeMap, is_type_of_type
-from .utils import BOOTSTRAP, keyword_decorator
+from .utils import keyword_decorator
 
 try:
     from types import UnionType
@@ -66,8 +66,6 @@ class _Ovld:
     Arguments:
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
-        type_error: The error type to raise when no function can be found to
-            dispatch to (default: TypeError).
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
@@ -82,7 +80,6 @@ class _Ovld:
     def __init__(
         self,
         *,
-        type_error=TypeError,
         mixins=[],
         bootstrap=None,
         name=None,
@@ -97,7 +94,6 @@ class _Ovld:
         self.mapper = mapper
         self.linkback = linkback
         self.children = []
-        self.type_error = type_error
         self.allow_replacement = allow_replacement
         self.bootstrap = bootstrap
         self.name = name
@@ -150,14 +146,14 @@ class _Ovld:
     def _key_error(self, key, possibilities=None):
         typenames = self._sig_string(key)
         if not possibilities:
-            return self.type_error(
+            return TypeError(
                 f"No method in {self} for argument types [{typenames}]"
             )
         else:
             hlp = ""
             for p, prio, spc in possibilities:
                 hlp += f"* {p.__name__}  (priority: {prio}, specificity: {list(spc)})\n"
-            return self.type_error(
+            return TypeError(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
                 f"Candidates are:\n{hlp}"
@@ -439,8 +435,6 @@ class OvldCall:
 
     def __init__(self, map, bind_to):
         """Initialize an OvldCall."""
-        # assert bind_to is not BOOTSTRAP
-        assert bind_to is not BOOTSTRAP
         self.map = map
         self._parent = super
         self.obj = bind_to
@@ -588,8 +582,6 @@ def ovld(fn, priority=0, **kwargs):
         fn: The function to register.
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
-        type_error: The error type to raise when no function can be found to
-            dispatch to (default: TypeError).
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.

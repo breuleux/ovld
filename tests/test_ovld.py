@@ -1008,17 +1008,6 @@ def test_multiple_dispatch_3():
     assert g.perform([1, 2.0]) == [6, 8.0, 6, 8.0]
 
 
-def test_error():
-    o = Ovld(type_error=FileNotFoundError)
-
-    @o.register
-    def f(x: int, y: int):
-        return x + y
-
-    with pytest.raises(FileNotFoundError):
-        o("hello")
-
-
 def test_repr():
     humptydumpty = Ovld()
 
