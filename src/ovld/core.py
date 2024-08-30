@@ -10,7 +10,7 @@ from functools import partial
 from .dependent import Equals
 from .recode import Conformer, adapt_function, rename_function
 from .typemap import MultiTypeMap, is_type_of_type
-from .utils import keyword_decorator
+from .utils import UsageError, keyword_decorator
 
 try:
     from types import UnionType
@@ -533,7 +533,7 @@ def extend_super(fn):
     plus this definition and others with the same name.
     """
     if not is_ovld(fn):
-        fn = ovld(fn)
+        fn = ovld(fn, fresh=True)
     fn._extend_super = True
     return fn
 
@@ -559,10 +559,10 @@ class ovld_cls_dict(dict):
 
         if prev is not None:
             if inspect.isfunction(prev):
-                prev = ovld(prev)
+                prev = ovld(prev, fresh=True)
 
             if is_ovld(prev):
-                if is_ovld(value):
+                if is_ovld(value) and prev is not value:
                     prev.add_mixins(value)
                     value = prev
                 elif inspect.isfunction(value):
@@ -615,19 +615,31 @@ class OvldBase(metaclass=OvldMC):
 
 
 def _find_overload(fn, **kwargs):
-    mod = __import__(fn.__module__, fromlist="_")
-    dispatch = getattr(mod, fn.__qualname__, None)
+    fr = sys._getframe(1)  # We typically expect to get to frame 3.
+    while fr and fn.__code__ not in fr.f_code.co_consts:
+        # We are basically searching for the function's code object in the stack.
+        # When a class/function A is nested in a class/function B, the former's
+        # code object is in the latter's co_consts. If ovld is used as a decorator,
+        # on A, then necessarily we are inside the execution of B, so B should be
+        # on the stack and we should be able to find A's code object in there.
+        fr = fr.f_back
+
+    if not fr:
+        raise UsageError("@ovld only works as a decorator.")
+
+    dispatch = fr.f_locals.get(fn.__name__, None)
+
     if dispatch is None:
         dispatch = _fresh(_Ovld)(**kwargs)
+    elif not is_ovld(dispatch):  # pragma: no cover
+        raise TypeError("@ovld requires Ovld instance")
     elif kwargs:  # pragma: no cover
         raise TypeError("Cannot configure an overload that already exists")
-    if not is_ovld(dispatch):  # pragma: no cover
-        raise TypeError("@ovld requires Ovld instance")
     return dispatch
 
 
 @keyword_decorator
-def ovld(fn, priority=0, **kwargs):
+def ovld(fn, priority=0, fresh=False, **kwargs):
     """Overload a function.
 
     Overloading is based on the function name.
@@ -641,6 +653,8 @@ def ovld(fn, priority=0, **kwargs):
 
     Arguments:
         fn: The function to register.
+        priority: The priority of the function in the resolution order.
+        fresh: Whether to create a new ovld or try to reuse an existing one.
         mixins: A list of Ovld instances that contribute functions to this
             Ovld.
         name: Optional name for the Ovld. If not provided, it will be
@@ -651,7 +665,10 @@ def ovld(fn, priority=0, **kwargs):
         linkback: Whether to keep a pointer in the parent mixins to this
             ovld so that updates can be propagated. (default: False)
     """
-    dispatch = _find_overload(fn, **kwargs)
+    if fresh:
+        dispatch = _fresh(_Ovld)(**kwargs)
+    else:
+        dispatch = _find_overload(fn, **kwargs)
     return dispatch.register(fn, priority=priority)
 
 
