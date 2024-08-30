@@ -242,6 +242,18 @@ class _Ovld:
 
         name = self.__name__
 
+        special_case = None
+        for key, fn in list(self.defns.items()):
+            spec = inspect.getfullargspec(fn)
+            if spec.varargs or spec.varkw or spec.defaults or spec.kwonlyargs:
+                special_case = "general"
+                break
+            this_case = len(spec.args) - (1 if self.bootstrap else 0)
+            if special_case is not None and this_case != special_case:
+                special_case = "general"
+                break
+            special_case = this_case
+
         # Replace the appropriate functions by their final behavior
         for method in dir(cls):
             value = getattr(cls, method)
@@ -252,8 +264,11 @@ class _Ovld:
 
         target = self.ocls if self.bootstrap else cls
 
-        # Rename the dispatch
-        target.__call__ = rename_function(target.__call__, f"{name}.dispatch")
+        # Set and rename the dispatch
+        special_method = getattr(
+            target, f"_call_{special_case}", target.__call__
+        )
+        target.__call__ = rename_function(special_method, f"{name}.dispatch")
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
@@ -390,9 +405,29 @@ class _Ovld:
             t = (t,)
         return self.map[t]
 
+    def _call_0(self):
+        method = self.map[()]
+        return method()
+
+    def _call_1(self, arg0, /):
+        method = self.map[(self.map.transform(arg0),)]
+        return method(arg0)
+
+    def _call_2(self, arg0, arg1, /):
+        method = self.map[self.map.transform(arg0), self.map.transform(arg1)]
+        return method(arg0, arg1)
+
+    def _call_3(self, arg0, arg1, arg2, /):
+        method = self.map[
+            self.map.transform(arg0),
+            self.map.transform(arg1),
+            self.map.transform(arg2),
+        ]
+        return method(arg0, arg1, arg2)
+
     @_compile_first
     @_setattrs(rename="dispatch")
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args):
         """Call the overloaded function.
 
         This version of __call__ is used when bootstrap is False.
@@ -402,16 +437,16 @@ class _Ovld:
         """
         key = tuple(map(self.map.transform, args))
         method = self.map[key]
-        return method(*args, **kwargs)
+        return method(*args)
 
     @_compile_first
     @_setattrs(rename="next")
-    def next(self, *args, **kwargs):
+    def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
         fr = sys._getframe(1)
         key = (fr.f_code, *map(self.map.transform, args))
         method = self.map[key]
-        return method(*args, **kwargs)
+        return method(*args)
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
@@ -439,25 +474,45 @@ class OvldCall:
         self._parent = super
         self.obj = bind_to
 
-    def next(self, *args, **kwargs):
+    def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
         fr = sys._getframe(1)
         key = (fr.f_code, *map(self.map.transform, args))
         method = self.map[key]
-        return method(self.obj, *args, **kwargs)
+        return method(self.obj, *args)
 
     def resolve(self, *args):
         """Find the right method to call for the given arguments."""
         return self.map[tuple(map(self.map.transform, args))].__get__(self.obj)
 
-    def __call__(self, *args, **kwargs):
+    def _call_0(self):
+        method = self.map[()]
+        return method(self.obj)
+
+    def _call_1(self, arg0, /):
+        method = self.map[(self.map.transform(arg0),)]
+        return method(self.obj, arg0)
+
+    def _call_2(self, arg0, arg1, /):
+        method = self.map[self.map.transform(arg0), self.map.transform(arg1)]
+        return method(self.obj, arg0, arg1)
+
+    def _call_3(self, arg0, arg1, arg2, /):
+        method = self.map[
+            self.map.transform(arg0),
+            self.map.transform(arg1),
+            self.map.transform(arg2),
+        ]
+        return method(self.obj, arg0, arg1, arg2)
+
+    def __call__(self, *args):
         """Call this overloaded function.
 
         If a dispatch function is provided, it replaces this function.
         """
         key = tuple(map(self.map.transform, args))
         method = self.map[key]
-        return method(self.obj, *args, **kwargs)
+        return method(self.obj, *args)
 
 
 def Ovld(*args, **kwargs):

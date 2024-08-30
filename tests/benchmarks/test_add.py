@@ -17,7 +17,6 @@ C = {"xs": list(range(10, 110, 2)), "ys": ("ox", (13, 13))}
 
 @ovld_dispatch
 def add_ovld(x: list, y: list):
-    """One."""
     return [add_ovld(a, b) for a, b in zip(x, y)]
 
 
@@ -49,7 +48,6 @@ def test_add_ovld(benchmark):
 
 @ovld_dispatch
 def add_ovld_recurse(x: list, y: list):
-    """One."""
     return [recurse(a, b) for a, b in zip(x, y)]
 
 
@@ -81,7 +79,6 @@ def test_add_ovld_recurse(benchmark):
 
 @plum_dispatch
 def add_plum(x: list, y: list):
-    """Three."""
     return [add_plum(a, b) for a, b in zip(x, y)]
 
 
@@ -113,7 +110,6 @@ def test_add_plum(benchmark):
 
 @multimethod_dispatch
 def add_multimethod(x: list, y: list):
-    """Three."""
     return [add_multimethod(a, b) for a, b in zip(x, y)]
 
 
@@ -145,7 +141,6 @@ def test_add_multimethod(benchmark):
 
 @multipledispatch_dispatch(list, list)
 def add_multipledispatch(x, y):
-    """Four."""
     return [add_multipledispatch(a, b) for a, b in zip(x, y)]
 
 
@@ -176,7 +171,6 @@ def test_add_multipledispatch(benchmark):
 
 
 def add_isinstance(x, y):
-    """Five."""
     if isinstance(x, dict) and isinstance(y, dict):
         return {k: add_isinstance(v, y[k]) for k, v in x.items()}
     elif isinstance(x, tuple) and isinstance(y, tuple):
