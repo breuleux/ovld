@@ -49,21 +49,19 @@ def test_Ovld():
 
 
 def test_nargs():
-    o = Ovld()
-
-    @o.register
+    @ovld
     def f():
         return 0
 
-    @o.register
+    @ovld
     def f(x: int):
         return 1
 
-    @o.register
+    @ovld
     def f(x: int, y: int):
         return 2
 
-    @o.register
+    @ovld
     def f(x: int, y: int, z: int):
         return 3
 
@@ -1310,6 +1308,20 @@ def test_string_annotation():
     assert f(1234) == "int"
     assert f([1, 2, 3, 4]) == "list"
     assert f(Booboo()) == "boo"
+
+
+def test_ovld_outside_scope():
+    def indirect():
+        def f(x: int):
+            return x * x
+
+        return f
+
+    with pytest.raises(UsageError):
+        ovld(indirect())
+
+    o = ovld(indirect(), fresh=True)
+    assert o(3) == 9
 
 
 def test_display(capsys, file_regression):
