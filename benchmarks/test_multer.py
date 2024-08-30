@@ -2,6 +2,7 @@ import pytest
 from multimethod import multimethod as multimethod_dispatch
 from multipledispatch import dispatch as multipledispatch_dispatch
 from plum import dispatch as plum_dispatch
+from runtype import multidispatch as runtype_dispatch
 
 from ovld import recurse
 from ovld.core import OvldBase
@@ -159,6 +160,38 @@ class MultimethodMulter:
 @pytest.mark.benchmark(group="multer")
 def test_multer_multimethod(benchmark):
     result = benchmark(MultimethodMulter(3), A)
+    assert result == C
+
+
+###########
+# runtype #
+###########
+
+
+class RuntypeMulter:
+    def __init__(self, factor):
+        self.factor = factor
+
+    @runtype_dispatch
+    def __call__(self, x: list):
+        return [self(a) for a in x]
+
+    @runtype_dispatch
+    def __call__(self, x: tuple):
+        return tuple(self(a) for a in x)
+
+    @runtype_dispatch
+    def __call__(self, x: dict):
+        return {k: self(v) for k, v in x.items()}
+
+    @runtype_dispatch
+    def __call__(self, x: object):
+        return x * self.factor
+
+
+@pytest.mark.benchmark(group="multer")
+def test_multer_runtype(benchmark):
+    result = benchmark(RuntypeMulter(3), A)
     assert result == C
 
 

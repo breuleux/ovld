@@ -174,6 +174,7 @@ dev = [
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
     { name = "pytest-regressions" },
+    { name = "runtype" },
 ]
 
 [package.metadata]
@@ -188,6 +189,7 @@ dev = [
     { name = "pytest-benchmark", specifier = ">=4.0.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-regressions", specifier = ">=2.5.0" },
+    { name = "runtype", specifier = ">=0.5.0" },
 ]
 
 [[package]]
@@ -373,6 +375,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cf/60/5959113cae0ce512cf246a6871c623117330105a0d5f59b4e26138f2c9cc/rich-13.8.0.tar.gz", hash = "sha256:a5ac1f1cd448ade0d59cc3356f7db7a7ccda2c8cbae9c7a90c28ff463d3e91f4", size = 222072 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/d9/c2a126eeae791e90ea099d05cb0515feea3688474b978343f3cdcfe04523/rich-13.8.0-py3-none-any.whl", hash = "sha256:2e85306a063b9492dffc86278197a60cbece75bcb766022f3436f567cae11bdc", size = 241597 },
+]
+
+[[package]]
+name = "runtype"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/4d/b60372061b4c8b0d91b0bfbbdbfb18790c08b48f7719e10551bbf129d2ba/runtype-0.5.0.tar.gz", hash = "sha256:91746a2f8e2dc0bc131de04df87635f16a682fc1ed3063af7ea565495f7dbbd5", size = 26529 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9d/32/b9efc4e325bea97e0cdbf097ce08627bbc0ec316584f6ec3d0d89afb38ee/runtype-0.5.0-py3-none-any.whl", hash = "sha256:5b4bba116a0868a7b3585b744a962eeb2dcf3b6504d7e6003a17c47d962ac9d9", size = 27045 },
 ]
 
 [[package]]
