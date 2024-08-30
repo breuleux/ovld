@@ -208,7 +208,16 @@ def adapt_function(fn, ovld, newname):
 def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     ovld_mangled = f"___OVLD{ovld.id}"
     code_mangled = f"___CODE{next(_current)}"
-    tree = ast.parse(textwrap.dedent(inspect.getsource(fn)))
+    try:
+        src = inspect.getsource(fn)
+    except OSError:
+        raise OSError(
+            f"ovld is unable to rewrite {fn} because it cannot read its source code."
+            " It may be an issue with __pycache__, so try to either change the source"
+            " to force a refresh, or remove __pycache__ altogether. If that does not work,"
+            " avoid calling recurse()/call_next()"
+        )
+    tree = ast.parse(textwrap.dedent(src))
     argspec = inspect.getfullargspec(fn).args
     new = NameConverter(
         has_self=argspec and argspec[0] == "self",
