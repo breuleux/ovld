@@ -69,8 +69,6 @@ class _Ovld:
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
-        mapper: Class implementing a mapping interface from a tuple of
-            types to a handler (default: MultiTypeMap).
         linkback: Whether to keep a pointer in the parent mixins to this
             ovld so that updates can be propagated. (default: False)
         allow_replacement: Allow replacing a method by another with the
@@ -83,7 +81,6 @@ class _Ovld:
         mixins=[],
         bootstrap=None,
         name=None,
-        mapper=MultiTypeMap,
         linkback=False,
         allow_replacement=True,
     ):
@@ -91,7 +88,6 @@ class _Ovld:
         self.id = next(_current_id)
         self._compiled = False
         self.maindoc = None
-        self.mapper = mapper
         self.linkback = linkback
         self.children = []
         self.allow_replacement = allow_replacement
@@ -236,7 +232,7 @@ class _Ovld:
             if self not in mixin.children:
                 mixin.lock()
         self._compiled = True
-        self.map = self.mapper(key_error=self._key_error)
+        self.map = MultiTypeMap(key_error=self._key_error)
 
         cls = type(self)
         if self.name is None:
@@ -660,8 +656,6 @@ def ovld(fn, priority=0, fresh=False, **kwargs):
         name: Optional name for the Ovld. If not provided, it will be
             gotten automatically from the first registered function or
             dispatch.
-        mapper: Class implementing a mapping interface from a tuple of
-            types to a handler (default: MultiTypeMap).
         linkback: Whether to keep a pointer in the parent mixins to this
             ovld so that updates can be propagated. (default: False)
     """
