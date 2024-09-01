@@ -8,7 +8,7 @@ import typing
 from functools import partial
 
 from .dependent import Equals
-from .recode import Conformer, adapt_function, rename_function
+from .recode import ArgumentAnalyzer, Conformer, adapt_function, rename_function
 from .typemap import MultiTypeMap, is_type_of_type
 from .utils import UsageError, keyword_decorator
 
@@ -240,18 +240,6 @@ class _Ovld:
 
         name = self.__name__
 
-        special_case = None
-        for key, fn in list(self.defns.items()):
-            spec = inspect.getfullargspec(fn)
-            if spec.varargs or spec.varkw or spec.defaults or spec.kwonlyargs:
-                special_case = "general"
-                break
-            this_case = len(spec.args) - (1 if self.bootstrap else 0)
-            if special_case is not None and this_case != special_case:
-                special_case = "general"
-                break
-            special_case = this_case
-
         # Replace the appropriate functions by their final behavior
         for method in dir(cls):
             value = getattr(cls, method)
@@ -262,11 +250,11 @@ class _Ovld:
 
         target = self.ocls if self.bootstrap else cls
 
-        # Set and rename the dispatch
-        special_method = getattr(
-            target, f"_call_{special_case}", target.__call__
-        )
-        target.__call__ = rename_function(special_method, f"{name}.dispatch")
+        anal = ArgumentAnalyzer()
+        for key, fn in list(self.defns.items()):
+            anal.add(fn)
+        dispatch = anal.generate_dispatch()
+        target.__call__ = rename_function(dispatch, f"{name}.dispatch")
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
@@ -407,35 +395,12 @@ class _Ovld:
             t = (t,)
         return self.map[t]
 
-    def _call_0(self):
-        method = self.map[()]
-        return method()
-
-    def _call_1(self, arg0, /):
-        method = self.map[(self.map.transform(arg0),)]
-        return method(arg0)
-
-    def _call_2(self, arg0, arg1, /):
-        method = self.map[self.map.transform(arg0), self.map.transform(arg1)]
-        return method(arg0, arg1)
-
-    def _call_3(self, arg0, arg1, arg2, /):
-        method = self.map[
-            self.map.transform(arg0),
-            self.map.transform(arg1),
-            self.map.transform(arg2),
-        ]
-        return method(arg0, arg1, arg2)
-
     @_compile_first
     @_setattrs(rename="dispatch")
-    def __call__(self, *args):
+    def __call__(self, *args):  # pragma: no cover
         """Call the overloaded function.
 
-        This version of __call__ is used when bootstrap is False.
-
-        If bootstrap is False and a dispatch function is provided, it
-        replaces this function.
+        This should be replaced by an auto-generated function.
         """
         key = tuple(map(self.map.transform, args))
         method = self.map[key]
@@ -487,30 +452,10 @@ class OvldCall:
         """Find the right method to call for the given arguments."""
         return self.map[tuple(map(self.map.transform, args))].__get__(self.obj)
 
-    def _call_0(self):
-        method = self.map[()]
-        return method(self.obj)
-
-    def _call_1(self, arg0, /):
-        method = self.map[(self.map.transform(arg0),)]
-        return method(self.obj, arg0)
-
-    def _call_2(self, arg0, arg1, /):
-        method = self.map[self.map.transform(arg0), self.map.transform(arg1)]
-        return method(self.obj, arg0, arg1)
-
-    def _call_3(self, arg0, arg1, arg2, /):
-        method = self.map[
-            self.map.transform(arg0),
-            self.map.transform(arg1),
-            self.map.transform(arg2),
-        ]
-        return method(self.obj, arg0, arg1, arg2)
-
-    def __call__(self, *args):
+    def __call__(self, *args):  # pragma: no cover
         """Call this overloaded function.
 
-        If a dispatch function is provided, it replaces this function.
+        This should be replaced by an auto-generated function.
         """
         key = tuple(map(self.map.transform, args))
         method = self.map[key]

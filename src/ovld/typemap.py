@@ -104,11 +104,10 @@ class MultiTypeMap(dict):
         self.type_tuples = {}
         self.empty = MISSING
         self.key_error = key_error
-        self.transform = type
         self.all = {}
         self.errors = {}
 
-    def _transform(self, obj):
+    def transform(self, obj):
         if isinstance(obj, GenericAlias):
             return type[obj]
         elif obj is typing.Any:
@@ -213,9 +212,6 @@ class MultiTypeMap(dict):
         """
         self.clear()
 
-        if any(isinstance(x, GenericAlias) for x in obj_t_tup):
-            self.transform = self._transform
-
         amin, amax, vararg, priority = nargs
 
         entry = (handler, amin, amax, vararg)
@@ -232,6 +228,7 @@ class MultiTypeMap(dict):
             if i not in self.maps:
                 self.maps[i] = TypeMap()
             self.maps[i].register(cls, entry)
+
         if vararg:
             if -1 not in self.maps:
                 self.maps[-1] = TypeMap()
