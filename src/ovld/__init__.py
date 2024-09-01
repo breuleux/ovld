@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from .core import (
     Ovld,
     OvldBase,
@@ -33,6 +35,12 @@ from .utils import (
     keyword_decorator,
 )
 from .version import version as __version__
+
+if TYPE_CHECKING:  # pragma: no cover
+    # Pretend that @ovld is @typing.overload.
+    # I can't believe this works.
+    from typing import overload as ovld
+
 
 __all__ = [
     "MultiTypeMap",
