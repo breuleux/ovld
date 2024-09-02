@@ -353,9 +353,9 @@ def rename_function(fn, newname):
 
 class NameConverter(ast.NodeTransformer):
     def __init__(
-        self, has_self, recurse_sym, call_next_sym, ovld_mangled, code_mangled
+        self, anal, recurse_sym, call_next_sym, ovld_mangled, code_mangled
     ):
-        self.has_self = has_self
+        self.analysis = anal
         self.recurse_sym = recurse_sym
         self.call_next_sym = call_next_sym
         self.ovld_mangled = ovld_mangled
@@ -388,6 +388,7 @@ class NameConverter(ast.NodeTransformer):
             )
             for i, arg in enumerate(node.args)
         ]
+
         type_parts = [
             ast.Call(
                 func=ast.Attribute(
@@ -398,8 +399,15 @@ class NameConverter(ast.NodeTransformer):
                 args=[self.visit(arg)],
                 keywords=[],
             )
-            for arg in new_args
+            if self.analysis.lookup_for(i) == "self.map.transform"
+            else ast.Call(
+                func=ast.Name(id="type", ctx=ast.Load()),
+                args=[self.visit(arg)],
+                keywords=[],
+            )
+            for i, arg in enumerate(new_args)
         ]
+
         if cn:
             type_parts.insert(0, ast.Name(id=self.code_mangled, ctx=ast.Load()))
         method = ast.Subscript(
@@ -418,7 +426,7 @@ class NameConverter(ast.NodeTransformer):
             ),
             ctx=ast.Load(),
         )
-        if self.has_self:
+        if self.analysis.is_method:
             method = ast.Call(
                 func=ast.Attribute(
                     value=method,
@@ -475,9 +483,8 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
             " avoid calling recurse()/call_next()"
         )
     tree = ast.parse(textwrap.dedent(src))
-    argspec = inspect.getfullargspec(fn).args
     new = NameConverter(
-        has_self=argspec and argspec[0] == "self",
+        anal=ovld.argument_analysis,
         recurse_sym=recurse_sym,
         call_next_sym=call_next_sym,
         ovld_mangled=ovld_mangled,
