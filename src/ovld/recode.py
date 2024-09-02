@@ -4,7 +4,7 @@ import runpy
 import tempfile
 import textwrap
 from collections import defaultdict
-from itertools import count
+from itertools import count, takewhile
 from types import CodeType, FunctionType, GenericAlias
 
 from .utils import Unusable, UsageError
@@ -96,30 +96,69 @@ class ArgumentAnalyzer:
             raise TypeError(
                 f"Argument {name} is found both in a positional and keyword setting."
             )
-        npositional = 0
-        positional = []
-        for pos, names in sorted(self.position_to_names.items()):
-            required, total = self.counts[pos]
-            name = f"_ovld_arg{pos}"
-            if len(names) == 1 and total == self.total:
-                name = list(names)[0]
-            else:
-                npositional = pos + 1
-            positional.append((name, required == self.total))
 
-        keywords = []
-        for key, (name,) in self.name_to_positions.items():
-            if isinstance(name, int):
-                pass  # ignore positional arguments
-            else:
-                assert key == name
-                required, total = self.counts[key]
-                keywords.append((name, required == self.total))
+        p_to_n = [
+            list(names) for _, names in sorted(self.position_to_names.items())
+        ]
 
-        return positional[:npositional], positional[npositional:], keywords
+        positional = list(
+            takewhile(
+                lambda names: len(names) == 1 and isinstance(names[0], str),
+                reversed(p_to_n),
+            )
+        )
+        positional.reverse()
+        strict_positional = p_to_n[: len(p_to_n) - len(positional)]
+
+        assert strict_positional + positional == p_to_n
+
+        strict_positional_required = [
+            f"_ovld_arg{pos}"
+            for pos, _ in enumerate(strict_positional)
+            if self.counts[pos][0] == self.total
+        ]
+        strict_positional_optional = [
+            f"_ovld_arg{pos}"
+            for pos, _ in enumerate(strict_positional)
+            if self.counts[pos][0] != self.total
+        ]
+
+        positional_required = [
+            names[0]
+            for pos, names in enumerate(positional)
+            if self.counts[pos][0] == self.total
+        ]
+        positional_optional = [
+            names[0]
+            for pos, names in enumerate(positional)
+            if self.counts[pos][0] != self.total
+        ]
+
+        keywords = [
+            name
+            for _, (name,) in self.name_to_positions.items()
+            if not isinstance(name, int)
+        ]
+        keyword_required = [
+            name for name in keywords if self.counts[name][0] == self.total
+        ]
+        keyword_optional = [
+            name for name in keywords if self.counts[name][0] != self.total
+        ]
+
+        return (
+            strict_positional_required,
+            strict_positional_optional,
+            positional_required,
+            positional_optional,
+            keyword_required,
+            keyword_optional,
+        )
 
     def generate_dispatch(self):
-        po, pn, kw = self.compile()
+        spr, spo, pr, po, kr, ko = self.compile()
+
+        lookup_fn = "self.map.transform"
 
         inits = set()
 
@@ -132,58 +171,83 @@ class ArgumentAnalyzer:
         posargs = []
         lookup = []
 
-        def _positional(key, k, necessary):
-            nonlocal argsstar, targsstar
-            lookup_fn = (
-                "self.map.transform"
-                if key in self.complex_transforms
-                else "type"
-            )
-            if necessary:
-                args.append(k)
-                posargs.append(k)
-                lookup.append(f"{lookup_fn}({k})")
-            else:
-                args.append(f"{k}=MISSING")
-                argsstar = "*ARGS"
-                targsstar = "*TARGS"
-                inits.add("ARGS = []")
-                inits.add("TARGS = []")
-                body.append(f"if {k} is not MISSING:")
-                body.append(f"    ARGS.append({k})")
-                body.append(f"    TARGS.append({lookup_fn}({k}))")
-
         i = 0
-        for k, necessary in po:
-            _positional(i, k, necessary)
+
+        for name in spr:
+            lookup_fn = (
+                "self.map.transform" if i in self.complex_transforms else "type"
+            )
+            args.append(name)
+            posargs.append(name)
+            lookup.append(f"{lookup_fn}({name})")
+            i += 1
+
+        for name in spo:
+            lookup_fn = (
+                "self.map.transform" if i in self.complex_transforms else "type"
+            )
+            args.append(f"{name}=MISSING")
+            argsstar = "*ARGS"
+            targsstar = "*TARGS"
+            inits.add("ARGS = []")
+            inits.add("TARGS = []")
+            body.append(f"if {name} is not MISSING:")
+            body.append(f"    ARGS.append({name})")
+            body.append(f"    TARGS.append({lookup_fn}({name}))")
             i += 1
 
         args.append("/")
 
-        for k, necessary in pn:
-            _positional(i, k, necessary)
+        for name in pr:
+            lookup_fn = (
+                "self.map.transform" if i in self.complex_transforms else "type"
+            )
+            args.append(name)
+            posargs.append(name)
+            lookup.append(f"{lookup_fn}({name})")
             i += 1
 
-        if kw:
+        for name in po:
+            lookup_fn = (
+                "self.map.transform" if i in self.complex_transforms else "type"
+            )
+            args.append(f"{name}=MISSING")
+            argsstar = "*ARGS"
+            targsstar = "*TARGS"
+            inits.add("ARGS = []")
+            inits.add("TARGS = []")
+            body.append(f"if {name} is not MISSING:")
+            body.append(f"    ARGS.append({name})")
+            body.append(f"    TARGS.append({lookup_fn}({name}))")
+            i += 1
+
+        if kr or ko:
             args.append("*")
 
-        for k, necessary in kw:
+        for name in kr:
             lookup_fn = (
-                "self.map.transform" if k in self.complex_transforms else "type"
+                "self.map.transform"
+                if name in self.complex_transforms
+                else "type"
             )
-            if necessary:
-                args.append(f"{k}")
-                posargs.append(f"{k}={k}")
-                lookup.append(f"({k!r}, {lookup_fn}({k}))")
-            else:
-                args.append(f"{k}=MISSING")
-                kwargsstar = "**KWARGS"
-                targsstar = "*TARGS"
-                inits.add("KWARGS = {}")
-                inits.add("TARGS = []")
-                body.append(f"if {k} is not MISSING:")
-                body.append(f"    KWARGS[{k!r}] = {k}")
-                body.append(f"    TARGS.append(({k!r}, {lookup_fn}({k})))")
+            args.append(f"{name}")
+            posargs.append(f"{name}={name}")
+            lookup.append(f"({name!r}, {lookup_fn}({name}))")
+
+        for name in ko:
+            lookup_fn = (
+                "self.map.transform"
+                if name in self.complex_transforms
+                else "type"
+            )
+            args.append(f"{name}=MISSING")
+            kwargsstar = "**KWARGS"
+            targsstar = "*TARGS"
+            inits.add("KWARGS = {}")
+            inits.add("TARGS = []")
+            body.append(f"if {name} is not MISSING:")
+            body.append(f"    KWARGS[{name!r}] = {name}")
+            body.append(f"    TARGS.append(({name!r}, {lookup_fn}({name})))")
 
         posargs.append(argsstar)
         posargs.append(kwargsstar)
