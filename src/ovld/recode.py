@@ -27,9 +27,13 @@ class MISSING:
 def __DISPATCH__(self, {args}):
     {inits}
     {body}
+    {call}
+"""
 
-    method = self.map[({lookup})]
-    return method({slf}{posargs})
+
+call_template = """
+method = self.map[({lookup})]
+return method({posargs})
 """
 
 
@@ -57,23 +61,23 @@ class ArgumentAnalyzer:
             if param.kind is inspect._POSITIONAL_ONLY:
                 cnt = self.counts[i]
                 self.position_to_names[i].add(None)
-                key = i
+                keys = {i}
             elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
                 cnt = self.counts[i]
                 self.position_to_names[i].add(param.name)
                 self.name_to_positions[param.name].add(i)
-                key = i
+                keys = {i, param.name}
             elif param.kind is inspect._KEYWORD_ONLY:
                 cnt = self.counts[param.name]
                 self.name_to_positions[param.name].add(param.name)
-                key = param.name
+                keys = {param.name}
             elif param.kind is inspect._VAR_POSITIONAL:
                 raise TypeError("ovld does not support *args")
             elif param.kind is inspect._VAR_KEYWORD:
                 raise TypeError("ovld does not support **kwargs")
 
             if is_complex:
-                self.complex_transforms.add(key)
+                self.complex_transforms.update(keys)
 
             cnt[0] += 1 if param.default is inspect._empty else 0
             cnt[1] += 1
@@ -155,70 +159,51 @@ class ArgumentAnalyzer:
             keyword_optional,
         )
 
-    def generate_dispatch(self):
-        spr, spo, pr, po, kr, ko = self.compile()
+    def lookup_for(self, key):
+        return (
+            "self.map.transform" if key in self.complex_transforms else "type"
+        )
 
-        lookup_fn = "self.map.transform"
+    def generate_dispatch(self):
+        def join(li, sep=", ", trail=False):
+            li = [x for x in li if x]
+            rval = sep.join(li)
+            if len(li) == 1 and trail:
+                rval += ","
+            return rval
+
+        spr, spo, pr, po, kr, ko = self.compile()
 
         inits = set()
 
-        argsstar = ""
         kwargsstar = ""
         targsstar = ""
 
         args = []
         body = [""]
-        posargs = []
+        posargs = ["self.obj" if self.is_method else ""]
         lookup = []
 
         i = 0
 
-        for name in spr:
-            lookup_fn = (
-                "self.map.transform" if i in self.complex_transforms else "type"
-            )
-            args.append(name)
+        for name in spr + spo:
+            if name in spr:
+                args.append(name)
+            else:
+                args.append(f"{name}=MISSING")
             posargs.append(name)
-            lookup.append(f"{lookup_fn}({name})")
-            i += 1
-
-        for name in spo:
-            lookup_fn = (
-                "self.map.transform" if i in self.complex_transforms else "type"
-            )
-            args.append(f"{name}=MISSING")
-            argsstar = "*ARGS"
-            targsstar = "*TARGS"
-            inits.add("ARGS = []")
-            inits.add("TARGS = []")
-            body.append(f"if {name} is not MISSING:")
-            body.append(f"    ARGS.append({name})")
-            body.append(f"    TARGS.append({lookup_fn}({name}))")
+            lookup.append(f"{self.lookup_for(i)}({name})")
             i += 1
 
         args.append("/")
 
-        for name in pr:
-            lookup_fn = (
-                "self.map.transform" if i in self.complex_transforms else "type"
-            )
-            args.append(name)
+        for name in pr + po:
+            if name in pr:
+                args.append(name)
+            else:
+                args.append(f"{name}=MISSING")
             posargs.append(name)
-            lookup.append(f"{lookup_fn}({name})")
-            i += 1
-
-        for name in po:
-            lookup_fn = (
-                "self.map.transform" if i in self.complex_transforms else "type"
-            )
-            args.append(f"{name}=MISSING")
-            argsstar = "*ARGS"
-            targsstar = "*TARGS"
-            inits.add("ARGS = []")
-            inits.add("TARGS = []")
-            body.append(f"if {name} is not MISSING:")
-            body.append(f"    ARGS.append({name})")
-            body.append(f"    TARGS.append({lookup_fn}({name}))")
+            lookup.append(f"{self.lookup_for(i)}({name})")
             i += 1
 
         if kr or ko:
@@ -235,11 +220,6 @@ class ArgumentAnalyzer:
             lookup.append(f"({name!r}, {lookup_fn}({name}))")
 
         for name in ko:
-            lookup_fn = (
-                "self.map.transform"
-                if name in self.complex_transforms
-                else "type"
-            )
             args.append(f"{name}=MISSING")
             kwargsstar = "**KWARGS"
             targsstar = "*TARGS"
@@ -247,19 +227,37 @@ class ArgumentAnalyzer:
             inits.add("TARGS = []")
             body.append(f"if {name} is not MISSING:")
             body.append(f"    KWARGS[{name!r}] = {name}")
-            body.append(f"    TARGS.append(({name!r}, {lookup_fn}({name})))")
+            body.append(
+                f"    TARGS.append(({name!r}, {self.lookup_for(name)}({name})))"
+            )
 
-        posargs.append(argsstar)
         posargs.append(kwargsstar)
         lookup.append(targsstar)
 
+        fullcall = call_template.format(
+            lookup=join(lookup, trail=True),
+            posargs=join(posargs),
+        )
+
+        calls = []
+        if spo or po:
+            req = len(spr + pr)
+            for i, arg in enumerate(spo + po):
+                call = call_template.format(
+                    lookup=join(lookup[: req + i], trail=True),
+                    posargs=join(posargs[: req + i + 1]),
+                )
+                call = textwrap.indent(call, "    ")
+                calls.append(f"\nif {arg} is MISSING:{call}")
+            calls.append(f"\nelse:{textwrap.indent(fullcall, '    ')}")
+        else:
+            calls.append(fullcall)
+
         code = dispatch_template.format(
-            inits="\n    ".join(inits),
-            args=", ".join(x for x in args if x),
-            posargs=", ".join(x for x in posargs if x),
-            body="\n    ".join(x for x in body if x),
-            lookup=", ".join(x for x in lookup if x) + ",",
-            slf="self.obj, " if self.is_method else "",
+            inits=join(inits, sep="\n    "),
+            args=join(args),
+            body=join(body, sep="\n    "),
+            call=textwrap.indent("".join(calls), "    "),
         )
         return self.instantiate_code("__DISPATCH__", code)
 
