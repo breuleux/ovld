@@ -253,6 +253,7 @@ class _Ovld:
         anal = ArgumentAnalyzer()
         for key, fn in list(self.defns.items()):
             anal.add(fn)
+        self.argument_analysis = anal
         dispatch = anal.generate_dispatch()
         target.__call__ = rename_function(dispatch, f"{name}.dispatch")
 
