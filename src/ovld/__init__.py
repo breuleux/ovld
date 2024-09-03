@@ -12,7 +12,7 @@ from .core import (
 from .dependent import (
     Dependent,
     DependentType,
-    SingleParameterDependentType,
+    ParametrizedDependentType,
     dependent_check,
 )
 from .recode import call_next, recurse
@@ -53,7 +53,7 @@ __all__ = [
     "is_ovld",
     "ovld",
     "Dependent",
-    "SingleParameterDependentType",
+    "ParametrizedDependentType",
     "DependentType",
     "dependent_check",
     "BOOTSTRAP",
