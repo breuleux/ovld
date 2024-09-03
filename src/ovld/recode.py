@@ -7,6 +7,7 @@ from collections import defaultdict
 from itertools import count, takewhile
 from types import CodeType, FunctionType, GenericAlias
 
+from .dependent import DependentType
 from .utils import Unusable, UsageError
 
 recurse = Unusable(
@@ -130,12 +131,12 @@ class ArgumentAnalyzer:
         positional_required = [
             names[0]
             for pos, names in enumerate(positional)
-            if self.counts[pos][0] == self.total
+            if self.counts[pos + len(strict_positional)][0] == self.total
         ]
         positional_optional = [
             names[0]
             for pos, names in enumerate(positional)
-            if self.counts[pos][0] != self.total
+            if self.counts[pos + len(strict_positional)][0] != self.total
         ]
 
         keywords = [
@@ -265,15 +266,92 @@ class ArgumentAnalyzer:
             body=join(body, sep="\n    "),
             call=textwrap.indent("".join(calls), "    "),
         )
-        return self.instantiate_code("__DISPATCH__", code)
+        # print(code)
+        return instantiate_code("__DISPATCH__", code)
 
-    def instantiate_code(self, symbol, code):
-        tf = tempfile.NamedTemporaryFile("w")
-        _tempfiles.append(tf)
-        tf.write(code)
-        tf.flush()
-        glb = runpy.run_path(tf.name)
-        return glb[symbol]
+
+def instantiate_code(symbol, code, inject={}):
+    tf = tempfile.NamedTemporaryFile("w")
+    _tempfiles.append(tf)
+    tf.write(code)
+    tf.flush()
+    glb = runpy.run_path(tf.name)
+    rval = glb[symbol]
+    rval.__globals__.update(inject)
+    return rval
+
+
+class GenSym:
+    def __init__(self, prefix):
+        self.prefix = prefix
+        self.count = count()
+        self.variables = {}
+
+    def add(self, value):
+        if isinstance(value, (int, float, str)):
+            return repr(value)
+        id = f"{self.prefix}{next(self.count)}"
+        self.variables[id] = value
+        return id
+
+
+def generate_dependent_dispatch(tup, handlers, next_call, slf, err):
+    def to_dict(tup):
+        return dict(
+            entry if isinstance(entry, tuple) else (i, entry)
+            for i, entry in enumerate(tup)
+        )
+
+    def argname(x):
+        return f"ARG{x}" if isinstance(x, int) else x
+
+    def argprovide(x):
+        return f"ARG{x}" if isinstance(x, int) else f"{x}={x}"
+
+    def codegen(typ, arg):
+        template, fill_in = typ.codegen()
+        return template.format(
+            arg=arg, **{k: gen.add(v) for k, v in fill_in.items()}
+        )
+
+    tup = to_dict(tup)
+    handlers = [(h, to_dict(types)) for h, types in handlers]
+    gen = GenSym(prefix="INJECT")
+    body = []
+    for i, (h, types) in enumerate(handlers):
+        relevant = [k for k in tup if isinstance(types[k], DependentType)]
+        codes = [codegen(types[k], argname(k)) for k in relevant]
+        conj = " and ".join(codes)
+        if not conj:
+            conj = "True"
+        line = f"MATCH{i} = {conj}"
+        body.append(line)
+
+    argspec = ", ".join(argname(x) for x in tup)
+    argcall = ", ".join(argprovide(x) for x in tup)
+
+    summation = " + ".join(f"MATCH{i}" for i in range(len(handlers)))
+    body.append(f"SUMMATION = {summation}")
+    body.append("if SUMMATION == 1:")
+    for i, (h, types) in enumerate(handlers):
+        body.append(f"    if MATCH{i}: return HANDLER{i}({slf}{argcall})")
+    body.append("elif SUMMATION == 0:")
+    body.append(f"    return HANDLERN({slf}{argcall})")
+    body.append("else:")
+    body.append(f"    raise {gen.add(err)}")
+
+    body_text = textwrap.indent("\n".join(body), "    ")
+    code = f"def __DEPENDENT_DISPATCH__({slf}{argspec}):\n{body_text}"
+
+    inject = gen.variables
+    for i, (h, types) in enumerate(handlers):
+        inject[f"HANDLER{i}"] = h
+    inject["HANDLERN"] = next_call[0] if next_call else None
+
+    fn = instantiate_code(
+        symbol="__DEPENDENT_DISPATCH__", code=code, inject=inject
+    )
+    return fn
 
 
 _current = count()
@@ -385,6 +463,9 @@ class NameConverter(ast.NodeTransformer):
         ):
             return self.generic_visit(node)
 
+        if any(isinstance(arg, ast.Starred) for arg in node.args):
+            return self.generic_visit(node)
+
         cn = node.func.id == self.call_next_sym
 
         def _make_lookup_call(key, arg):
@@ -468,8 +549,12 @@ class NameConverter(ast.NodeTransformer):
         return ast.copy_location(old_node=node, new_node=new_node)
 
 
-def _search_name(co, value, glb):
+def _search_name(co, value, glb, closure=None):
     if isinstance(co, CodeType):
+        if closure is not None:
+            for varname, cell in zip(co.co_freevars, closure):
+                if cell.cell_contents is value:
+                    return varname
         for name in co.co_names:
             if glb.get(name, None) is value:
                 return name
@@ -482,8 +567,10 @@ def _search_name(co, value, glb):
 
 def adapt_function(fn, ovld, newname):
     """Create a copy of the function with a different name."""
-    rec_sym = _search_name(fn.__code__, recurse, fn.__globals__)
-    cn_sym = _search_name(fn.__code__, call_next, fn.__globals__)
+    rec_sym = _search_name(fn.__code__, recurse, fn.__globals__, fn.__closure__)
+    cn_sym = _search_name(
+        fn.__code__, call_next, fn.__globals__, fn.__closure__
+    )
     if rec_sym or cn_sym:
         return recode(fn, ovld, rec_sym, cn_sym, newname)
     else:

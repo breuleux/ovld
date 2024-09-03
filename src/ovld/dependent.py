@@ -12,6 +12,12 @@ class DependentType:
     def check(self, value):  # pragma: no cover
         raise NotImplementedError()
 
+    def codegen(self):
+        return "{this}.check({arg})", {"this": self}
+
+    def __lt__(self, other):
+        return False
+
 
 def dependent_match(tup, args):
     for t, a in zip(tup, args):
@@ -53,10 +59,26 @@ class Equals(ParametrizedDependentType):
     def check(self, value):
         return value == self.parameter
 
+    def codegen(self):
+        return "({arg} == {p})", {"p": self.parameter}
+
 
 class StartsWith(ParametrizedDependentType):
     def check(self, value):
         return value.startswith(self.parameter)
+
+
+class Bounded(ParametrizedDependentType):
+    def check(self, value):
+        min, max = self.parameters
+        return min <= value <= max
+
+    def __lt__(self, other):
+        if type(other) is not type(self):
+            return False
+        smin, smax = self.parameters
+        omin, omax = other.parameters
+        return (smin < omin and smax >= omax) or (smin <= omin and smax > omax)
 
 
 class HasKeys(ParametrizedDependentType):

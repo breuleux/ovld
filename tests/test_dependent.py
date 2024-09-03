@@ -1,9 +1,11 @@
+from numbers import Number
 from typing import Literal
 
 import pytest
 
 from ovld.core import OvldBase, ovld
 from ovld.dependent import (
+    Bounded,
     Dependent,
     Equals,
     Falsey,
@@ -170,3 +172,17 @@ def test_truey_falsey():
     assert f([]) == "nay"
     assert f({}) == "nay"
     assert f([1]) == "yay"
+
+
+def test_bounded():
+    @ovld
+    def f(x: Dependent[Number, Bounded(0, 10)]):
+        return "0-10"
+
+    @f.register
+    def f(x: Dependent[Number, Bounded(2, 6)]):
+        return "2-6"
+
+    assert Bounded(0, 10) < Bounded(2, 6)
+    assert f(1) == "0-10"
+    assert f(5) == "2-6"
