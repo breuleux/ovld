@@ -117,12 +117,12 @@ class ArgumentAnalyzer:
         assert strict_positional + positional == p_to_n
 
         strict_positional_required = [
-            f"_ovld_arg{pos}"
+            f"ARG{pos + 1}"
             for pos, _ in enumerate(strict_positional)
             if self.counts[pos][0] == self.total
         ]
         strict_positional_optional = [
-            f"_ovld_arg{pos}"
+            f"ARG{pos + 1}"
             for pos, _ in enumerate(strict_positional)
             if self.counts[pos][0] != self.total
         ]
@@ -195,7 +195,12 @@ class ArgumentAnalyzer:
             lookup.append(f"{self.lookup_for(i)}({name})")
             i += 1
 
-        args.append("/")
+        if len(po) <= 1:
+            # If there are more than one non-strictly positional optional arguments,
+            # then all positional arguments are strictly positional, because if e.g.
+            # x and y are optional we want x==MISSING to imply that y==MISSING, but
+            # that only works if y cannot be provided as a keyword argument.
+            args.append("/")
 
         for name in pr + po:
             if name in pr:
@@ -205,6 +210,9 @@ class ArgumentAnalyzer:
             posargs.append(name)
             lookup.append(f"{self.lookup_for(i)}({name})")
             i += 1
+
+        if len(po) > 1:
+            args.append("/")
 
         if kr or ko:
             args.append("*")
@@ -249,9 +257,7 @@ class ArgumentAnalyzer:
                 )
                 call = textwrap.indent(call, "    ")
                 calls.append(f"\nif {arg} is MISSING:{call}")
-            calls.append(f"\nelse:{textwrap.indent(fullcall, '    ')}")
-        else:
-            calls.append(fullcall)
+        calls.append(fullcall)
 
         code = dispatch_template.format(
             inits=join(inits, sep="\n    "),
