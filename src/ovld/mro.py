@@ -7,7 +7,9 @@ from .dependent import DependentType
 
 def _issubclass(c1, c2):
     if isinstance(c1, DependentType) and isinstance(c2, DependentType):
-        return c1.bound != c2.bound and _issubclass(c1.bound, c2.bound)
+        return (
+            c1.bound != c2.bound and _issubclass(c1.bound, c2.bound)
+        ) or c1 > c2
     elif isinstance(c1, DependentType) or isinstance(c2, DependentType):
         return False
     if getattr(c2, "__origin__", None) is typing.Union:

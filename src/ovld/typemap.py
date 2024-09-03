@@ -5,6 +5,7 @@ from types import CodeType
 
 from .dependent import DependentType, dependent_match
 from .mro import sort_types
+from .recode import generate_dependent_dispatch
 from .utils import MISSING
 
 
@@ -291,61 +292,57 @@ class MultiTypeMap(dict):
                 finished = True
         print("Resolution:", message)
 
-    def wrap_dependent(self, tup, handlers, group):
+    def wrap_dependent(self, tup, handlers, group, next_call):
         handlers = list(handlers)
         htup = [(h, self.type_tuples[h]) for h in handlers]
-        nxt_key = (handlers[0].__code__, *tup)
-
-        def dependent_find_method(args):
-            matches = [h for h, tup in htup if dependent_match(tup, args)]
-            if len(matches) == 1:
-                return matches[0]
-            elif len(matches) == 0:
-                return self[nxt_key]
-            else:
-                raise self.key_error(tup, group)
-
-        if inspect.getfullargspec(handlers[0]).args[0] == "self":
-
-            def dependent_dispatch(slf, *args):
-                return dependent_find_method(args)(slf, *args)
-        else:
-
-            def dependent_dispatch(*args):
-                return dependent_find_method(args)(*args)
-
-        return dependent_dispatch
+        slf = (
+            "self, "
+            if inspect.getfullargspec(handlers[0]).args[0] == "self"
+            else ""
+        )
+        return generate_dependent_dispatch(
+            tup, htup, next_call, slf, err=self.key_error(tup, group)
+        )
 
     def resolve(self, obj_t_tup):
         results = self.mro(obj_t_tup)
         if not results:
             raise self.key_error(obj_t_tup, ())
+
+        funcs = []
+        for group in reversed(results):
+            handlers = [fn for (fn, _, _) in group]
+            dependent = any(self.dependent[fn] for (fn, _, _) in group)
+            if dependent:
+                nxt = self.wrap_dependent(
+                    obj_t_tup, handlers, group, funcs[-1] if funcs else None
+                )
+            elif len(group) != 1:
+                nxt = None
+            else:
+                nxt = handlers[0]
+            codes = [h.__code__ for h in handlers if hasattr(h, "__code__")]
+            funcs.append((nxt, codes))
+
+        funcs.reverse()
+
         parents = []
-        for group in results:
+        for group, (func, codes) in zip(results, funcs):
             tups = (
                 [obj_t_tup]
                 if not parents
                 else [(parent, *obj_t_tup) for parent in parents]
             )
-            dependent = any(self.dependent[fn] for (fn, _, _) in group)
-            if dependent:
-                handlers = [fn for (fn, _, _) in group]
-                wrapped = self.wrap_dependent(obj_t_tup, handlers, group)
-                for tup in tups:
-                    self[tup] = wrapped
-                parents = [h.__code__ for h in handlers]
-            elif len(group) != 1:
+            if func is None:
                 for tup in tups:
                     self.errors[tup] = self.key_error(obj_t_tup, group)
                 break
             else:
-                ((fn, _, _),) = group
                 for tup in tups:
-                    self[tup] = fn
-                if hasattr(fn, "__code__"):
-                    parents = [fn.__code__]
-                else:
-                    break
+                    self[tup] = func
+            if not codes:
+                break
+            parents = codes
 
         return True
 
