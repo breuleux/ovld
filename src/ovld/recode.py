@@ -608,6 +608,32 @@ def adapt_function(fn, ovld, newname):
         return rename_function(fn, newname)
 
 
+def closure_wrap(tree, fname, names):
+    wrap = ast.copy_location(
+        ast.FunctionDef(
+            name="##create_closure",
+            args=ast.arguments(
+                posonlyargs=[],
+                args=[ast.arg(arg=name) for name in names],
+                vararg=None,
+                kwonlyargs=[],
+                kw_defaults=[],
+                kwarg=None,
+                defaults=[],
+            ),
+            body=[
+                tree,
+                ast.Return(ast.Name(id=fname, ctx=ast.Load())),
+            ],
+            decorator_list=[],
+            returns=None,
+        ),
+        tree,
+    )
+    ast.fix_missing_locations(wrap)
+    return ast.Module(body=[wrap], type_ignores=[])
+
+
 def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     ovld_mangled = f"___OVLD{ovld.id}"
     code_mangled = f"___CODE{next(_current)}"
@@ -629,14 +655,22 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
         code_mangled=code_mangled,
     ).visit(tree)
     new.body[0].decorator_list = []
+    if fn.__closure__:
+        new = closure_wrap(new.body[0], "irrelevant", fn.__code__.co_freevars)
     ast.fix_missing_locations(new)
     ast.increment_lineno(new, fn.__code__.co_firstlineno - 1)
     res = compile(new, mode="exec", filename=fn.__code__.co_filename)
-    (*_, new_code) = [
-        ct for ct in res.co_consts if isinstance(ct, type(fn.__code__))
-    ]
+    if fn.__closure__:
+        res = [x for x in res.co_consts if isinstance(x, CodeType)][0]
+    (*_, new_code) = [ct for ct in res.co_consts if isinstance(ct, CodeType)]
+    new_closure = tuple(
+        [
+            fn.__closure__[fn.__code__.co_freevars.index(name)]
+            for name in new_code.co_freevars
+        ]
+    )
     new_fn = FunctionType(
-        new_code, fn.__globals__, newname, fn.__defaults__, fn.__closure__
+        new_code, fn.__globals__, newname, fn.__defaults__, new_closure
     )
     new_fn.__kwdefaults__ = fn.__kwdefaults__
     new_fn.__annotations__ = fn.__annotations__
