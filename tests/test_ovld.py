@@ -1343,3 +1343,16 @@ def test_display(capsys, file_regression):
 
     out = re.sub(string=out, pattern=r"THIS_FILE:([0-9]+)", repl=renumber)
     file_regression.check(out)
+
+
+def test_keywords():
+    @ovld
+    def f(name: str, *, hello: int):
+        return "hello" * hello + " " + name
+
+    @f.register
+    def f(name: str, *, goodbye: int):
+        return "goodbye" * goodbye + " " + name
+
+    assert f("Helena", hello=3) == "hellohellohello Helena"
+    assert f("Gertrude", goodbye=2) == "goodbyegoodbye Gertrude"

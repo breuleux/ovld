@@ -289,6 +289,10 @@ class _Ovld:
         def _normalize_type(t, force_tuple=False):
             if t is type:
                 t = type[object]
+            elif t is typing.Any:
+                t = object
+            elif t is inspect._empty:
+                t = object
             origin = getattr(t, "__origin__", None)
             if UnionType and isinstance(t, UnionType):
                 return _normalize_type(t.__args__)
@@ -297,11 +301,16 @@ class _Ovld:
             elif origin is typing.Union:
                 return _normalize_type(t.__args__)
             elif origin is typing.Literal:
-                return (Equals(t.__args__[0]),)
+                x = Equals(t.__args__[0])
+                return (x,) if force_tuple else x
             elif origin is not None:
                 raise TypeError(
                     f"ovld does not accept generic types except type, Union or Optional, not {t}"
                 )
+            elif isinstance(t, dict):
+                (key, t), = list(t.items())
+                rval = (key, _normalize_type(t))
+                return (rval,) if force_tuple else rval
             elif isinstance(t, tuple):
                 return tuple(_normalize_type(t2) for t2 in t)
             elif force_tuple:
@@ -313,28 +322,34 @@ class _Ovld:
 
         self._set_attrs_from(fn)
 
-        ann = fn.__annotations__
-        argspec = inspect.getfullargspec(fn)
-        argnames = argspec.args
-        if argnames and argnames[0] == "self":
-            argnames = argnames[1:]
-
         typelist = []
-        for name in argnames:
-            t = ann.get(name, None)
-            if t is None:
-                typelist.append(object)
-            else:
-                typelist.append(t)
+        sig = inspect.signature(fn)
+        max_pos = 0
+        req_pos = 0
+        for param in sig.parameters.values():
+            if param.name == "self":
+                continue
+            elif param.kind is inspect._POSITIONAL_ONLY:
+                typelist.append(param.annotation)
+                req_pos += (param.default is inspect._empty)
+                max_pos += 1
+            elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
+                typelist.append(param.annotation)
+                req_pos += (param.default is inspect._empty)
+                max_pos += 1
+            elif param.kind is inspect._KEYWORD_ONLY:
+                typelist.append({param.name: param.annotation})
+            elif param.kind is inspect._VAR_POSITIONAL:
+                raise TypeError("ovld does not support *args")
+            elif param.kind is inspect._VAR_KEYWORD:
+                raise TypeError("ovld does not support **kwargs")
 
-        max_pos = len(argnames)
-        req_pos = max_pos - len(argspec.defaults or ())
-
+        # TODO: avoid this product
         typelist_tups = tuple(
             _normalize_type(t, force_tuple=True) for t in typelist
         )
         for tl in itertools.product(*typelist_tups):
-            sig = (tuple(tl), req_pos, max_pos, bool(argspec.varargs), priority)
+            sig = (tuple(tl), req_pos, max_pos, False, priority)
             if not self.allow_replacement and sig in self._defns:
                 raise TypeError(f"There is already a method for {tl}")
             self._defns[(*sig,)] = fn
