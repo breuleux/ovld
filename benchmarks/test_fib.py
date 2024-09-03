@@ -4,7 +4,7 @@ import pytest
 from multimethod import multimethod as multimethod_dispatch
 from plum import dispatch as plum_dispatch
 
-from ovld import ovld as ovld_dispatch
+from ovld import ovld as ovld_dispatch, recurse
 
 ########
 # ovld #
@@ -23,7 +23,7 @@ def fib_ovld(n: Literal[1]):
 
 @ovld_dispatch
 def fib_ovld(n: int):
-    return fib_ovld(n - 1) + fib_ovld(n - 2)
+    return recurse(n - 1) + recurse(n - 2)
 
 
 @pytest.mark.benchmark(group="fib")
@@ -97,6 +97,6 @@ def fib_normal(n):
 
 
 @pytest.mark.benchmark(group="fib")
-def test_fib_normal(benchmark):
+def test_fib_custom(benchmark):
     result = benchmark(fib_normal, 8)
     assert result == 21

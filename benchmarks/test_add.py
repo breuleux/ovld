@@ -214,7 +214,7 @@ def add_isinstance(x, y):
 
 
 @pytest.mark.benchmark(group="add")
-def test_add_isinstance(benchmark):
+def test_add_custom_isinstance(benchmark):
     result = benchmark(add_isinstance, A, B)
     assert result == C
 
@@ -237,6 +237,6 @@ def add_match(x, y):
 
 
 @pytest.mark.benchmark(group="add")
-def test_add_match(benchmark):
+def test_add_custom_match(benchmark):
     result = benchmark(add_match, A, B)
     assert result == C
