@@ -120,9 +120,12 @@ class MultiTypeMap(dict):
     def mro(self, obj_t_tup):
         specificities = {}
         candidates = None
-        nargs = len(obj_t_tup)
+        nargs = len([t for t in obj_t_tup if not isinstance(t, tuple)])
 
         for i, cls in enumerate(obj_t_tup):
+            if isinstance(cls, tuple):
+                i, cls = cls
+
             try:
                 results = self.maps[i][cls]
             except KeyError:
@@ -225,6 +228,8 @@ class MultiTypeMap(dict):
         )
 
         for i, cls in enumerate(obj_t_tup):
+            if isinstance(cls, tuple):
+                i, cls = cls
             if i not in self.maps:
                 self.maps[i] = TypeMap()
             self.maps[i].register(cls, entry)
