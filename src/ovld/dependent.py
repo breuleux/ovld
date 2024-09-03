@@ -20,61 +20,53 @@ def dependent_match(tup, args):
     return True
 
 
-class SingleParameterDependentType(DependentType):
-    def __init__(self, parameter, bound=None):
-        super().__init__(type(parameter) if bound is None else bound)
-        self.parameter = parameter
+class ParametrizedDependentType(DependentType):
+    def __init__(self, *parameters, bound=None):
+        super().__init__(type(parameters[0]) if bound is None else bound)
+        self.parameters = parameters
+
+    @property
+    def parameter(self):
+        return self.parameters[0]
 
     def with_bound(self, new_bound):
-        return type(self)(self.parameter, new_bound)
+        return type(self)(*self.parameters, bound=new_bound)
 
     def __eq__(self, other):
         return (
             type(self) is type(other)
-            and self.parameter == other.parameter
+            and self.parameters == other.parameters
             and self.bound == other.bound
         )
 
     def __hash__(self):
-        return hash(self.parameter) ^ hash(self.bound)
+        return hash(self.parameters) ^ hash(self.bound)
 
     def __str__(self):
-        return f"{type(self).__name__}({self.parameter!r})"
+        params = ", ".join(map(repr, self.parameters))
+        return f"{type(self).__name__}({params})"
 
     __repr__ = __str__
 
 
-class Equals(SingleParameterDependentType):
+class Equals(ParametrizedDependentType):
     def check(self, value):
         return value == self.parameter
 
 
-class StartsWith(SingleParameterDependentType):
+class StartsWith(ParametrizedDependentType):
     def check(self, value):
         return value.startswith(self.parameter)
 
 
-class HasKeys(SingleParameterDependentType):
-    def __init__(self, *keys, bound=dict):
-        super().__init__(keys, bound)
-
-    def with_bound(self, new_bound):
-        return type(self)(*self.parameter, bound=new_bound)
-
+class HasKeys(ParametrizedDependentType):
     def check(self, value):
-        print(value, self.parameter)
-        return all(k in value for k in self.parameter)
+        return all(k in value for k in self.parameters)
 
 
-class LengthRange(SingleParameterDependentType):
-    def __init__(self, min, max, bound=object):
-        super().__init__((min, max), bound)
-
-    def with_bound(self, new_bound):
-        return type(self)(*self.parameter, new_bound)
-
+class LengthRange(ParametrizedDependentType):
     def check(self, value):
-        min, max = self.parameter
+        min, max = self.parameters
         return min <= len(value) <= max
 
 
