@@ -1345,6 +1345,44 @@ def test_display(capsys, file_regression):
     file_regression.check(out)
 
 
+def test_closure():
+    def make(n):
+        @ovld
+        def f(xs: list):
+            return [recurse(x) for x in xs]
+
+        @ovld
+        def f(x: int):
+            return x * n
+
+        return f
+
+    twice = make(2)
+    thrice = make(3)
+
+    assert twice([1, 2, 3]) == [2, 4, 6]
+    assert thrice([1, 2, 3]) == [3, 6, 9]
+
+
+def test_closure_plus_recurse():
+    def make(n):
+        @ovld
+        def f(xs: list):
+            return [recurse(x, n) for x in xs]
+
+        @ovld
+        def f(x: int, y: int):
+            return x * y
+
+        return f
+
+    twice = make(2)
+    thrice = make(3)
+
+    assert twice([1, 2, 3]) == [2, 4, 6]
+    assert thrice([1, 2, 3]) == [3, 6, 9]
+
+
 def test_keywords():
     @ovld
     def f(name: str, *, hello: int):
