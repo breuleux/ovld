@@ -301,7 +301,12 @@ class MultiTypeMap(dict):
             else ""
         )
         return generate_dependent_dispatch(
-            tup, htup, next_call, slf, err=self.key_error(tup, group)
+            tup,
+            htup,
+            next_call,
+            slf,
+            err=self.key_error(tup, group),
+            nerr=self.key_error(tup, ()),
         )
 
     def resolve(self, obj_t_tup):

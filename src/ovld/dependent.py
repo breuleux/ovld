@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, TypeVar
 
 
 class DependentType:
+    exclusive_type = False
+
     def __init__(self, bound):
         self.bound = bound
 
@@ -56,8 +58,17 @@ class ParametrizedDependentType(DependentType):
 
 
 class Equals(ParametrizedDependentType):
+    exclusive_type = True
+
     def check(self, value):
         return value == self.parameter
+
+    @classmethod
+    def keygen(cls):
+        return "{arg}"
+
+    def get_key(self):
+        return self.parameter
 
     def codegen(self):
         return "({arg} == {p})", {"p": self.parameter}
