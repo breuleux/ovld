@@ -381,31 +381,40 @@ class NameConverter(ast.NodeTransformer):
 
         cn = node.func.id == self.call_next_sym
 
-        new_args = [
-            ast.NamedExpr(
-                target=ast.Name(id=f"__TMP{i}", ctx=ast.Store()),
+        def _make_lookup_call(key, arg):
+            value = ast.NamedExpr(
+                target=ast.Name(id=f"__TMP{key}", ctx=ast.Store()),
                 value=self.visit(arg),
             )
-            for i, arg in enumerate(node.args)
-        ]
-
-        type_parts = [
-            ast.Call(
-                func=ast.Attribute(
+            if self.analysis.lookup_for(key) == "self.map.transform":
+                func = ast.Attribute(
                     value=ast.Name(id="__TMPM", ctx=ast.Load()),
                     attr="transform",
                     ctx=ast.Load(),
-                ),
-                args=[self.visit(arg)],
+                )
+            else:
+                func = ast.Name(id="type", ctx=ast.Load())
+            return ast.Call(
+                func=func,
+                args=[value],
                 keywords=[],
             )
-            if self.analysis.lookup_for(i) == "self.map.transform"
-            else ast.Call(
-                func=ast.Name(id="type", ctx=ast.Load()),
-                args=[self.visit(arg)],
-                keywords=[],
+
+        # type index for positional arguments
+        type_parts = [
+            _make_lookup_call(i, arg) for i, arg in enumerate(node.args)
+        ]
+
+        # type index for keyword arguments
+        type_parts += [
+            ast.Tuple(
+                elts=[
+                    ast.Constant(value=kw.arg),
+                    _make_lookup_call(kw.arg, kw.value),
+                ],
+                ctx=ast.Load(),
             )
-            for i, arg in enumerate(new_args)
+            for kw in node.keywords
         ]
 
         if cn:
@@ -414,7 +423,6 @@ class NameConverter(ast.NodeTransformer):
             value=ast.NamedExpr(
                 target=ast.Name(id="__TMPM", ctx=ast.Store()),
                 value=ast.Attribute(
-                    # value=self.visit(node.func),
                     value=ast.Name(id=self.ovld_mangled, ctx=ast.Load()),
                     attr="map",
                     ctx=ast.Load(),
@@ -443,7 +451,13 @@ class NameConverter(ast.NodeTransformer):
                 ast.Name(id=f"__TMP{i}", ctx=ast.Load())
                 for i, arg in enumerate(node.args)
             ],
-            keywords=[self.visit(k) for k in node.keywords],
+            keywords=[
+                ast.keyword(
+                    arg=kw.arg,
+                    value=ast.Name(id=f"__TMP{kw.arg}", ctx=ast.Load()),
+                )
+                for kw in node.keywords
+            ],
         )
         return ast.copy_location(old_node=node, new_node=new_node)
 

@@ -1,3 +1,4 @@
+import typing
 from graphlib import TopologicalSorter
 from itertools import product
 
@@ -9,6 +10,10 @@ def _issubclass(c1, c2):
         return c1.bound != c2.bound and _issubclass(c1.bound, c2.bound)
     elif isinstance(c1, DependentType) or isinstance(c2, DependentType):
         return False
+    if getattr(c2, "__origin__", None) is typing.Union:
+        return any(_issubclass(c1, c) for c in c2.__args__)
+    if getattr(c1, "__origin__", None) is typing.Union:
+        return all(_issubclass(c, c2) for c in c1.__args__)
     c1 = getattr(c1, "__proxy_for__", c1)
     c2 = getattr(c2, "__proxy_for__", c2)
     if hasattr(c1, "__origin__") or hasattr(c2, "__origin__"):

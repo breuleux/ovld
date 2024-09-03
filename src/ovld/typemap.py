@@ -121,6 +121,7 @@ class MultiTypeMap(dict):
         specificities = {}
         candidates = None
         nargs = len([t for t in obj_t_tup if not isinstance(t, tuple)])
+        names = {t[0] for t in obj_t_tup if isinstance(t, tuple)}
 
         for i, cls in enumerate(obj_t_tup):
             if isinstance(cls, tuple):
@@ -133,8 +134,9 @@ class MultiTypeMap(dict):
 
             results = {
                 handler: spc
-                for (handler, min, max, va), spc in results.items()
+                for (handler, min, max, rn, va), spc in results.items()
                 if min <= nargs <= (math.inf if va else max)
+                and not (rn - names)
             }
 
             try:
@@ -144,7 +146,7 @@ class MultiTypeMap(dict):
 
             vararg_results = {
                 handler: spc
-                for (handler, min, max, va), spc in vararg_results.items()
+                for (handler, min, max, rn, va), spc in vararg_results.items()
                 if min <= nargs and i >= max
             }
 
@@ -215,9 +217,9 @@ class MultiTypeMap(dict):
         """
         self.clear()
 
-        amin, amax, vararg, priority = nargs
+        amin, amax, reqnames, vararg, priority = nargs
 
-        entry = (handler, amin, amax, vararg)
+        entry = (handler, amin, amax, reqnames, vararg)
         if not obj_t_tup:
             self.empty = entry
 
