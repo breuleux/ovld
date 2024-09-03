@@ -216,6 +216,6 @@ class IsinstanceMulter:
 
 
 @pytest.mark.benchmark(group="multer")
-def test_multer_isinstance(benchmark):
+def test_multer_custom_isinstance(benchmark):
     result = benchmark(IsinstanceMulter(3), A)
     assert result == C

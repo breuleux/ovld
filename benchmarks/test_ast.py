@@ -300,7 +300,7 @@ class NT(ast.NodeTransformer):
 
 
 @pytest.mark.benchmark(group="ast")
-def test_node_transformer(benchmark, foobar):
+def test_transform_custom(benchmark, foobar):
     result = benchmark(NT().visit, foobar[0])
     assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
         "bar", "foo"
