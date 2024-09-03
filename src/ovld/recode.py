@@ -266,7 +266,6 @@ class ArgumentAnalyzer:
             body=join(body, sep="\n    "),
             call=textwrap.indent("".join(calls), "    "),
         )
-        # print(code)
         return instantiate_code("__DISPATCH__", code)
 
 
@@ -295,7 +294,7 @@ class GenSym:
         return id
 
 
-def generate_dependent_dispatch(tup, handlers, next_call, slf, err):
+def generate_dependent_dispatch(tup, handlers, next_call, slf, err, nerr):
     def to_dict(tup):
         return dict(
             entry if isinstance(entry, tuple) else (i, entry)
@@ -317,28 +316,56 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, err):
     tup = to_dict(tup)
     handlers = [(h, to_dict(types)) for h, types in handlers]
     gen = GenSym(prefix="INJECT")
-    body = []
+    conjs = []
+
+    exclusive = False
+    keyexpr = None
+    keyed = None
+    for k in tup:
+        featured = set(types[k] for h, types in handlers)
+        if len(featured) == len(handlers):
+            possibilities = set(type(t) for t in featured)
+            focus = possibilities.pop()
+            if not possibilities and getattr(focus, "exclusive_type", False):
+                exclusive = True
+                if len(featured) > 4 and hasattr(focus, "keygen"):
+                    keyexpr = focus.keygen().format(arg=argname(k))
+                    keyed = {types[k].get_key(): h for h, types in handlers}
+
     for i, (h, types) in enumerate(handlers):
         relevant = [k for k in tup if isinstance(types[k], DependentType)]
         codes = [codegen(types[k], argname(k)) for k in relevant]
         conj = " and ".join(codes)
         if not conj:
             conj = "True"
-        line = f"MATCH{i} = {conj}"
-        body.append(line)
+        conjs.append(conj)
 
     argspec = ", ".join(argname(x) for x in tup)
     argcall = ", ".join(argprovide(x) for x in tup)
 
-    summation = " + ".join(f"MATCH{i}" for i in range(len(handlers)))
-    body.append(f"SUMMATION = {summation}")
-    body.append("if SUMMATION == 1:")
-    for i, (h, types) in enumerate(handlers):
-        body.append(f"    if MATCH{i}: return HANDLER{i}({slf}{argcall})")
-    body.append("elif SUMMATION == 0:")
-    body.append(f"    return HANDLERN({slf}{argcall})")
-    body.append("else:")
-    body.append(f"    raise {gen.add(err)}")
+    body = []
+    if keyed:
+        body.append(f"HANDLER = {gen.add(keyed)}.get({keyexpr}, HANDLERN)")
+        body.append(f"return HANDLER({slf}{argcall})")
+
+    elif exclusive:
+        for i, conj in enumerate(conjs):
+            body.append(f"if {conj}: return HANDLER{i}({slf}{argcall})")
+        body.append(f"return HANDLERN({slf}{argcall})")
+
+    else:
+        for i, conj in enumerate(conjs):
+            body.append(f"MATCH{i} = {conj}")
+
+        summation = " + ".join(f"MATCH{i}" for i in range(len(handlers)))
+        body.append(f"SUMMATION = {summation}")
+        body.append("if SUMMATION == 1:")
+        for i, (h, types) in enumerate(handlers):
+            body.append(f"    if MATCH{i}: return HANDLER{i}({slf}{argcall})")
+        body.append("elif SUMMATION == 0:")
+        body.append(f"    return HANDLERN({slf}{argcall})")
+        body.append("else:")
+        body.append(f"    raise {gen.add(err)}")
 
     body_text = textwrap.indent("\n".join(body), "    ")
     code = f"def __DEPENDENT_DISPATCH__({slf}{argspec}):\n{body_text}"
@@ -346,7 +373,11 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, err):
     inject = gen.variables
     for i, (h, types) in enumerate(handlers):
         inject[f"HANDLER{i}"] = h
-    inject["HANDLERN"] = next_call[0] if next_call else None
+
+    def raise_error(*args, **kwargs):
+        raise nerr
+
+    inject["HANDLERN"] = next_call[0] if next_call else raise_error
 
     fn = instantiate_code(
         symbol="__DEPENDENT_DISPATCH__", code=code, inject=inject

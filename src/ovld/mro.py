@@ -40,7 +40,7 @@ def _may_cover(c1, c2):
     if isinstance(c1, DependentType):
         if isinstance(c2, DependentType):
             return False
-        return _issubclass(c2, c1.bound)
+        return _issubclass(c2, c1.bound) or _issubclass(c1.bound, c2)
     return False
 
 
