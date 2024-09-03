@@ -130,9 +130,17 @@ class _Ovld:
         def clsname(cls):
             if cls is object:
                 return "*"
+            elif isinstance(cls, tuple):
+                key, typ = cls
+                return f"{key}: {clsname(typ)}"
             elif is_type_of_type(cls):
                 arg = clsname(cls.__args__[0])
                 return f"type[{arg}]"
+            elif hasattr(cls, "__origin__"):
+                if cls.__origin__ is typing.Union:
+                    return "|".join(map(clsname, cls.__args__))
+                else:
+                    return repr(cls)
             elif hasattr(cls, "__name__"):
                 return cls.__name__
             else:
@@ -267,14 +275,14 @@ class _Ovld:
 
     def register_signature(self, key, orig_fn):
         """Register a function for the given signature."""
-        sig, min, max, vararg, priority = key
+        sig, min, max, reqnames, vararg, priority = key
         fn = adapt_function(
             orig_fn, self, f"{self.__name__}[{self._sig_string(sig)}]"
         )
         # We just need to keep the Conformer pointer alive for jurigged
         # to find it, if jurigged is used with ovld
         fn._conformer = Conformer(self, orig_fn, fn)
-        self.map.register(sig, (min, max, vararg, priority), fn)
+        self.map.register(sig, (min, max, reqnames, vararg, priority), fn)
         return self
 
     def register(self, fn=None, priority=0):
@@ -286,7 +294,7 @@ class _Ovld:
     def _register(self, fn, priority):
         """Register a function."""
 
-        def _normalize_type(t, force_tuple=False):
+        def _normalize_type(t):
             if t is type:
                 t = type[object]
             elif t is typing.Any:
@@ -297,24 +305,17 @@ class _Ovld:
             if UnionType and isinstance(t, UnionType):
                 return _normalize_type(t.__args__)
             elif origin is type:
-                return (t,) if force_tuple else t
+                return t
             elif origin is typing.Union:
                 return _normalize_type(t.__args__)
             elif origin is typing.Literal:
-                x = Equals(t.__args__[0])
-                return (x,) if force_tuple else x
+                return Equals(t.__args__[0])
             elif origin is not None:
                 raise TypeError(
                     f"ovld does not accept generic types except type, Union or Optional, not {t}"
                 )
-            elif isinstance(t, dict):
-                (key, t), = list(t.items())
-                rval = (key, _normalize_type(t))
-                return (rval,) if force_tuple else rval
             elif isinstance(t, tuple):
-                return tuple(_normalize_type(t2) for t2 in t)
-            elif force_tuple:
-                return (t,)
+                return typing.Union[tuple(_normalize_type(t2) for t2 in t)]
             else:
                 return t
 
@@ -326,33 +327,44 @@ class _Ovld:
         sig = inspect.signature(fn)
         max_pos = 0
         req_pos = 0
+        req_names = set()
         for param in sig.parameters.values():
             if param.name == "self":
                 continue
             elif param.kind is inspect._POSITIONAL_ONLY:
-                typelist.append(param.annotation)
-                req_pos += (param.default is inspect._empty)
+                typelist.append((max_pos, param.annotation))
+                req_pos += param.default is inspect._empty
                 max_pos += 1
             elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
-                typelist.append(param.annotation)
-                req_pos += (param.default is inspect._empty)
+                typelist.append((max_pos, param.annotation))
+                req_pos += param.default is inspect._empty
                 max_pos += 1
             elif param.kind is inspect._KEYWORD_ONLY:
-                typelist.append({param.name: param.annotation})
+                typelist.append((param.name, param.annotation))
+                if param.default is inspect._empty:
+                    req_names.add(param.name)
             elif param.kind is inspect._VAR_POSITIONAL:
                 raise TypeError("ovld does not support *args")
             elif param.kind is inspect._VAR_KEYWORD:
                 raise TypeError("ovld does not support **kwargs")
 
-        # TODO: avoid this product
-        typelist_tups = tuple(
-            _normalize_type(t, force_tuple=True) for t in typelist
+        typelist = [
+            _normalize_type(t)
+            if isinstance(k, int)
+            else (k, _normalize_type(t))
+            for k, t in typelist
+        ]
+        sig = (
+            tuple(typelist),
+            req_pos,
+            max_pos,
+            frozenset(req_names),
+            False,
+            priority,
         )
-        for tl in itertools.product(*typelist_tups):
-            sig = (tuple(tl), req_pos, max_pos, False, priority)
-            if not self.allow_replacement and sig in self._defns:
-                raise TypeError(f"There is already a method for {tl}")
-            self._defns[(*sig,)] = fn
+        if not self.allow_replacement and sig in self._defns:
+            raise TypeError(f"There is already a method for {typelist}")
+        self._defns[sig] = fn
 
         self._make_signature()
         self._update()

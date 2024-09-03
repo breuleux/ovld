@@ -1356,3 +1356,15 @@ def test_keywords():
 
     assert f("Helena", hello=3) == "hellohellohello Helena"
     assert f("Gertrude", goodbye=2) == "goodbyegoodbye Gertrude"
+
+
+def test_keywords_recurse():
+    @ovld
+    def f(xs: list, *, factor: int):
+        return [recurse(x, factor=factor) for x in xs]
+
+    @ovld
+    def f(x: int, *, factor: int):
+        return x * factor
+
+    assert f([1, 2, 3], factor=3) == [3, 6, 9]
