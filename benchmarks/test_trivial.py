@@ -1,3 +1,5 @@
+from numbers import Number
+
 import pytest
 
 from .common import (
@@ -6,6 +8,7 @@ from .common import (
     ovld_dispatch,
     plum_dispatch,
     runtype_dispatch,
+    singledispatch_dispatch,
 )
 
 
@@ -36,7 +39,7 @@ class Bird(Animal):
 
 def make_trivial(dispatch):
     @dispatch
-    def trivial(x: int | float):
+    def trivial(x: Number):
         return "A"
 
     @dispatch
@@ -121,5 +124,6 @@ test_trivial_multipledispatch = make_test(
     make_trivial(multipledispatch_dispatch)
 )
 test_trivial_runtype = make_test(make_trivial(runtype_dispatch))
+test_trivial_singledispatch = make_test(make_trivial(singledispatch_dispatch))
 
 test_trivial_custom_isinstance = make_test(trivial_isinstance)
