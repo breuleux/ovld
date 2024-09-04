@@ -46,10 +46,7 @@ class TypeMap(dict):
             obj_t = eval(obj_t, getattr(handler[0], "__globals__", {}))
 
         self.clear()
-        if is_type_of_type(obj_t):
-            self.types.add(obj_t.__args__[0])
-        else:
-            self.types.add(obj_t)
+        self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
         s.add(handler)
 
@@ -60,15 +57,10 @@ class TypeMap(dict):
         the next time getitem is called.
         """
         results = {}
-        if itot := is_type_of_type(obj_t):
-            groups = list(sort_types(obj_t.__args__[0], self.types))
-        else:
-            groups = list(sort_types(obj_t, self.types))
+        groups = list(sort_types(obj_t, self.types))
 
         for lvl, grp in enumerate(reversed(groups)):
             for cls in grp:
-                if itot:
-                    cls = type[cls]
                 handlers = self.entries.get(cls, None)
                 if handlers:
                     results.update({h: lvl for h in handlers})

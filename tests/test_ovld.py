@@ -1206,6 +1206,18 @@ def test_plain_type_argument():
     assert f(1234) == "other anything"
 
 
+def test_incidental_type_argument():
+    @ovld
+    def f(t: object):
+        return "ok"
+
+    @ovld
+    def f(t: type[str]):
+        return "hmmm"
+
+    assert f(list) == "ok"
+
+
 def test_parametrized():
     @ovld
     def f(t: type[list[int]]):
