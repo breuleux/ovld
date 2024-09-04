@@ -3,9 +3,8 @@ import inspect
 import runpy
 import tempfile
 import textwrap
-from collections import defaultdict
-from itertools import count, takewhile
-from types import CodeType, FunctionType, GenericAlias
+from itertools import count
+from types import CodeType, FunctionType
 
 from .dependent import DependentType
 from .utils import Unusable, UsageError
@@ -38,237 +37,6 @@ return method({posargs})
 """
 
 
-class ArgumentAnalyzer:
-    def __init__(self):
-        self.name_to_positions = defaultdict(set)
-        self.position_to_names = defaultdict(set)
-        self.counts = defaultdict(lambda: [0, 0])
-        self.complex_transforms = set()
-        self.total = 0
-        self.is_method = None
-
-    def add(self, fn):
-        sig = inspect.signature(fn)
-        is_method = False
-        for i, (name, param) in enumerate(sig.parameters.items()):
-            if name == "self":
-                assert i == 0
-                is_method = True
-                continue
-            ann = param.annotation
-            if isinstance(ann, str):
-                ann = eval(ann, getattr(fn, "__globals__", {}))
-            is_complex = isinstance(ann, GenericAlias)
-            if param.kind is inspect._POSITIONAL_ONLY:
-                cnt = self.counts[i]
-                self.position_to_names[i].add(None)
-                keys = {i}
-            elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
-                cnt = self.counts[i]
-                self.position_to_names[i].add(param.name)
-                self.name_to_positions[param.name].add(i)
-                keys = {i, param.name}
-            elif param.kind is inspect._KEYWORD_ONLY:
-                cnt = self.counts[param.name]
-                self.name_to_positions[param.name].add(param.name)
-                keys = {param.name}
-            elif param.kind is inspect._VAR_POSITIONAL:
-                raise TypeError("ovld does not support *args")
-            elif param.kind is inspect._VAR_KEYWORD:
-                raise TypeError("ovld does not support **kwargs")
-
-            if is_complex:
-                self.complex_transforms.update(keys)
-
-            cnt[0] += 1 if param.default is inspect._empty else 0
-            cnt[1] += 1
-
-        self.total += 1
-
-        if self.is_method is None:
-            self.is_method = is_method
-        elif self.is_method != is_method:
-            raise TypeError(
-                "Some, but not all registered methods define `self`. It should be all or none."
-            )
-
-    def compile(self):
-        if any(
-            len(pos) != 1
-            for _name, pos in self.name_to_positions.items()
-            if (name := _name) is not None
-        ):
-            raise TypeError(
-                f"Argument {name} is found both in a positional and keyword setting."
-            )
-
-        p_to_n = [
-            list(names) for _, names in sorted(self.position_to_names.items())
-        ]
-
-        positional = list(
-            takewhile(
-                lambda names: len(names) == 1 and isinstance(names[0], str),
-                reversed(p_to_n),
-            )
-        )
-        positional.reverse()
-        strict_positional = p_to_n[: len(p_to_n) - len(positional)]
-
-        assert strict_positional + positional == p_to_n
-
-        strict_positional_required = [
-            f"ARG{pos + 1}"
-            for pos, _ in enumerate(strict_positional)
-            if self.counts[pos][0] == self.total
-        ]
-        strict_positional_optional = [
-            f"ARG{pos + 1}"
-            for pos, _ in enumerate(strict_positional)
-            if self.counts[pos][0] != self.total
-        ]
-
-        positional_required = [
-            names[0]
-            for pos, names in enumerate(positional)
-            if self.counts[pos + len(strict_positional)][0] == self.total
-        ]
-        positional_optional = [
-            names[0]
-            for pos, names in enumerate(positional)
-            if self.counts[pos + len(strict_positional)][0] != self.total
-        ]
-
-        keywords = [
-            name
-            for _, (name,) in self.name_to_positions.items()
-            if not isinstance(name, int)
-        ]
-        keyword_required = [
-            name for name in keywords if self.counts[name][0] == self.total
-        ]
-        keyword_optional = [
-            name for name in keywords if self.counts[name][0] != self.total
-        ]
-
-        return (
-            strict_positional_required,
-            strict_positional_optional,
-            positional_required,
-            positional_optional,
-            keyword_required,
-            keyword_optional,
-        )
-
-    def lookup_for(self, key):
-        return (
-            "self.map.transform" if key in self.complex_transforms else "type"
-        )
-
-    def generate_dispatch(self):
-        def join(li, sep=", ", trail=False):
-            li = [x for x in li if x]
-            rval = sep.join(li)
-            if len(li) == 1 and trail:
-                rval += ","
-            return rval
-
-        spr, spo, pr, po, kr, ko = self.compile()
-
-        inits = set()
-
-        kwargsstar = ""
-        targsstar = ""
-
-        args = []
-        body = [""]
-        posargs = ["self.obj" if self.is_method else ""]
-        lookup = []
-
-        i = 0
-
-        for name in spr + spo:
-            if name in spr:
-                args.append(name)
-            else:
-                args.append(f"{name}=MISSING")
-            posargs.append(name)
-            lookup.append(f"{self.lookup_for(i)}({name})")
-            i += 1
-
-        if len(po) <= 1:
-            # If there are more than one non-strictly positional optional arguments,
-            # then all positional arguments are strictly positional, because if e.g.
-            # x and y are optional we want x==MISSING to imply that y==MISSING, but
-            # that only works if y cannot be provided as a keyword argument.
-            args.append("/")
-
-        for name in pr + po:
-            if name in pr:
-                args.append(name)
-            else:
-                args.append(f"{name}=MISSING")
-            posargs.append(name)
-            lookup.append(f"{self.lookup_for(i)}({name})")
-            i += 1
-
-        if len(po) > 1:
-            args.append("/")
-
-        if kr or ko:
-            args.append("*")
-
-        for name in kr:
-            lookup_fn = (
-                "self.map.transform"
-                if name in self.complex_transforms
-                else "type"
-            )
-            args.append(f"{name}")
-            posargs.append(f"{name}={name}")
-            lookup.append(f"({name!r}, {lookup_fn}({name}))")
-
-        for name in ko:
-            args.append(f"{name}=MISSING")
-            kwargsstar = "**KWARGS"
-            targsstar = "*TARGS"
-            inits.add("KWARGS = {}")
-            inits.add("TARGS = []")
-            body.append(f"if {name} is not MISSING:")
-            body.append(f"    KWARGS[{name!r}] = {name}")
-            body.append(
-                f"    TARGS.append(({name!r}, {self.lookup_for(name)}({name})))"
-            )
-
-        posargs.append(kwargsstar)
-        lookup.append(targsstar)
-
-        fullcall = call_template.format(
-            lookup=join(lookup, trail=True),
-            posargs=join(posargs),
-        )
-
-        calls = []
-        if spo or po:
-            req = len(spr + pr)
-            for i, arg in enumerate(spo + po):
-                call = call_template.format(
-                    lookup=join(lookup[: req + i], trail=True),
-                    posargs=join(posargs[: req + i + 1]),
-                )
-                call = textwrap.indent(call, "    ")
-                calls.append(f"\nif {arg} is MISSING:{call}")
-        calls.append(fullcall)
-
-        code = dispatch_template.format(
-            inits=join(inits, sep="\n    "),
-            args=join(args),
-            body=join(body, sep="\n    "),
-            call=textwrap.indent("".join(calls), "    "),
-        )
-        return instantiate_code("__DISPATCH__", code)
-
-
 def instantiate_code(symbol, code, inject={}):
     tf = tempfile.NamedTemporaryFile("w")
     _tempfiles.append(tf)
@@ -278,6 +46,110 @@ def instantiate_code(symbol, code, inject={}):
     rval = glb[symbol]
     rval.__globals__.update(inject)
     return rval
+
+
+def generate_dispatch(arganal):
+    def join(li, sep=", ", trail=False):
+        li = [x for x in li if x]
+        rval = sep.join(li)
+        if len(li) == 1 and trail:
+            rval += ","
+        return rval
+
+    spr, spo, pr, po, kr, ko = arganal.compile()
+
+    inits = set()
+
+    kwargsstar = ""
+    targsstar = ""
+
+    args = []
+    body = [""]
+    posargs = ["self.obj" if arganal.is_method else ""]
+    lookup = []
+
+    i = 0
+
+    for name in spr + spo:
+        if name in spr:
+            args.append(name)
+        else:
+            args.append(f"{name}=MISSING")
+        posargs.append(name)
+        lookup.append(f"{arganal.lookup_for(i)}({name})")
+        i += 1
+
+    if len(po) <= 1:
+        # If there are more than one non-strictly positional optional arguments,
+        # then all positional arguments are strictly positional, because if e.g.
+        # x and y are optional we want x==MISSING to imply that y==MISSING, but
+        # that only works if y cannot be provided as a keyword argument.
+        args.append("/")
+
+    for name in pr + po:
+        if name in pr:
+            args.append(name)
+        else:
+            args.append(f"{name}=MISSING")
+        posargs.append(name)
+        lookup.append(f"{arganal.lookup_for(i)}({name})")
+        i += 1
+
+    if len(po) > 1:
+        args.append("/")
+
+    if kr or ko:
+        args.append("*")
+
+    for name in kr:
+        lookup_fn = (
+            "self.map.transform"
+            if name in arganal.complex_transforms
+            else "type"
+        )
+        args.append(f"{name}")
+        posargs.append(f"{name}={name}")
+        lookup.append(f"({name!r}, {lookup_fn}({name}))")
+
+    for name in ko:
+        args.append(f"{name}=MISSING")
+        kwargsstar = "**KWARGS"
+        targsstar = "*TARGS"
+        inits.add("KWARGS = {}")
+        inits.add("TARGS = []")
+        body.append(f"if {name} is not MISSING:")
+        body.append(f"    KWARGS[{name!r}] = {name}")
+        body.append(
+            f"    TARGS.append(({name!r}, {arganal.lookup_for(name)}({name})))"
+        )
+
+    posargs.append(kwargsstar)
+    lookup.append(targsstar)
+
+    fullcall = call_template.format(
+        lookup=join(lookup, trail=True),
+        posargs=join(posargs),
+    )
+
+    calls = []
+    if spo or po:
+        req = len(spr + pr)
+        for i, arg in enumerate(spo + po):
+            call = call_template.format(
+                lookup=join(lookup[: req + i], trail=True),
+                posargs=join(posargs[: req + i + 1]),
+            )
+            call = textwrap.indent(call, "    ")
+            calls.append(f"\nif {arg} is MISSING:{call}")
+    calls.append(fullcall)
+
+    code = dispatch_template.format(
+        inits=join(inits, sep="\n    "),
+        args=join(args),
+        body=join(body, sep="\n    "),
+        call=textwrap.indent("".join(calls), "    "),
+    )
+    return instantiate_code("__DISPATCH__", code)
 
 
 class GenSym:
