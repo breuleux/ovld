@@ -101,7 +101,7 @@ class Signature:
     max_pos: int
     req_names: frozenset
     vararg: bool
-    priority: int | float
+    priority: float
 
 
 def clsstring(cls):
