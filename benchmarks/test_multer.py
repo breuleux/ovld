@@ -1,53 +1,49 @@
 import pytest
-from multimethod import multimethod as multimethod_dispatch
 from multipledispatch import dispatch as multipledispatch_dispatch
-from plum import dispatch as plum_dispatch
-from runtype import multidispatch as runtype_dispatch
 
 from ovld import recurse
 from ovld.core import OvldBase
 
-A = {"xs": list(range(0, 50)), "ys": ("o", (6, 7))}
-C = {"xs": list(range(0, 150, 3)), "ys": ("ooo", (18, 21))}
+from .common import (
+    multimethod_dispatch,
+    ovld_dispatch,
+    plum_dispatch,
+    runtype_dispatch,
+)
 
 
-########
-# ovld #
-########
-
-
-class OvldMulter(OvldBase):
+class BaseMulter:
     def __init__(self, factor):
         self.factor = factor
 
-    def __call__(self, x: list):
-        return [self(a) for a in x]
 
-    def __call__(self, x: tuple):
-        return tuple(self(a) for a in x)
+def make_multer(dispatch):
+    class Multer(BaseMulter):
+        @dispatch
+        def __call__(self, x: list):
+            return [self(a) for a in x]
 
-    def __call__(self, x: dict):
-        return {k: self(v) for k, v in x.items()}
+        @dispatch
+        def __call__(self, x: tuple):
+            return tuple(self(a) for a in x)
 
-    def __call__(self, x: object):
-        return x * self.factor
+        @dispatch
+        def __call__(self, x: dict):
+            return {k: self(v) for k, v in x.items()}
 
+        @dispatch
+        def __call__(self, x: object):
+            return x * self.factor
 
-@pytest.mark.benchmark(group="multer")
-def test_multer_ovld(benchmark):
-    result = benchmark(OvldMulter(3), A)
-    assert result == C
-
-
-################
-# ovld_recurse #
-################
+    return Multer
 
 
-class OvldRecurseMulter(OvldBase):
-    def __init__(self, factor):
-        self.factor = factor
+#####################
+# ovld with recurse #
+#####################
 
+
+class OvldRecurseMulter(BaseMulter, OvldBase):
     def __call__(self, x: list):
         return [recurse(a) for a in x]
 
@@ -61,53 +57,15 @@ class OvldRecurseMulter(OvldBase):
         return x * self.factor
 
 
-@pytest.mark.benchmark(group="multer")
-def test_multer_ovld_recurse(benchmark):
-    result = benchmark(OvldRecurseMulter(3), A)
-    assert result == C
-
-
-########
-# plum #
-########
-
-
-class PlumMulter:
-    def __init__(self, factor):
-        self.factor = factor
-
-    @plum_dispatch
-    def __call__(self, x: list):
-        return [self(a) for a in x]
-
-    @plum_dispatch
-    def __call__(self, x: tuple):
-        return tuple(self(a) for a in x)
-
-    @plum_dispatch
-    def __call__(self, x: dict):
-        return {k: self(v) for k, v in x.items()}
-
-    @plum_dispatch
-    def __call__(self, x: object):
-        return x * self.factor
-
-
-@pytest.mark.benchmark(group="multer")
-def test_multer_plum(benchmark):
-    result = benchmark(PlumMulter(3), A)
-    assert result == C
-
-
 ####################
 # multipledispatch #
 ####################
 
 
-class MultipleDispatchMulter:
-    def __init__(self, factor):
-        self.factor = factor
+# shim doesn't work
 
+
+class MultipleDispatchMulter(BaseMulter):
     @multipledispatch_dispatch(list)
     def __call__(self, x: list):
         return [self(a) for a in x]
@@ -123,76 +81,6 @@ class MultipleDispatchMulter:
     @multipledispatch_dispatch(object)
     def __call__(self, x: object):
         return x * self.factor
-
-
-@pytest.mark.benchmark(group="multer")
-def test_multer_multipledispatch(benchmark):
-    result = benchmark(MultipleDispatchMulter(3), A)
-    assert result == C
-
-
-###############
-# multimethod #
-###############
-
-
-class MultimethodMulter:
-    def __init__(self, factor):
-        self.factor = factor
-
-    @multimethod_dispatch
-    def __call__(self, x: list):
-        return [self(a) for a in x]
-
-    @multimethod_dispatch
-    def __call__(self, x: tuple):
-        return tuple(self(a) for a in x)
-
-    @multimethod_dispatch
-    def __call__(self, x: dict):
-        return {k: self(v) for k, v in x.items()}
-
-    @multimethod_dispatch
-    def __call__(self, x: object):
-        return x * self.factor
-
-
-@pytest.mark.benchmark(group="multer")
-def test_multer_multimethod(benchmark):
-    result = benchmark(MultimethodMulter(3), A)
-    assert result == C
-
-
-###########
-# runtype #
-###########
-
-
-class RuntypeMulter:
-    def __init__(self, factor):
-        self.factor = factor
-
-    @runtype_dispatch
-    def __call__(self, x: list):
-        return [self(a) for a in x]
-
-    @runtype_dispatch
-    def __call__(self, x: tuple):
-        return tuple(self(a) for a in x)
-
-    @runtype_dispatch
-    def __call__(self, x: dict):
-        return {k: self(v) for k, v in x.items()}
-
-    @runtype_dispatch
-    def __call__(self, x: object):
-        return x * self.factor
-
-
-@pytest.mark.benchmark(group="multer")
-def test_multer_runtype(benchmark):
-    result = benchmark(RuntypeMulter(3), A)
-    assert result == C
 
 
 ##############
@@ -215,7 +103,29 @@ class IsinstanceMulter:
             return x * self.factor
 
 
-@pytest.mark.benchmark(group="multer")
-def test_multer_custom_isinstance(benchmark):
-    result = benchmark(IsinstanceMulter(3), A)
-    assert result == C
+####################
+# Test definitions #
+####################
+
+
+A = {"xs": list(range(0, 50)), "ys": ("o", (6, 7))}
+C = {"xs": list(range(0, 150, 3)), "ys": ("ooo", (18, 21))}
+
+
+def make_test(cls):
+    @pytest.mark.benchmark(group="multer")
+    def test(benchmark):
+        result = benchmark(cls(3), A)
+        assert result == C
+
+    return test
+
+
+test_multer_ovld = make_test(make_multer(ovld_dispatch))
+test_multer_ovld_recurse = make_test(OvldRecurseMulter)
+test_multer_plum = make_test(make_multer(plum_dispatch))
+test_multer_multimethod = make_test(make_multer(multimethod_dispatch))
+test_multer_multipledispatch = make_test(MultipleDispatchMulter)
+test_multer_runtype = make_test(make_multer(runtype_dispatch))
+
+test_multer_custom_isinstance = make_test(IsinstanceMulter)

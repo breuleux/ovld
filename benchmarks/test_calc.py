@@ -2,14 +2,19 @@ from numbers import Number
 from typing import Literal
 
 import pytest
-from multimethod import multimethod as multimethod_dispatch
-from plum import dispatch as plum_dispatch
-from runtype import multidispatch as runtype_dispatch
 
-from ovld import ovld as ovld_dispatch
+from .common import (
+    multimethod_dispatch,
+    ovld_dispatch,
+    plum_dispatch,
+)
+
+###############################
+# multiple dispatch libraries #
+###############################
 
 
-def make_dispatch(dispatch):
+def make_calc(dispatch):
     @dispatch
     def calc(num: Number):
         return num
@@ -45,46 +50,6 @@ def make_dispatch(dispatch):
     return calc
 
 
-expr = ("add", ("mul", ("sqrt", 4), 7), ("div", ("add", 6, 4), ("sub", 5, 3)))
-expected_result = 19
-
-
-@pytest.mark.benchmark(group="calc")
-def test_calc_ovld(benchmark):
-    calc = make_dispatch(ovld_dispatch)
-    result = benchmark(calc, expr)
-    assert result == expected_result
-
-
-@pytest.mark.benchmark(group="calc")
-def test_calc_ovld(benchmark):
-    calc = make_dispatch(ovld_dispatch)
-    result = benchmark(calc, expr)
-    assert result == expected_result
-
-
-@pytest.mark.benchmark(group="calc")
-def test_calc_plum(benchmark):
-    calc = make_dispatch(plum_dispatch)
-    result = benchmark(calc, expr)
-    assert result == expected_result
-
-
-@pytest.mark.benchmark(group="calc")
-def test_calc_multimethod(benchmark):
-    calc = make_dispatch(multimethod_dispatch)
-    result = benchmark(calc, expr)
-    assert result == expected_result
-
-
-@pytest.mark.xfail(reason="runtype has an issue with caching.")
-@pytest.mark.benchmark(group="calc")
-def test_calc_runtype(benchmark):
-    calc = make_dispatch(runtype_dispatch)
-    result = benchmark(calc, expr)
-    assert result == expected_result
-
-
 #########
 # match #
 #########
@@ -106,12 +71,6 @@ def calc_match(expr):
             return calc_match(x) ** 0.5
         case Number():
             return expr
-
-
-@pytest.mark.benchmark(group="calc")
-def test_calc_custom_match(benchmark):
-    result = benchmark(calc_match, expr)
-    assert result == expected_result
 
 
 #########
@@ -160,7 +119,26 @@ def calc_dict(expr):
         return expr
 
 
-@pytest.mark.benchmark(group="calc")
-def test_calc_custom_dict(benchmark):
-    result = benchmark(calc_dict, expr)
-    assert result == expected_result
+####################
+# Test definitions #
+####################
+
+expr = ("add", ("mul", ("sqrt", 4), 7), ("div", ("add", 6, 4), ("sub", 5, 3)))
+expected_result = 19
+
+
+def make_test(fn):
+    @pytest.mark.benchmark(group="calc")
+    def test(benchmark):
+        result = benchmark(fn, expr)
+        assert result == expected_result
+
+    return test
+
+
+test_calc_ovld = make_test(make_calc(ovld_dispatch))
+test_calc_plum = make_test(make_calc(plum_dispatch))
+test_calc_multimethod = make_test(make_calc(multimethod_dispatch))
+
+test_calc_custom_dict = make_test(calc_dict)
+test_calc_custom_match = make_test(calc_match)

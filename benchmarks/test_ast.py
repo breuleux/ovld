@@ -3,13 +3,14 @@ import inspect
 from types import NoneType
 
 import pytest
-from multimethod import multimethod as multimethod_dispatch
-from multipledispatch import dispatch as multipledispatch_dispatch
-from plum import dispatch as plum_dispatch
-from runtype import multidispatch as runtype_dispatch
 
-from ovld import ovld as ovld_dispatch
-from ovld import recurse
+from .common import (
+    multimethod_dispatch,
+    multipledispatch_dispatch,
+    ovld_dispatch,
+    plum_dispatch,
+    runtype_dispatch,
+)
 
 
 def foo(xs, ys):
@@ -29,252 +30,38 @@ def foobar():
     return ast.parse(inspect.getsource(foo)), ast.parse(inspect.getsource(bar))
 
 
-########
-# ovld #
-########
-
-
-@ovld_dispatch
-def transform_ovld(node: list):
-    return [recurse(x) for x in node]
-
-
-@ovld_dispatch
-def transform_ovld(node: int | str | NoneType):
-    return node
-
-
-@ovld_dispatch
-def transform_ovld(node: ast.AST):
-    kw = {field: recurse(getattr(node, field)) for field in node._fields}
-    return type(node)(**kw)
-
-
-@ovld_dispatch
-def transform_ovld(node: ast.BinOp):
-    return ast.BinOp(
-        op=ast.Pow(),
-        left=recurse(node.left),
-        right=recurse(node.right),
-    )
-
-
-@ovld_dispatch
-def transform_ovld(node: ast.Constant):
-    return ast.Constant(
-        value=node.value.replace("beginning", "end")
-        if isinstance(node.value, str)
-        else node.value,
-        kind=node.kind,
-    )
-
-
-@pytest.mark.benchmark(group="ast")
-def test_transform_ovld(benchmark, foobar):
-    result = benchmark(transform_ovld, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
-
-
-########
-# plum #
-########
-
-
-@plum_dispatch
-def transform_plum(node: list):
-    return [transform_plum(x) for x in node]
-
-
-@plum_dispatch
-def transform_plum(node: int | str | NoneType):
-    return node
-
-
-@plum_dispatch
-def transform_plum(node: ast.AST):
-    kw = {field: transform_plum(getattr(node, field)) for field in node._fields}
-    return type(node)(**kw)
-
-
-@plum_dispatch
-def transform_plum(node: ast.BinOp):
-    return ast.BinOp(
-        op=ast.Pow(),
-        left=transform_plum(node.left),
-        right=transform_plum(node.right),
-    )
-
-
-@plum_dispatch
-def transform_plum(node: ast.Constant):
-    return ast.Constant(
-        value=node.value.replace("beginning", "end")
-        if isinstance(node.value, str)
-        else node.value,
-        kind=node.kind,
-    )
-
-
-@pytest.mark.benchmark(group="ast")
-def test_transform_plum(benchmark, foobar):
-    result = benchmark(transform_plum, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
-
-
-###############
-# multimethod #
-###############
-
-
-@multimethod_dispatch
-def transform_multimethod(node: list):
-    return [transform_multimethod(x) for x in node]
-
-
-@multimethod_dispatch
-def transform_multimethod(node: int | str | NoneType):
-    return node
-
-
-@multimethod_dispatch
-def transform_multimethod(node: ast.AST):
-    kw = {
-        field: transform_multimethod(getattr(node, field))
-        for field in node._fields
-    }
-    return type(node)(**kw)
-
-
-@multimethod_dispatch
-def transform_multimethod(node: ast.BinOp):
-    return ast.BinOp(
-        op=ast.Pow(),
-        left=transform_multimethod(node.left),
-        right=transform_multimethod(node.right),
-    )
-
-
-@multimethod_dispatch
-def transform_multimethod(node: ast.Constant):
-    return ast.Constant(
-        value=node.value.replace("beginning", "end")
-        if isinstance(node.value, str)
-        else node.value,
-        kind=node.kind,
-    )
-
-
-@pytest.mark.benchmark(group="ast")
-def test_transform_multimethod(benchmark, foobar):
-    result = benchmark(transform_multimethod, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
-
-
-###########
-# runtype #
-###########
-
-
-@runtype_dispatch
-def transform_runtype(node: list):
-    return [transform_runtype(x) for x in node]
-
-
-@runtype_dispatch
-def transform_runtype(node: int | str | NoneType):
-    return node
-
-
-@runtype_dispatch
-def transform_runtype(node: ast.AST):
-    kw = {
-        field: transform_runtype(getattr(node, field)) for field in node._fields
-    }
-    return type(node)(**kw)
-
-
-@runtype_dispatch
-def transform_runtype(node: ast.BinOp):
-    return ast.BinOp(
-        op=ast.Pow(),
-        left=transform_runtype(node.left),
-        right=transform_runtype(node.right),
-    )
-
-
-@runtype_dispatch
-def transform_runtype(node: ast.Constant):
-    return ast.Constant(
-        value=node.value.replace("beginning", "end")
-        if isinstance(node.value, str)
-        else node.value,
-        kind=node.kind,
-    )
-
-
-@pytest.mark.benchmark(group="ast")
-def test_transform_runtype(benchmark, foobar):
-    result = benchmark(transform_runtype, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
-
-
-####################
-# multipledispatch #
-####################
-
-
-@multipledispatch_dispatch(list)
-def transform_multipledispatch(node: list):
-    return [transform_multipledispatch(x) for x in node]
-
-
-@multipledispatch_dispatch((int, str, NoneType))
-def transform_multipledispatch(node: int | str | NoneType):
-    return node
-
-
-@multipledispatch_dispatch(ast.AST)
-def transform_multipledispatch(node: ast.AST):
-    kw = {
-        field: transform_multipledispatch(getattr(node, field))
-        for field in node._fields
-    }
-    return type(node)(**kw)
-
-
-@multipledispatch_dispatch(ast.BinOp)
-def transform_multipledispatch(node: ast.BinOp):
-    return ast.BinOp(
-        op=ast.Pow(),
-        left=transform_multipledispatch(node.left),
-        right=transform_multipledispatch(node.right),
-    )
-
-
-@multipledispatch_dispatch(ast.Constant)
-def transform_multipledispatch(node: ast.Constant):
-    return ast.Constant(
-        value=node.value.replace("beginning", "end")
-        if isinstance(node.value, str)
-        else node.value,
-        kind=node.kind,
-    )
-
-
-@pytest.mark.benchmark(group="ast")
-def test_transform_multipledispatch(benchmark, foobar):
-    result = benchmark(transform_multipledispatch, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
+def make_transform(dispatch):
+    @dispatch
+    def transform(node: list):
+        return [transform(x) for x in node]
+
+    @dispatch
+    def transform(node: int | str | NoneType):
+        return node
+
+    @dispatch
+    def transform(node: ast.AST):
+        kw = {field: transform(getattr(node, field)) for field in node._fields}
+        return type(node)(**kw)
+
+    @dispatch
+    def transform(node: ast.BinOp):
+        return ast.BinOp(
+            op=ast.Pow(),
+            left=transform(node.left),
+            right=transform(node.right),
+        )
+
+    @dispatch
+    def transform(node: ast.Constant):
+        return ast.Constant(
+            value=node.value.replace("beginning", "end")
+            if isinstance(node.value, str)
+            else node.value,
+            kind=node.kind,
+        )
+
+    return transform
 
 
 ###################
@@ -299,9 +86,28 @@ class NT(ast.NodeTransformer):
         )
 
 
-@pytest.mark.benchmark(group="ast")
-def test_transform_custom(benchmark, foobar):
-    result = benchmark(NT().visit, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
+####################
+# Test definitions #
+####################
+
+expr = ("add", ("mul", ("sqrt", 4), 7), ("div", ("add", 6, 4), ("sub", 5, 3)))
+expected_result = 19
+
+
+def make_test(fn):
+    @pytest.mark.benchmark(group="ast")
+    def test(benchmark, foobar):
+        result = benchmark(fn, foobar[0])
+        assert ast.dump(result, indent=2) == ast.dump(
+            foobar[1], indent=2
+        ).replace("bar", "foo")
+
+    return test
+
+
+test_ast_ovld = make_test(make_transform(ovld_dispatch))
+test_ast_plum = make_test(make_transform(plum_dispatch))
+test_ast_multimethod = make_test(make_transform(multimethod_dispatch))
+test_ast_multipledispatch = make_test(make_transform(multipledispatch_dispatch))
+test_ast_runtype = make_test(make_transform(runtype_dispatch))
+test_ast_custom = make_test(NT().visit)

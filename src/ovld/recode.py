@@ -580,30 +580,34 @@ class NameConverter(ast.NodeTransformer):
         return ast.copy_location(old_node=node, new_node=new_node)
 
 
-def _search_name(co, value, glb, closure=None):
+def _search_names(co, values, glb, closure=None):
     if isinstance(co, CodeType):
         if closure is not None:
             for varname, cell in zip(co.co_freevars, closure):
-                if cell.cell_contents is value:
-                    return varname
+                if any(cell.cell_contents is v for v in values):
+                    yield varname
         for name in co.co_names:
-            if glb.get(name, None) is value:
-                return name
+            if any(glb.get(name, None) is v for v in values):
+                yield name
         else:
             for ct in co.co_consts:
-                if (result := _search_name(ct, value, glb)) is not None:
-                    return result
-    return None
+                yield from _search_names(ct, values, glb)
 
 
 def adapt_function(fn, ovld, newname):
     """Create a copy of the function with a different name."""
-    rec_sym = _search_name(fn.__code__, recurse, fn.__globals__, fn.__closure__)
-    cn_sym = _search_name(
-        fn.__code__, call_next, fn.__globals__, fn.__closure__
+    rec_syms = list(
+        _search_names(
+            fn.__code__, (recurse, ovld), fn.__globals__, fn.__closure__
+        )
     )
-    if rec_sym or cn_sym:
-        return recode(fn, ovld, rec_sym, cn_sym, newname)
+    cn_syms = list(
+        _search_names(fn.__code__, (call_next,), fn.__globals__, fn.__closure__)
+    )
+    if rec_syms or cn_syms:
+        return recode(
+            fn, ovld, rec_syms and rec_syms[0], cn_syms and cn_syms[0], newname
+        )
     else:
         return rename_function(fn, newname)
 
