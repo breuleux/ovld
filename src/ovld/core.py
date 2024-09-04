@@ -240,13 +240,13 @@ class _Ovld:
             if self not in mixin.children:
                 mixin.lock()
         self._compiled = True
-        self.map = MultiTypeMap(key_error=self._key_error)
 
         cls = type(self)
         if self.name is None:
             self.name = self.__name__ = f"ovld{id(self)}"
 
         name = self.__name__
+        self.map = MultiTypeMap(name=name, key_error=self._key_error)
 
         # Replace the appropriate functions by their final behavior
         for method in dir(cls):
