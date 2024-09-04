@@ -85,8 +85,6 @@ class Bounded(ParametrizedDependentType):
         return min <= value <= max
 
     def __lt__(self, other):
-        if type(other) is not type(self):
-            return False
         smin, smax = self.parameters
         omin, omax = other.parameters
         return (smin < omin and smax >= omax) or (smin <= omin and smax > omax)

@@ -208,7 +208,8 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         relevant = [k for k in tup if isinstance(types[k], DependentType)]
         codes = [codegen(types[k], argname(k)) for k in relevant]
         conj = " and ".join(codes)
-        if not conj:
+        if not conj:  # pragma: no cover
+            # Not sure if this can happen
             conj = "True"
         conjs.append(conj)
 
@@ -515,7 +516,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     code_mangled = f"___CODE{next(_current)}"
     try:
         src = inspect.getsource(fn)
-    except OSError:
+    except OSError:  # pragma: no cover
         raise OSError(
             f"ovld is unable to rewrite {fn} because it cannot read its source code."
             " It may be an issue with __pycache__, so try to either change the source"
