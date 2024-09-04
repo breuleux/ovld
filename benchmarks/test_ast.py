@@ -10,6 +10,7 @@ from .common import (
     ovld_dispatch,
     plum_dispatch,
     runtype_dispatch,
+    singledispatch_dispatch,
 )
 
 
@@ -110,4 +111,5 @@ test_ast_plum = make_test(make_transform(plum_dispatch))
 test_ast_multimethod = make_test(make_transform(multimethod_dispatch))
 test_ast_multipledispatch = make_test(make_transform(multipledispatch_dispatch))
 test_ast_runtype = make_test(make_transform(runtype_dispatch))
+test_ast_singledispatch = make_test(make_transform(singledispatch_dispatch))
 test_ast_custom = make_test(NT().visit)
