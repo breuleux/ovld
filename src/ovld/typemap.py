@@ -42,9 +42,6 @@ class TypeMap(dict):
 
     def register(self, obj_t, handler):
         """Register a handler for the given object type."""
-        if isinstance(obj_t, str):
-            obj_t = eval(obj_t, getattr(handler[0], "__globals__", {}))
-
         self.clear()
         self.types.add(obj_t)
         s = self.entries.setdefault(obj_t, set())
@@ -227,7 +224,8 @@ class MultiTypeMap(dict):
                 self.maps[i] = TypeMap()
             self.maps[i].register(cls, entry)
 
-        if sig.vararg:
+        if sig.vararg:  # pragma: no cover
+            # TODO: either add this back in, or remove it
             if -1 not in self.maps:
                 self.maps[-1] = TypeMap()
             self.maps[-1].register(object, entry)
@@ -357,7 +355,8 @@ class MultiTypeMap(dict):
                 raise self.key_error(real_tup, ())
 
         if not obj_t_tup:
-            if self.empty is MISSING:
+            if self.empty is MISSING:  # pragma: no cover
+                # Might not be reachable because of codegen
                 raise self.key_error(obj_t_tup, ())
             else:
                 return self.empty[0]

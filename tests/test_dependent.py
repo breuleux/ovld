@@ -3,7 +3,7 @@ from typing import Literal
 
 import pytest
 
-from ovld.core import OvldBase, ovld
+from ovld.core import Ovld, OvldBase, ovld
 from ovld.dependent import (
     Bounded,
     Dependent,
@@ -16,6 +16,12 @@ from ovld.dependent import (
     StartsWith,
     Truey,
 )
+
+
+def test_equality():
+    assert Equals(0) == Equals(0)
+    assert Equals(0) != Equals(1)
+    assert Bounded(0, 10) == Bounded(0, 10)
 
 
 def test_dependent_type():
@@ -67,6 +73,27 @@ def test_literal():
     assert f(0) == "zero"
     assert f(1) == "one"
     assert f(2) == "nah"
+
+
+def test_many_literals():
+    f = Ovld()
+
+    n = 10
+
+    for i in range(n):
+
+        @ovld
+        def f(x: Literal[i]):
+            return x * x
+
+    for i in range(n):
+        assert f(i) == i * i
+
+    with pytest.raises(TypeError, match="No method"):
+        f(-1)
+
+    with pytest.raises(TypeError, match="No method"):
+        f(n)
 
 
 def test_dependent_method():

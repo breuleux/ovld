@@ -6,8 +6,8 @@ import sys
 import textwrap
 import typing
 from collections import defaultdict
-from dataclasses import dataclass
-from functools import partial
+from dataclasses import dataclass, field, replace
+from functools import cached_property, partial
 from types import GenericAlias
 
 from .dependent import Equals
@@ -95,6 +95,22 @@ def normalize_type(t, fn):
 
 
 @dataclass(frozen=True)
+class Arginfo:
+    position: typing.Optional[int]
+    name: typing.Optional[str]
+    required: bool
+    ann: type
+
+    @cached_property
+    def is_complex(self):
+        return isinstance(self.ann, GenericAlias)
+
+    @cached_property
+    def canonical(self):
+        return self.name if self.position is None else self.position
+
+
+@dataclass(frozen=True)
 class Signature:
     types: tuple
     req_pos: int
@@ -102,6 +118,65 @@ class Signature:
     req_names: frozenset
     vararg: bool
     priority: float
+    is_method: bool = False
+    arginfo: list[Arginfo] = field(default_factory=list, hash=False)
+
+    @classmethod
+    def extract(cls, fn):
+        typelist = []
+        sig = inspect.signature(fn)
+        max_pos = 0
+        req_pos = 0
+        req_names = set()
+        is_method = False
+
+        arginfo = []
+        for i, (name, param) in enumerate(sig.parameters.items()):
+            if name == "self":
+                assert i == 0
+                is_method = True
+                continue
+            pos = nm = None
+            ann = normalize_type(param.annotation, fn)
+            if param.kind is inspect._POSITIONAL_ONLY:
+                pos = i - is_method
+                typelist.append(ann)
+                req_pos += param.default is inspect._empty
+                max_pos += 1
+            elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
+                pos = i - is_method
+                nm = param.name
+                typelist.append(ann)
+                req_pos += param.default is inspect._empty
+                max_pos += 1
+            elif param.kind is inspect._KEYWORD_ONLY:
+                nm = param.name
+                typelist.append((param.name, ann))
+                if param.default is inspect._empty:
+                    req_names.add(param.name)
+            elif param.kind is inspect._VAR_POSITIONAL:
+                raise TypeError("ovld does not support *args")
+            elif param.kind is inspect._VAR_KEYWORD:
+                raise TypeError("ovld does not support **kwargs")
+            arginfo.append(
+                Arginfo(
+                    position=pos,
+                    name=nm,
+                    required=param.default is inspect._empty,
+                    ann=normalize_type(param.annotation, fn),
+                )
+            )
+
+        return cls(
+            types=tuple(typelist),
+            req_pos=req_pos,
+            max_pos=max_pos,
+            req_names=frozenset(req_names),
+            vararg=False,
+            is_method=is_method,
+            priority=None,
+            arginfo=arginfo,
+        )
 
 
 def clsstring(cls):
@@ -138,57 +213,40 @@ class ArgumentAnalyzer:
         self.is_method = None
 
     def add(self, fn):
-        sig = inspect.signature(fn)
-        is_method = False
-        for i, (name, param) in enumerate(sig.parameters.items()):
-            if name == "self":
-                assert i == 0
-                is_method = True
-                continue
-            ann = normalize_type(param.annotation, fn)
-            is_complex = isinstance(ann, GenericAlias)
-            if param.kind is inspect._POSITIONAL_ONLY:
-                cnt = self.counts[i]
-                self.position_to_names[i].add(None)
-                keys = {i - is_method}
-            elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
-                cnt = self.counts[i]
-                self.position_to_names[i].add(param.name)
-                self.name_to_positions[param.name].add(i)
-                keys = {i - is_method, param.name}
-            elif param.kind is inspect._KEYWORD_ONLY:
-                cnt = self.counts[param.name]
-                self.name_to_positions[param.name].add(param.name)
-                keys = {param.name}
-            elif param.kind is inspect._VAR_POSITIONAL:
-                raise TypeError("ovld does not support *args")
-            elif param.kind is inspect._VAR_KEYWORD:
-                raise TypeError("ovld does not support **kwargs")
+        sig = Signature.extract(fn)
+        self.complex_transforms.update(
+            arg.canonical for arg in sig.arginfo if arg.is_complex
+        )
+        for arg in sig.arginfo:
+            if arg.position is not None:
+                self.position_to_names[arg.position].add(arg.name)
+            if arg.name is not None:
+                self.name_to_positions[arg.name].add(arg.canonical)
 
-            if is_complex:
-                self.complex_transforms.update(keys)
-
-            cnt[0] += 1 if param.default is inspect._empty else 0
+            cnt = self.counts[arg.canonical]
+            cnt[0] += arg.required
             cnt[1] += 1
 
         self.total += 1
 
         if self.is_method is None:
-            self.is_method = is_method
-        elif self.is_method != is_method:
+            self.is_method = sig.is_method
+        elif self.is_method != sig.is_method:  # pragma: no cover
             raise TypeError(
                 "Some, but not all registered methods define `self`. It should be all or none."
             )
 
     def compile(self):
-        if any(
-            len(pos) != 1
-            for _name, pos in self.name_to_positions.items()
-            if (name := _name) is not None
-        ):
-            raise TypeError(
-                f"Argument {name} is found both in a positional and keyword setting."
-            )
+        for name, pos in self.name_to_positions.items():
+            if len(pos) != 1:
+                if all(isinstance(p, int) for p in pos):
+                    raise TypeError(
+                        f"Argument '{name}' is declared in different positions by different methods. The same argument name should always be in the same position unless it is strictly positional."
+                    )
+                else:
+                    raise TypeError(
+                        f"Argument '{name}' is declared in a positional and keyword setting by different methods. It should be either."
+                    )
 
         p_to_n = [
             list(names) for _, names in sorted(self.position_to_names.items())
@@ -363,7 +421,7 @@ class _Ovld:
             else f"Ovld with {len(self.defns)} methods.\n\n"
         )
         for fn in self.defns.values():
-            if fn in seen:
+            if fn in seen:  # pragma: no cover
                 continue
             seen.add(fn)
             fndef = inspect.signature(fn)
@@ -415,7 +473,6 @@ class _Ovld:
         for mixin in self.mixins:
             if self not in mixin.children:
                 mixin.lock()
-        self._compiled = True
 
         cls = type(self)
         if self.name is None:
@@ -443,6 +500,8 @@ class _Ovld:
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
+
+        self._compiled = True
 
     @_compile_first
     def resolve(self, *args):
@@ -473,43 +532,11 @@ class _Ovld:
 
         self._set_attrs_from(fn)
 
-        typelist = []
-        sig = inspect.signature(fn)
-        max_pos = 0
-        req_pos = 0
-        req_names = set()
-        for param in sig.parameters.values():
-            if param.name == "self":
-                continue
-            elif param.kind is inspect._POSITIONAL_ONLY:
-                typelist.append(normalize_type(param.annotation, fn))
-                req_pos += param.default is inspect._empty
-                max_pos += 1
-            elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
-                typelist.append(normalize_type(param.annotation, fn))
-                req_pos += param.default is inspect._empty
-                max_pos += 1
-            elif param.kind is inspect._KEYWORD_ONLY:
-                typelist.append(
-                    (param.name, normalize_type(param.annotation, fn))
-                )
-                if param.default is inspect._empty:
-                    req_names.add(param.name)
-            elif param.kind is inspect._VAR_POSITIONAL:
-                raise TypeError("ovld does not support *args")
-            elif param.kind is inspect._VAR_KEYWORD:
-                raise TypeError("ovld does not support **kwargs")
-
-        sig = Signature(
-            types=tuple(typelist),
-            req_pos=req_pos,
-            max_pos=max_pos,
-            req_names=frozenset(req_names),
-            vararg=False,
-            priority=priority,
-        )
+        sig = replace(Signature.extract(fn), priority=priority)
         if not self.allow_replacement and sig in self._defns:
-            raise TypeError(f"There is already a method for {typelist}")
+            raise TypeError(
+                f"There is already a method for {sigstring(sig.types)}"
+            )
         self._defns[sig] = fn
 
         self._make_signature()

@@ -1177,6 +1177,20 @@ def test_generic_type_argument():
 
 def test_any():
     @ovld
+    def f(x: int):
+        return "no"
+
+    @ovld
+    def f(t: typing.Any):
+        return "yes"
+
+    assert f(1) == "no"
+    assert f("xyz") == "yes"
+    assert f(object()) == "yes"
+
+
+def test_type_any():
+    @ovld
     def f(t: type[dict]):
         return "no"
 
@@ -1393,6 +1407,78 @@ def test_closure_plus_recurse():
 
     assert twice([1, 2, 3]) == [2, 4, 6]
     assert thrice([1, 2, 3]) == [3, 6, 9]
+
+
+def test_no_kwargs():
+    with pytest.raises(TypeError):
+
+        @ovld
+        def f(x: int, **kw):
+            return x
+
+        f(123)
+
+
+def test_inconsistent_position_naming():
+    @ovld
+    def f(x: int, y: int):
+        return x + y
+
+    @ovld
+    def f(y: int):
+        return y * y
+
+    with pytest.raises(
+        TypeError, match="declared in different positions by different methods"
+    ):
+        f(123)
+
+
+def test_inconsistent_naming():
+    @ovld
+    def f(x: int, y: int):
+        return x + y
+
+    @ovld
+    def f(x: str, *, y: str):
+        return y + y
+
+    with pytest.raises(
+        TypeError,
+        match="declared in a positional and keyword setting by different methods",
+    ):
+        f(1, 2)
+
+
+def test_uniform_positional_names():
+    @ovld
+    def f(x: int, y: int):
+        return x + y
+
+    @ovld
+    def f(x: int):
+        return x * x
+
+    assert f(3, 4) == 7
+    assert f(3) == 9
+
+    assert f(x=3, y=4) == 7
+    assert f(x=3) == 9
+
+
+def test_strict_positional():
+    @ovld
+    def f(x: int, y: int, /):
+        return x + y
+
+    @ovld
+    def f(y: int, /):
+        return y * y
+
+    assert f(3, 4) == 7
+    assert f(3) == 9
+    with pytest.raises(TypeError):
+        f(x=3, y=4)
 
 
 def test_keywords():
