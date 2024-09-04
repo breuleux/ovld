@@ -5,10 +5,17 @@ import itertools
 import sys
 import textwrap
 import typing
+from collections import defaultdict
 from functools import partial
+from types import GenericAlias
 
 from .dependent import Equals
-from .recode import ArgumentAnalyzer, Conformer, adapt_function, rename_function
+from .recode import (
+    Conformer,
+    adapt_function,
+    generate_dispatch,
+    rename_function,
+)
 from .typemap import MultiTypeMap, is_type_of_type
 from .utils import UsageError, keyword_decorator
 
@@ -54,6 +61,164 @@ def arg0_is_self(fn):
     sgn = inspect.signature(fn)
     params = list(sgn.parameters.values())
     return params and params[0].name == "self"
+
+
+def normalize_type(t, fn):
+    if isinstance(t, str):
+        t = eval(t, getattr(fn, "__globals__", {}))
+
+    if t is type:
+        t = type[object]
+    elif t is typing.Any:
+        t = object
+    elif t is inspect._empty:
+        t = object
+
+    origin = getattr(t, "__origin__", None)
+    if UnionType and isinstance(t, UnionType):
+        return normalize_type(t.__args__, fn)
+    elif origin is type:
+        return t
+    elif origin is typing.Union:
+        return normalize_type(t.__args__, fn)
+    elif origin is typing.Literal:
+        return Equals(t.__args__[0])
+    elif origin is not None:
+        raise TypeError(
+            f"ovld does not accept generic types except type, Union, Optional, Literal, but not: {t}"
+        )
+    elif isinstance(t, tuple):
+        return typing.Union[tuple(normalize_type(t2, fn) for t2 in t)]
+    else:
+        return t
+
+
+class ArgumentAnalyzer:
+    def __init__(self):
+        self.name_to_positions = defaultdict(set)
+        self.position_to_names = defaultdict(set)
+        self.counts = defaultdict(lambda: [0, 0])
+        self.complex_transforms = set()
+        self.total = 0
+        self.is_method = None
+
+    def add(self, fn):
+        sig = inspect.signature(fn)
+        is_method = False
+        for i, (name, param) in enumerate(sig.parameters.items()):
+            if name == "self":
+                assert i == 0
+                is_method = True
+                continue
+            ann = param.annotation
+            if isinstance(ann, str):
+                ann = eval(ann, getattr(fn, "__globals__", {}))
+            is_complex = isinstance(ann, GenericAlias)
+            if param.kind is inspect._POSITIONAL_ONLY:
+                cnt = self.counts[i]
+                self.position_to_names[i].add(None)
+                keys = {i - is_method}
+            elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
+                cnt = self.counts[i]
+                self.position_to_names[i].add(param.name)
+                self.name_to_positions[param.name].add(i)
+                keys = {i - is_method, param.name}
+            elif param.kind is inspect._KEYWORD_ONLY:
+                cnt = self.counts[param.name]
+                self.name_to_positions[param.name].add(param.name)
+                keys = {param.name}
+            elif param.kind is inspect._VAR_POSITIONAL:
+                raise TypeError("ovld does not support *args")
+            elif param.kind is inspect._VAR_KEYWORD:
+                raise TypeError("ovld does not support **kwargs")
+
+            if is_complex:
+                self.complex_transforms.update(keys)
+
+            cnt[0] += 1 if param.default is inspect._empty else 0
+            cnt[1] += 1
+
+        self.total += 1
+
+        if self.is_method is None:
+            self.is_method = is_method
+        elif self.is_method != is_method:
+            raise TypeError(
+                "Some, but not all registered methods define `self`. It should be all or none."
+            )
+
+    def compile(self):
+        if any(
+            len(pos) != 1
+            for _name, pos in self.name_to_positions.items()
+            if (name := _name) is not None
+        ):
+            raise TypeError(
+                f"Argument {name} is found both in a positional and keyword setting."
+            )
+
+        p_to_n = [
+            list(names) for _, names in sorted(self.position_to_names.items())
+        ]
+
+        positional = list(
+            itertools.takewhile(
+                lambda names: len(names) == 1 and isinstance(names[0], str),
+                reversed(p_to_n),
+            )
+        )
+        positional.reverse()
+        strict_positional = p_to_n[: len(p_to_n) - len(positional)]
+
+        assert strict_positional + positional == p_to_n
+
+        strict_positional_required = [
+            f"ARG{pos + 1}"
+            for pos, _ in enumerate(strict_positional)
+            if self.counts[pos][0] == self.total
+        ]
+        strict_positional_optional = [
+            f"ARG{pos + 1}"
+            for pos, _ in enumerate(strict_positional)
+            if self.counts[pos][0] != self.total
+        ]
+
+        positional_required = [
+            names[0]
+            for pos, names in enumerate(positional)
+            if self.counts[pos + len(strict_positional)][0] == self.total
+        ]
+        positional_optional = [
+            names[0]
+            for pos, names in enumerate(positional)
+            if self.counts[pos + len(strict_positional)][0] != self.total
+        ]
+
+        keywords = [
+            name
+            for _, (name,) in self.name_to_positions.items()
+            if not isinstance(name, int)
+        ]
+        keyword_required = [
+            name for name in keywords if self.counts[name][0] == self.total
+        ]
+        keyword_optional = [
+            name for name in keywords if self.counts[name][0] != self.total
+        ]
+
+        return (
+            strict_positional_required,
+            strict_positional_optional,
+            positional_required,
+            positional_optional,
+            keyword_required,
+            keyword_optional,
+        )
+
+    def lookup_for(self, key):
+        return (
+            "self.map.transform" if key in self.complex_transforms else "type"
+        )
 
 
 class _Ovld:
@@ -262,7 +427,7 @@ class _Ovld:
         for key, fn in list(self.defns.items()):
             anal.add(fn)
         self.argument_analysis = anal
-        dispatch = anal.generate_dispatch()
+        dispatch = generate_dispatch(anal)
         target.__call__ = rename_function(dispatch, f"{name}.dispatch")
 
         for key, fn in list(self.defns.items()):
@@ -294,31 +459,6 @@ class _Ovld:
     def _register(self, fn, priority):
         """Register a function."""
 
-        def _normalize_type(t):
-            if t is type:
-                t = type[object]
-            elif t is typing.Any:
-                t = object
-            elif t is inspect._empty:
-                t = object
-            origin = getattr(t, "__origin__", None)
-            if UnionType and isinstance(t, UnionType):
-                return _normalize_type(t.__args__)
-            elif origin is type:
-                return t
-            elif origin is typing.Union:
-                return _normalize_type(t.__args__)
-            elif origin is typing.Literal:
-                return Equals(t.__args__[0])
-            elif origin is not None:
-                raise TypeError(
-                    f"ovld does not accept generic types except type, Union or Optional, not {t}"
-                )
-            elif isinstance(t, tuple):
-                return typing.Union[tuple(_normalize_type(t2) for t2 in t)]
-            else:
-                return t
-
         self._attempt_modify()
 
         self._set_attrs_from(fn)
@@ -332,15 +472,17 @@ class _Ovld:
             if param.name == "self":
                 continue
             elif param.kind is inspect._POSITIONAL_ONLY:
-                typelist.append((max_pos, param.annotation))
+                typelist.append(normalize_type(param.annotation, fn))
                 req_pos += param.default is inspect._empty
                 max_pos += 1
             elif param.kind is inspect._POSITIONAL_OR_KEYWORD:
-                typelist.append((max_pos, param.annotation))
+                typelist.append(normalize_type(param.annotation, fn))
                 req_pos += param.default is inspect._empty
                 max_pos += 1
             elif param.kind is inspect._KEYWORD_ONLY:
-                typelist.append((param.name, param.annotation))
+                typelist.append(
+                    (param.name, normalize_type(param.annotation, fn))
+                )
                 if param.default is inspect._empty:
                     req_names.add(param.name)
             elif param.kind is inspect._VAR_POSITIONAL:
@@ -348,12 +490,6 @@ class _Ovld:
             elif param.kind is inspect._VAR_KEYWORD:
                 raise TypeError("ovld does not support **kwargs")
 
-        typelist = [
-            _normalize_type(t)
-            if isinstance(k, int)
-            else (k, _normalize_type(t))
-            for k, t in typelist
-        ]
         sig = (
             tuple(typelist),
             req_pos,
