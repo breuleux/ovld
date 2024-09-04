@@ -6,6 +6,7 @@ import sys
 import textwrap
 import typing
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import partial
 from types import GenericAlias
 
@@ -93,6 +94,40 @@ def normalize_type(t, fn):
         return t
 
 
+@dataclass(frozen=True)
+class Signature:
+    types: tuple
+    req_pos: int
+    max_pos: int
+    req_names: frozenset
+    vararg: bool
+    priority: int | float
+
+
+def clsstring(cls):
+    if cls is object:
+        return "*"
+    elif isinstance(cls, tuple):
+        key, typ = cls
+        return f"{key}: {clsstring(typ)}"
+    elif is_type_of_type(cls):
+        arg = clsstring(cls.__args__[0])
+        return f"type[{arg}]"
+    elif hasattr(cls, "__origin__"):
+        if cls.__origin__ is typing.Union:
+            return "|".join(map(clsstring, cls.__args__))
+        else:
+            return repr(cls)
+    elif hasattr(cls, "__name__"):
+        return cls.__name__
+    else:
+        return repr(cls)
+
+
+def sigstring(types):
+    return ", ".join(map(clsstring, types))
+
+
 class ArgumentAnalyzer:
     def __init__(self):
         self.name_to_positions = defaultdict(set)
@@ -110,9 +145,7 @@ class ArgumentAnalyzer:
                 assert i == 0
                 is_method = True
                 continue
-            ann = param.annotation
-            if isinstance(ann, str):
-                ann = eval(ann, getattr(fn, "__globals__", {}))
+            ann = normalize_type(param.annotation, fn)
             is_complex = isinstance(ann, GenericAlias)
             if param.kind is inspect._POSITIONAL_ONLY:
                 cnt = self.counts[i]
@@ -291,30 +324,8 @@ class _Ovld:
                 self.bootstrap = mixin.bootstrap
         self.mixins += mixins
 
-    def _sig_string(self, type_tuple):
-        def clsname(cls):
-            if cls is object:
-                return "*"
-            elif isinstance(cls, tuple):
-                key, typ = cls
-                return f"{key}: {clsname(typ)}"
-            elif is_type_of_type(cls):
-                arg = clsname(cls.__args__[0])
-                return f"type[{arg}]"
-            elif hasattr(cls, "__origin__"):
-                if cls.__origin__ is typing.Union:
-                    return "|".join(map(clsname, cls.__args__))
-                else:
-                    return repr(cls)
-            elif hasattr(cls, "__name__"):
-                return cls.__name__
-            else:
-                return repr(cls)
-
-        return ", ".join(map(clsname, type_tuple))
-
     def _key_error(self, key, possibilities=None):
-        typenames = self._sig_string(key)
+        typenames = sigstring(key)
         if not possibilities:
             return TypeError(
                 f"No method in {self} for argument types [{typenames}]"
@@ -438,16 +449,15 @@ class _Ovld:
         """Find the correct method to call for the given arguments."""
         return self.map[tuple(map(self.map.transform, args))]
 
-    def register_signature(self, key, orig_fn):
+    def register_signature(self, sig, orig_fn):
         """Register a function for the given signature."""
-        sig, min, max, reqnames, vararg, priority = key
         fn = adapt_function(
-            orig_fn, self, f"{self.__name__}[{self._sig_string(sig)}]"
+            orig_fn, self, f"{self.__name__}[{sigstring(sig.types)}]"
         )
         # We just need to keep the Conformer pointer alive for jurigged
         # to find it, if jurigged is used with ovld
         fn._conformer = Conformer(self, orig_fn, fn)
-        self.map.register(sig, (min, max, reqnames, vararg, priority), fn)
+        self.map.register(sig, fn)
         return self
 
     def register(self, fn=None, priority=0):
@@ -490,13 +500,13 @@ class _Ovld:
             elif param.kind is inspect._VAR_KEYWORD:
                 raise TypeError("ovld does not support **kwargs")
 
-        sig = (
-            tuple(typelist),
-            req_pos,
-            max_pos,
-            frozenset(req_names),
-            False,
-            priority,
+        sig = Signature(
+            types=tuple(typelist),
+            req_pos=req_pos,
+            max_pos=max_pos,
+            req_names=frozenset(req_names),
+            vararg=False,
+            priority=priority,
         )
         if not self.allow_replacement and sig in self._defns:
             raise TypeError(f"There is already a method for {typelist}")
