@@ -1,6 +1,7 @@
 import inspect
 import math
 import typing
+from itertools import count
 from types import CodeType
 
 from .dependent import DependentType, dependent_match
@@ -98,13 +99,15 @@ class MultiTypeMap(dict):
     specific than [object, int] (which means there is an ambiguity).
     """
 
-    def __init__(self, key_error=KeyError):
+    def __init__(self, name="_ovld", key_error=KeyError):
         self.maps = {}
         self.priorities = {}
         self.dependent = {}
         self.type_tuples = {}
         self.empty = MISSING
         self.key_error = key_error
+        self.name = name
+        self.dispatch_id = count()
         self.all = {}
         self.errors = {}
 
@@ -305,6 +308,7 @@ class MultiTypeMap(dict):
             htup,
             next_call,
             slf,
+            name=f"{self.name}.specialized_dispatch_{next(self.dispatch_id)}",
             err=self.key_error(tup, group),
             nerr=self.key_error(tup, ()),
         )

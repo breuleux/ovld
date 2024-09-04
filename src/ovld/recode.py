@@ -294,7 +294,7 @@ class GenSym:
         return id
 
 
-def generate_dependent_dispatch(tup, handlers, next_call, slf, err, nerr):
+def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
     def to_dict(tup):
         return dict(
             entry if isinstance(entry, tuple) else (i, entry)
@@ -382,7 +382,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, err, nerr):
     fn = instantiate_code(
         symbol="__DEPENDENT_DISPATCH__", code=code, inject=inject
     )
-    return fn
+    return rename_function(fn, name)
 
 
 _current = count()
