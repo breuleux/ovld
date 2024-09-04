@@ -130,9 +130,11 @@ class MultiTypeMap(dict):
 
             results = {
                 handler: spc
-                for (handler, min, max, rn, va), spc in results.items()
-                if min <= nargs <= (math.inf if va else max)
-                and not (rn - names)
+                for (handler, sig), spc in results.items()
+                if sig.req_pos
+                <= nargs
+                <= (math.inf if sig.vararg else sig.max_pos)
+                and not (sig.req_names - names)
             }
 
             try:
@@ -142,8 +144,8 @@ class MultiTypeMap(dict):
 
             vararg_results = {
                 handler: spc
-                for (handler, min, max, rn, va), spc in vararg_results.items()
-                if min <= nargs and i >= max
+                for (handler, sig), spc in vararg_results.items()
+                if sig.req_pos <= nargs and i >= sig.max_pos
             }
 
             results.update(vararg_results)
@@ -198,28 +200,21 @@ class MultiTypeMap(dict):
 
         return list(_pull(candidates))
 
-    def register(self, obj_t_tup, nargs, handler):
+    def register(self, sig, handler):
         """Register a handler for a tuple of argument types.
 
         Arguments:
-            obj_t_tup: A tuple of argument types.
-            nargs: A (amin, amax, varargs) tuple where amin is the minimum
-                number of arguments needed to match this tuple (if there are
-                default arguments, it is possible that amin < len(obj_t_tup)),
-                amax is the maximum number of arguments, and varargs is a
-                boolean indicating whether there can be an arbitrary number
-                of arguments.
+            sig: A Signature object.
             handler: A function to handle the tuple.
         """
         self.clear()
 
-        amin, amax, reqnames, vararg, priority = nargs
-
-        entry = (handler, amin, amax, reqnames, vararg)
+        obj_t_tup = sig.types
+        entry = (handler, sig)
         if not obj_t_tup:
             self.empty = entry
 
-        self.priorities[handler] = priority
+        self.priorities[handler] = sig.priority
         self.type_tuples[handler] = obj_t_tup
         self.dependent[handler] = any(
             isinstance(t, DependentType) for t in obj_t_tup
@@ -232,7 +227,7 @@ class MultiTypeMap(dict):
                 self.maps[i] = TypeMap()
             self.maps[i].register(cls, entry)
 
-        if vararg:
+        if sig.vararg:
             if -1 not in self.maps:
                 self.maps[-1] = TypeMap()
             self.maps[-1].register(object, entry)
