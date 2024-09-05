@@ -1,3 +1,5 @@
+from functools import singledispatchmethod
+
 import pytest
 from multipledispatch import dispatch as multipledispatch_dispatch
 
@@ -83,6 +85,29 @@ class MultipleDispatchMulter(BaseMulter):
         return x * self.factor
 
 
+##################
+# singledispatch #
+##################
+
+
+class SingleDispatchMulter(BaseMulter):
+    @singledispatchmethod
+    def __call__(self, x):
+        return x * self.factor
+
+    @__call__.register
+    def _(self, x: tuple):
+        return tuple(self(a) for a in x)
+
+    @__call__.register
+    def _(self, x: dict):
+        return {k: self(v) for k, v in x.items()}
+
+    @__call__.register
+    def _(self, x: list):
+        return [self(a) for a in x]
+
+
 ##############
 # isinstance #
 ##############
@@ -125,6 +150,7 @@ test_multer_ovld = make_test(make_multer(ovld_dispatch))
 test_multer_ovld_recurse = make_test(OvldRecurseMulter)
 test_multer_plum = make_test(make_multer(plum_dispatch))
 test_multer_multimethod = make_test(make_multer(multimethod_dispatch))
+test_multer_singledispatch = make_test(SingleDispatchMulter)
 test_multer_multipledispatch = make_test(MultipleDispatchMulter)
 test_multer_runtype = make_test(make_multer(runtype_dispatch))
 
