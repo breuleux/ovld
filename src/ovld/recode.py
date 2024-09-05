@@ -3,6 +3,7 @@ import inspect
 import runpy
 import tempfile
 import textwrap
+from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
@@ -198,11 +199,26 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         if len(featured) == len(handlers):
             possibilities = set(type(t) for t in featured)
             focus = possibilities.pop()
-            if not possibilities and getattr(focus, "exclusive_type", False):
-                exclusive = True
-                if len(featured) > 4 and hasattr(focus, "keygen"):
-                    keyexpr = focus.keygen().format(arg=argname(k))
-                    keyed = {types[k].get_key(): h for h, types in handlers}
+            # Possibilities is now empty if only one type of DependentType
+
+            if not possibilities:
+                if getattr(focus, "keyable_type", False):
+                    all_keys = [
+                        {key: h for key in types[k].get_keys()}
+                        for h, types in handlers
+                    ]
+                    keyed = reduce(lambda a, b: {**a, **b}, all_keys)
+                    if (
+                        len(keyed) == sum(map(len, all_keys))
+                        and len(featured) < 4
+                    ):
+                        exclusive = True
+                        keyexpr = None
+                    else:
+                        keyexpr = focus.keygen().format(arg=argname(k))
+
+                else:
+                    exclusive = getattr(focus, "exclusive_type", False)
 
     for i, (h, types) in enumerate(handlers):
         relevant = [k for k in tup if isinstance(types[k], DependentType)]
@@ -217,7 +233,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
     argcall = ", ".join(argprovide(x) for x in tup)
 
     body = []
-    if keyed:
+    if keyexpr:
         body.append(f"HANDLER = {gen.add(keyed)}.get({keyexpr}, HANDLERN)")
         body.append(f"return HANDLER({slf}{argcall})")
 

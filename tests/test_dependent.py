@@ -69,12 +69,18 @@ def test_literal():
         return "one"
 
     @f.register
+    def f(x: Literal[2, 3]):
+        return "two or three"
+
+    @f.register
     def f(x: int):
         return "nah"
 
     assert f(0) == "zero"
     assert f(1) == "one"
-    assert f(2) == "nah"
+    assert f(2) == "two or three"
+    assert f(3) == "two or three"
+    assert f(4) == "nah"
 
 
 def test_many_literals():

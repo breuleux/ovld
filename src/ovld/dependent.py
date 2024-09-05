@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 class DependentType:
     exclusive_type = False
+    keyable_type = False
 
     def __init__(self, bound):
         self.bound = bound
@@ -70,23 +71,27 @@ class ParametrizedDependentType(DependentType):
 
 
 class Equals(ParametrizedDependentType):
-    exclusive_type = True
+    # exclusive_type = True
+    keyable_type = True
 
     def default_bound(self, *parameters):
         return type(parameters[0])
 
     def check(self, value):
-        return value == self.parameter
+        return value in self.parameters
 
     @classmethod
     def keygen(cls):
         return "{arg}"
 
-    def get_key(self):
-        return self.parameter
+    def get_keys(self):
+        return [self.parameter]
 
     def codegen(self):
-        return "({arg} == {p})", {"p": self.parameter}
+        if len(self.parameters) == 1:
+            return "({arg} == {p})", {"p": self.parameter}
+        else:
+            return "({arg} in {ps})", {"ps": self.parameters}
 
 
 class StartsWith(ParametrizedDependentType):
