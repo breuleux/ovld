@@ -223,6 +223,19 @@ def test_bounded():
     assert f(5) == "2-6"
 
 
+def test_bound():
+    @ovld
+    def f(x: Dependent[int, lambda x: 1 / 0]):
+        return 123
+
+    @ovld
+    def f(x):
+        return x
+
+    o = object()
+    assert f(o) is o
+
+
 def test_no_type_bound():
     with pytest.raises(UsageError):
 
@@ -231,3 +244,17 @@ def test_no_type_bound():
             return "123"
 
         f(123)
+
+
+def test_vs_catchall():
+    @ovld
+    def f(x: Dependent[Number, Bounded(0, 10)]):
+        return "0-10"
+
+    @f.register
+    def f(x):
+        return "other"
+
+    assert f(1) == "0-10"
+    assert f(25) == "other"
+    assert f("zazz") == "other"

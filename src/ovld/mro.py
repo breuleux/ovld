@@ -36,22 +36,27 @@ def _issubclass(c1, c2):
         return issubclass(c1, c2)
 
 
+def _refines(c1, c2):
+    return _issubclass(c1, c2) or _may_cover(c1, c2)
+
+
 def _may_cover(c1, c2):
     if isinstance(c1, DependentType):
         if isinstance(c2, DependentType):
             return False
-        return _issubclass(c2, c1.bound)
+        return _issubclass(c2, c1.bound) or _issubclass(c1.bound, c2)
     return False
-
-
-def _refines(c1, c2):
-    return _issubclass(c1, c2) or _may_cover(c1, c2)
 
 
 def sort_types(cls, avail):
     # We filter everything except subclasses and dependent types that *might* cover
     # the object represented by cls.
-    avail = [t for t in avail if _refines(cls, t) or _may_cover(t, cls)]
+    avail = [
+        t
+        for t in avail
+        if _issubclass(cls, t)
+        or (isinstance(t, DependentType) and _issubclass(cls, t.bound))
+    ]
     deps = {t: set() for t in avail}
     for t1, t2 in product(avail, avail):
         if t1 is not t2 and _refines(t1, t2):
