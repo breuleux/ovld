@@ -1,43 +1,20 @@
-import typing
 from graphlib import TopologicalSorter
 from itertools import product
 
 from .dependent import DependentType
+from .types import Order, typeorder
 
 
-def _issubclass(c1, c2):
-    if isinstance(c1, DependentType) and isinstance(c2, DependentType):
-        return (
-            c1.bound != c2.bound and _issubclass(c1.bound, c2.bound)
-        ) or c1 > c2
-    elif isinstance(c1, DependentType) or isinstance(c2, DependentType):
-        return False
-    if getattr(c2, "__origin__", None) is typing.Union:
-        return any(_issubclass(c1, c) for c in c2.__args__)
-    if getattr(c1, "__origin__", None) is typing.Union:
-        return all(_issubclass(c, c2) for c in c1.__args__)
-    c1 = getattr(c1, "__proxy_for__", c1)
-    c2 = getattr(c2, "__proxy_for__", c2)
-    if hasattr(c1, "__origin__") or hasattr(c2, "__origin__"):
-        o1 = getattr(c1, "__origin__", c1)
-        o2 = getattr(c2, "__origin__", c2)
-        if issubclass(o1, o2):
-            if o2 is c2:  # pragma: no cover
-                return True
-            else:
-                args1 = getattr(c1, "__args__", ())
-                args2 = getattr(c2, "__args__", ())
-                if len(args1) != len(args2):
-                    return False
-                return all(_issubclass(a1, a2) for a1, a2 in zip(args1, args2))
-        else:
-            return False
+def _issubclass(c1, c2, strict=False):
+    order = typeorder(c1, c2)
+    if strict:
+        return order is Order.LESS
     else:
-        return issubclass(c1, c2)
+        return order is Order.LESS or order is Order.SAME
 
 
 def _refines(c1, c2):
-    return _issubclass(c1, c2) or _may_cover(c1, c2)
+    return _issubclass(c1, c2, strict=True) or _may_cover(c1, c2)
 
 
 def _may_cover(c1, c2):
@@ -59,7 +36,7 @@ def sort_types(cls, avail):
     ]
     deps = {t: set() for t in avail}
     for t1, t2 in product(avail, avail):
-        if t1 is not t2 and _refines(t1, t2):
+        if _refines(t1, t2):
             deps[t2].add(t1)
     sorter = TopologicalSorter(deps)
     sorter.prepare()

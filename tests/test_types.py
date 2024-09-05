@@ -3,14 +3,68 @@ import sys
 from dataclasses import dataclass
 
 from ovld import ovld
+from ovld.core import normalize_type
 from ovld.types import (
     Dataclass,
     Deferred,
     Exactly,
+    Intersection,
+    Order,
     StrictSubclass,
     class_check,
     parametrized_class_check,
+    typeorder,
 )
+
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+
+def inorder(*seq):
+    seq = [normalize_type(x, None) for x in seq]
+    for a, b in zip(seq[:-1], seq[1:]):
+        assert typeorder(a, b) == Order.MORE
+        assert typeorder(b, a) == Order.LESS
+
+
+def sameorder(*seq):
+    seq = [normalize_type(x, None) for x in seq]
+    for a, b in zip(seq[:-1], seq[1:]):
+        assert typeorder(a, b) is Order.SAME
+        assert typeorder(b, a) is Order.SAME
+
+
+def noorder(*seq):
+    seq = [normalize_type(x, None) for x in seq]
+    for a, b in zip(seq[:-1], seq[1:]):
+        assert typeorder(a, b) is Order.NONE
+        assert typeorder(b, a) is Order.NONE
+
+
+def test_typeorder():
+    inorder(object, int)
+    inorder(object, int | str, str)
+    inorder(object, Dataclass, Point)
+    inorder(object, type, type[Dataclass])
+    inorder(type[list], type[list[int]])
+    inorder(str, Intersection[int, str])
+    inorder(object, Intersection[object, int])
+
+    sameorder(int, int)
+
+    assert typeorder(list, list[int]) == Order.MORE
+    assert typeorder(tuple[int, int], tuple[int]) == Order.NONE
+    assert typeorder(dict[str, int], dict[int, str]) == Order.NONE
+    assert typeorder(dict[str, object], dict[object, str]) == Order.NONE
+
+    noorder(type[int], type[Dataclass])
+    noorder(float, int)
+    noorder(int, str)
+    noorder(int, Dataclass)
+    noorder(int | str, float)
 
 
 def test_meta():
@@ -131,11 +185,6 @@ def test_strict_subclass():
 
 
 def test_Dataclass():
-    @dataclass
-    class Point:
-        x: int
-        y: int
-
     @ovld
     def f(x: Dataclass):
         return "yes"
@@ -156,3 +205,44 @@ def test_Dataclass():
     assert f(1234) == "no"
     assert f(Point) == "type, yes"
     assert f(int) == "type, no"
+
+
+def test_intersection():
+    class A:
+        pass
+
+    class B:
+        pass
+
+    class C(A, B):
+        pass
+
+    @ovld
+    def f(x: A):
+        return "A"
+
+    @ovld
+    def f(x: B):
+        return "B"
+
+    @ovld
+    def f(x: A | B):
+        return "A | B"
+
+    @ovld
+    def f(x: Intersection[A, B]):
+        return "A & B"
+
+    @ovld
+    def f(x):
+        return "other"
+
+    assert f(A()) == "A"
+    assert f(B()) == "B"
+    assert f(C()) == "A & B"
+    assert f(object()) == "other"
+    assert f(1.5) == "other"
+
+
+def test_intersection_issubclass():
+    assert not issubclass(int, Intersection[int, str])

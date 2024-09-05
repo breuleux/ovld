@@ -18,6 +18,20 @@ class DependentType:
     def codegen(self):
         return "{this}.check({arg})", {"this": self}
 
+    def __typeorder__(self, other):
+        if not isinstance(other, DependentType):
+            return Order.NONE
+        order = typeorder(self.bound, other.bound)
+        if order is Order.SAME:
+            if self < other:
+                return Order.MORE
+            elif other < self:
+                return Order.LESS
+            else:
+                return Order.NONE
+        else:
+            return order
+
     def __lt__(self, other):
         return False
 
