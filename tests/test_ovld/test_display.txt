@@ -14,6 +14,8 @@
      @ THIS_FILE:21
 [0]    [1mf[*][0m
      @ THIS_FILE:25
+[0]    [1mf[*, k: str][0m
+     @ THIS_FILE:33
 ================================================================================
 Resolve f(13)
 ================================================================================
@@ -70,3 +72,7 @@ Resolve f('hello')
 [1;90m-- [0:0]    f[*]
           @ THIS_FILE:25[0m
 Resolution: f[*] will be called first. There is ambiguity between multiple matching methods, marked '=='.
+================================================================================
+[1;32m#1 [0:0.0]  f[*, k: str]
+          @ THIS_FILE:33[0m
+Resolution: f[*, k: str] will be called first.

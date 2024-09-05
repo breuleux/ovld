@@ -23,6 +23,9 @@ class DependentType:
 
 def dependent_match(tup, args):
     for t, a in zip(tup, args):
+        if isinstance(t, tuple):
+            t = t[1]
+            a = a[1]
         if isinstance(t, DependentType) and not t.check(a):
             return False
     return True
@@ -30,12 +33,21 @@ def dependent_match(tup, args):
 
 class ParametrizedDependentType(DependentType):
     def __init__(self, *parameters, bound=None):
-        super().__init__(type(parameters[0]) if bound is None else bound)
+        super().__init__(
+            self.default_bound(*parameters) if bound is None else bound
+        )
         self.parameters = parameters
+
+    def __class_getitem__(cls, item):
+        items = (item,) if not isinstance(item, tuple) else item
+        return cls(*items)
 
     @property
     def parameter(self):
         return self.parameters[0]
+
+    def default_bound(self, *parameters):
+        return None
 
     def with_bound(self, new_bound):
         return type(self)(*self.parameters, bound=new_bound)
@@ -60,6 +72,9 @@ class ParametrizedDependentType(DependentType):
 class Equals(ParametrizedDependentType):
     exclusive_type = True
 
+    def default_bound(self, *parameters):
+        return type(parameters[0])
+
     def check(self, value):
         return value == self.parameter
 
@@ -75,11 +90,17 @@ class Equals(ParametrizedDependentType):
 
 
 class StartsWith(ParametrizedDependentType):
+    def default_bound(self, *parameters):
+        return type(parameters[0])
+
     def check(self, value):
         return value.startswith(self.parameter)
 
 
 class Bounded(ParametrizedDependentType):
+    def default_bound(self, *parameters):
+        return type(parameters[0])
+
     def check(self, value):
         min, max = self.parameters
         return min <= value <= max

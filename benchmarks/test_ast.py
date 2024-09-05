@@ -1,5 +1,6 @@
 import ast
 import inspect
+import sys
 from types import NoneType
 
 import pytest
@@ -111,5 +112,6 @@ test_ast_plum = make_test(make_transform(plum_dispatch))
 test_ast_multimethod = make_test(make_transform(multimethod_dispatch))
 test_ast_multipledispatch = make_test(make_transform(multipledispatch_dispatch))
 test_ast_runtype = make_test(make_transform(runtype_dispatch))
-test_ast_singledispatch = make_test(make_transform(singledispatch_dispatch))
+if sys.version_info >= (3, 11):
+    test_ast_singledispatch = make_test(make_transform(singledispatch_dispatch))
 test_ast_custom = make_test(NT().visit)

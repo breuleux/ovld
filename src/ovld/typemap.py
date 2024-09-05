@@ -214,7 +214,8 @@ class MultiTypeMap(dict):
         self.priorities[handler] = sig.priority
         self.type_tuples[handler] = obj_t_tup
         self.dependent[handler] = any(
-            isinstance(t, DependentType) for t in obj_t_tup
+            isinstance(t[1] if isinstance(t, tuple) else t, DependentType)
+            for t in obj_t_tup
         )
 
         for i, cls in enumerate(obj_t_tup):
@@ -238,15 +239,20 @@ class MultiTypeMap(dict):
             co = h.__code__
             print(f"{'':{width-2}} @ {co.co_filename}:{co.co_firstlineno}")
 
-    def display_resolution(self, *args):
+    def display_resolution(self, *args, **kwargs):
         message = "No method will be called."
-        argt = map(self.transform, args)
+        argt = [
+            *map(self.transform, args),
+            *[(k, self.transform(v)) for k, v in kwargs.items()],
+        ]
         finished = False
         rank = 1
         for grp in self.mro(tuple(argt)):
             grp.sort(key=lambda x: x[0].__name__)
             match = [
-                dependent_match(self.type_tuples[handler], args)
+                dependent_match(
+                    self.type_tuples[handler], [*args, *kwargs.items()]
+                )
                 for handler, _, _ in grp
             ]
             ambiguous = len([m for m in match if m]) > 1
