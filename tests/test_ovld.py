@@ -1201,6 +1201,23 @@ def test_type_any():
     assert f(typing.Any) == "yes"
 
 
+def test_annotated():
+    @ovld
+    def f(x: typing.Annotated[int, "blah"]):
+        return x * x
+
+    assert f(7) == 49
+
+
+def test_iterable():
+    @ovld
+    def f(xs: typing.Iterable):
+        return sum(xs)
+
+    assert f([1, 2, 3]) == 6
+    assert f(range(4)) == 6
+
+
 def test_plain_type_argument():
     @ovld
     def f(t: type[list]):
@@ -1351,12 +1368,19 @@ def test_display(capsys, file_regression):
     def f(x: object):
         return "start"
 
+    @f.register
+    def f(x: object, *, k: str):
+        return "keyy"
+
     f.display_methods()
     for arg in (13, 0, 1, "hello"):
         print("=" * 80)
         print(f"Resolve f({arg!r})")
         print("=" * 80)
         f.display_resolution(arg)
+
+    print("=" * 80)
+    f.display_resolution(123, k="oi")
 
     out, err = capsys.readouterr()
     assert not err

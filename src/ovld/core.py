@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from types import GenericAlias
 
-from .dependent import Equals
+from .dependent import DependentType, Equals
 from .recode import (
     Conformer,
     adapt_function,
@@ -74,6 +74,8 @@ def normalize_type(t, fn):
         t = object
     elif t is inspect._empty:
         t = object
+    elif isinstance(t, typing._AnnotatedAlias):
+        t = t.__origin__
 
     origin = getattr(t, "__origin__", None)
     if UnionType and isinstance(t, UnionType):
@@ -84,12 +86,18 @@ def normalize_type(t, fn):
         return normalize_type(t.__args__, fn)
     elif origin is typing.Literal:
         return Equals(t.__args__[0])
+    elif origin and not getattr(t, "__args__", None):
+        return t
     elif origin is not None:
         raise TypeError(
             f"ovld does not accept generic types except type, Union, Optional, Literal, but not: {t}"
         )
     elif isinstance(t, tuple):
         return typing.Union[tuple(normalize_type(t2, fn) for t2 in t)]
+    elif isinstance(t, DependentType) and not t.bound:
+        raise UsageError(
+            f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
+        )
     else:
         return t
 
@@ -575,7 +583,7 @@ class _Ovld:
         """
         ov = self.copy(**kwargs)
         if fn is None:
-            return ov.register
+            return partial(ov.register, priority=priority)
         else:
             ov.register(fn, priority=priority)
             return ov
@@ -624,8 +632,8 @@ class _Ovld:
         self.map.display_methods()
 
     @_compile_first
-    def display_resolution(self, *args):
-        self.map.display_resolution(*args)
+    def display_resolution(self, *args, **kwargs):
+        self.map.display_resolution(*args, **kwargs)
 
 
 def is_ovld(x):

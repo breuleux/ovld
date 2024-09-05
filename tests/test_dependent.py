@@ -16,10 +16,12 @@ from ovld.dependent import (
     StartsWith,
     Truey,
 )
+from ovld.utils import UsageError
 
 
 def test_equality():
     assert Equals(0) == Equals(0)
+    assert Equals[0] == Equals(0)
     assert Equals(0) != Equals(1)
     assert Bounded(0, 10) == Bounded(0, 10)
 
@@ -213,3 +215,13 @@ def test_bounded():
     assert Bounded(0, 10) < Bounded(2, 6)
     assert f(1) == "0-10"
     assert f(5) == "2-6"
+
+
+def test_no_type_bound():
+    with pytest.raises(UsageError):
+
+        @ovld
+        def f(x: Truey):
+            return "123"
+
+        f(123)

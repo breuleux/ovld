@@ -1,6 +1,6 @@
 from dataclasses import dataclass, fields
 from numbers import Number
-from typing import Literal
+from typing import Literal, Union
 
 from ovld import ovld, recurse
 from ovld.types import Dataclass
@@ -102,7 +102,7 @@ def deserialize(t: type[dict], data: dict):
 
 
 @ovld
-def deserialize(t: type[int | str], data: int | str):
+def deserialize(t: type[Union[int, str]], data: Union[int, str]):
     assert isinstance(data, t)
     return data
 
