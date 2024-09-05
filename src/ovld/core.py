@@ -85,7 +85,7 @@ def normalize_type(t, fn):
     elif origin is typing.Union:
         return normalize_type(t.__args__, fn)
     elif origin is typing.Literal:
-        return Equals(t.__args__[0])
+        return Equals(*t.__args__)
     elif origin and not getattr(t, "__args__", None):
         return t
     elif origin is not None:
