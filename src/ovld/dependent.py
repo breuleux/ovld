@@ -1,6 +1,8 @@
 import math
 from typing import TYPE_CHECKING, TypeVar
 
+from .types import Order, TypeRelationship, subclasscheck, typeorder
+
 
 class DependentType:
     exclusive_type = False
@@ -19,18 +21,23 @@ class DependentType:
         return "{this}.check({arg})", {"this": self}
 
     def __typeorder__(self, other):
-        if not isinstance(other, DependentType):
-            return Order.NONE
-        order = typeorder(self.bound, other.bound)
-        if order is Order.SAME:
-            if self < other:
-                return Order.MORE
-            elif other < self:
-                return Order.LESS
+        if isinstance(other, DependentType):
+            order = typeorder(self.bound, other.bound)
+            if order is Order.SAME:
+                if self < other:
+                    return TypeRelationship(Order.MORE, matches=False)
+                elif other < self:
+                    return TypeRelationship(Order.LESS, matches=False)
+                else:
+                    return TypeRelationship(Order.NONE, matches=False)
             else:
-                return Order.NONE
+                return TypeRelationship(order, matches=False)
+        elif (matches := subclasscheck(other, self.bound)) or subclasscheck(
+            self.bound, other
+        ):
+            return TypeRelationship(Order.LESS, matches=matches)
         else:
-            return order
+            return TypeRelationship(Order.NONE, matches=False)
 
     def __lt__(self, other):
         return False

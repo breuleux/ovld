@@ -1,9 +1,9 @@
 import os
 import sys
 from dataclasses import dataclass
+from typing import Iterable, Union
 
 from ovld import ovld
-from ovld.core import normalize_type
 from ovld.types import (
     Dataclass,
     Deferred,
@@ -24,21 +24,18 @@ class Point:
 
 
 def inorder(*seq):
-    seq = [normalize_type(x, None) for x in seq]
     for a, b in zip(seq[:-1], seq[1:]):
         assert typeorder(a, b) == Order.MORE
         assert typeorder(b, a) == Order.LESS
 
 
 def sameorder(*seq):
-    seq = [normalize_type(x, None) for x in seq]
     for a, b in zip(seq[:-1], seq[1:]):
         assert typeorder(a, b) is Order.SAME
         assert typeorder(b, a) is Order.SAME
 
 
 def noorder(*seq):
-    seq = [normalize_type(x, None) for x in seq]
     for a, b in zip(seq[:-1], seq[1:]):
         assert typeorder(a, b) is Order.NONE
         assert typeorder(b, a) is Order.NONE
@@ -46,25 +43,26 @@ def noorder(*seq):
 
 def test_typeorder():
     inorder(object, int)
-    inorder(object, int | str, str)
+    inorder(object, Union[int, str], str)
     inorder(object, Dataclass, Point)
     inorder(object, type, type[Dataclass])
     inorder(type[list], type[list[int]])
     inorder(str, Intersection[int, str])
     inorder(object, Intersection[object, int])
+    inorder(object, Iterable, Iterable[int], list[int])
+    inorder(Iterable[int], list)
+    inorder(list, list[int])
 
     sameorder(int, int)
 
-    assert typeorder(list, list[int]) == Order.MORE
-    assert typeorder(tuple[int, int], tuple[int]) == Order.NONE
-    assert typeorder(dict[str, int], dict[int, str]) == Order.NONE
-    assert typeorder(dict[str, object], dict[object, str]) == Order.NONE
-
+    noorder(tuple[int, int], tuple[int])
+    noorder(dict[str, int], dict[int, str])
+    noorder(dict[str, object], dict[object, str])
     noorder(type[int], type[Dataclass])
     noorder(float, int)
     noorder(int, str)
     noorder(int, Dataclass)
-    noorder(int | str, float)
+    noorder(Union[int, str], float)
 
 
 def test_meta():
