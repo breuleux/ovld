@@ -1,0 +1,10 @@
+mushroom(x, y=MISSING, *, beauty=MISSING, bigness=MISSING)
+
+Unlike mushrooms, this function doesn't do anything.
+
+mushroom(x: int)
+
+mushroom(x: str)
+
+mushroom(x: str, y: object, *, beauty, bigness)
+

@@ -1,0 +1,10 @@
+rise(self, /, x, y=MISSING, *, beauty=MISSING, bigness=MISSING)
+
+Unlike mushrooms, this function doesn't do anything.
+
+rise(self, x: int)
+
+rise(self, x: str)
+
+rise(self, x: str, y: object, *, beauty, bigness)
+

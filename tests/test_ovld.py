@@ -1,3 +1,4 @@
+import inspect
 import re
 import sys
 import typing
@@ -1528,3 +1529,69 @@ def test_keywords_recurse():
         return x * factor
 
     assert f([1, 2, 3], factor=3) == [3, 6, 9]
+
+
+def test_doc(file_regression):
+    @ovld
+    def mushroom(x: int):
+        """Unlike mushrooms, this function doesn't do anything."""
+        return None
+
+    @ovld
+    def mushroom(x: str):
+        """Naming mushrooms."""
+        return None
+
+    @ovld
+    def mushroom(x: str, y: object, *, beauty, bigness):
+        """Whatever."""
+        return None
+
+    doc = f"{mushroom.__name__}{inspect.signature(mushroom)}\n\n"
+    doc += mushroom.__doc__
+
+    file_regression.check(doc)
+
+
+def test_doc2(file_regression):
+    @ovld
+    def mushroom(x: int):
+        """Unlike mushrooms, this function doesn't do anything."""
+        return None
+
+    @ovld
+    def mushroom(x: str):
+        return None
+
+    @ovld
+    def mushroom(x: str, y: object, *, beauty, bigness):
+        return None
+
+    doc = mushroom.__doc__
+    doc = f"{mushroom.__name__}{inspect.signature(mushroom)}\n\n" + doc
+
+    file_regression.check(doc)
+
+
+def test_method_doc(file_regression):
+    class Mushroom:
+        @ovld
+        def rise(self, x: int):
+            """Unlike mushrooms, this function doesn't do anything."""
+            return None
+
+        @ovld
+        def rise(self, x: str):
+            return None
+
+        @ovld
+        def rise(self, x: str, y: object, *, beauty, bigness):
+            return None
+
+    mushroom = Mushroom()
+    doc = mushroom.rise.__doc__
+    doc = (
+        f"{mushroom.rise.__name__}{inspect.signature(mushroom.rise)}\n\n" + doc
+    )
+
+    file_regression.check(doc)

@@ -1,0 +1,13 @@
+mushroom(x, y=MISSING, *, beauty=MISSING, bigness=MISSING)
+
+Ovld with 3 methods.
+
+mushroom(x: int)
+    Unlike mushrooms, this function doesn't do anything.
+
+mushroom(x: str)
+    Naming mushrooms.
+
+mushroom(x: str, y: object, *, beauty, bigness)
+    Whatever.
+

@@ -35,7 +35,10 @@ def _fresh(t):
     Each Ovld corresponds to its own class, which allows for specialization of
     methods.
     """
-    return type(t.__name__, (t,), {})
+    methods = {}
+    if not isinstance(getattr(t, "__doc__", None), str):
+        methods["__doc__"] = t.__doc__
+    return type(t.__name__, (t,), methods)
 
 
 @keyword_decorator
@@ -351,7 +354,6 @@ class _Ovld:
         """Initialize an Ovld."""
         self.id = next(_current_id)
         self._compiled = False
-        self.maindoc = None
         self.linkback = linkback
         self.children = []
         self.allow_replacement = allow_replacement
@@ -364,7 +366,6 @@ class _Ovld:
         self.mixins = []
         self.add_mixins(*mixins)
         self.ocls = _fresh(OvldCall)
-        self._make_signature()
 
     @property
     def defns(self):
@@ -373,6 +374,42 @@ class _Ovld:
             defns.update(mixin.defns)
         defns.update(self._defns)
         return defns
+
+    @property
+    def __doc__(self):
+        if not self._compiled:
+            self.compile()
+
+        docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
+        if len(docs) == 1:
+            maindoc = docs[0]
+        else:
+            maindoc = f"Ovld with {len(self.defns)} methods."
+
+        doc = f"{maindoc}\n\n"
+        for fn in self.defns.values():
+            fndef = inspect.signature(fn)
+            fdoc = fn.__doc__
+            if not fdoc or fdoc == maindoc:
+                doc += f"{self.__name__}{fndef}\n\n"
+            else:
+                if not fdoc.strip(" ").endswith("\n"):
+                    fdoc += "\n"
+                fdoc = textwrap.indent(fdoc, " " * 4)
+                doc += f"{self.__name__}{fndef}\n{fdoc}\n"
+        return doc
+
+    @property
+    def __signature__(self):
+        if not self._compiled:
+            self.compile()
+
+        sig = inspect.signature(self._dispatch)
+        if not self.argument_analysis.is_method:
+            sig = inspect.Signature(
+                [v for k, v in sig.parameters.items() if k != "self"]
+            )
+        return sig
 
     def lock(self):
         self._locked = True
@@ -411,41 +448,6 @@ class _Ovld:
         """Rename this Ovld."""
         self.name = name
         self.__name__ = name
-        self._make_signature()
-
-    def _make_signature(self):
-        """Make the __doc__ and __signature__."""
-
-        def modelA(*args, **kwargs):  # pragma: no cover
-            pass
-
-        def modelB(self, *args, **kwargs):  # pragma: no cover
-            pass
-
-        seen = set()
-        doc = (
-            f"{self.maindoc}\n"
-            if self.maindoc
-            else f"Ovld with {len(self.defns)} methods.\n\n"
-        )
-        for fn in self.defns.values():
-            if fn in seen:  # pragma: no cover
-                continue
-            seen.add(fn)
-            fndef = inspect.signature(fn)
-            fdoc = fn.__doc__
-            if not fdoc or fdoc == self.maindoc:
-                doc += f"    ``{self.__name__}{fndef}``\n\n"
-            else:
-                if not fdoc.strip(" ").endswith("\n"):
-                    fdoc += "\n"
-                fdoc = textwrap.indent(fdoc, " " * 8)
-                doc += f"    ``{self.__name__}{fndef}``\n{fdoc}\n"
-        self.__doc__ = doc
-        if self.bootstrap:
-            self.__signature__ = inspect.signature(modelB)
-        else:
-            self.__signature__ = inspect.signature(modelA)
 
     def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
@@ -455,9 +457,6 @@ class _Ovld:
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
             self.shortname = fn.__name__
-            self.maindoc = fn.__doc__
-            if self.maindoc and not self.maindoc.strip(" ").endswith("\n"):
-                self.maindoc += "\n"
             self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
@@ -504,6 +503,7 @@ class _Ovld:
             anal.add(fn)
         self.argument_analysis = anal
         dispatch = generate_dispatch(anal)
+        self._dispatch = dispatch
         target.__call__ = rename_function(dispatch, f"{name}.dispatch")
 
         for key, fn in list(self.defns.items()):
@@ -547,7 +547,6 @@ class _Ovld:
             )
         self._defns[sig] = fn
 
-        self._make_signature()
         self._update()
         return self
 
@@ -595,7 +594,7 @@ class _Ovld:
         key = self.shortname
         rval = obj.__dict__.get(key, None)
         if rval is None:
-            obj.__dict__[key] = rval = self.ocls(self.map, obj)
+            obj.__dict__[key] = rval = self.ocls(self, obj)
         return rval
 
     @_compile_first
@@ -644,11 +643,23 @@ def is_ovld(x):
 class OvldCall:
     """Context for an Ovld call."""
 
-    def __init__(self, map, bind_to):
+    def __init__(self, ovld, bind_to):
         """Initialize an OvldCall."""
-        self.map = map
-        self._parent = super
+        self.ovld = ovld
+        self.map = ovld.map
         self.obj = bind_to
+
+    @property
+    def __name__(self):
+        return self.ovld.__name__
+
+    @property
+    def __doc__(self):
+        return self.ovld.__doc__
+
+    @property
+    def __signature__(self):
+        return self.ovld.__signature__
 
     def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
