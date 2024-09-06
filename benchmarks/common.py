@@ -1,6 +1,7 @@
 import sys
 from functools import singledispatch
 
+from fastcore.dispatch import typedispatch as fastcore_dispatch
 from multimethod import multimethod as multimethod_dispatch
 from multipledispatch import dispatch as _md_dispatch
 from plum import dispatch as plum_dispatch
@@ -49,5 +50,6 @@ __all__ = [
     "runtype_dispatch",
     "ovld_dispatch",
     "multipledispatch_dispatch",
+    "fastcore_dispatch",
     "singledispatch_dispatch",
 ]

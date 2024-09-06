@@ -224,7 +224,7 @@ def test_intersection():
         return "B"
 
     @ovld
-    def f(x: A | B):
+    def f(x: Union[A, B]):
         return "A | B"
 
     @ovld

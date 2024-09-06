@@ -5,18 +5,31 @@ import pytest
 
 from ovld.core import Ovld, OvldBase, ovld
 from ovld.dependent import (
-    Bounded,
     Dependent,
+    EndsWith,
     Equals,
-    Falsey,
     HasKeys,
-    Length,
-    MinLength,
-    Nonempty,
+    ParametrizedDependentType,
+    Regexp,
     StartsWith,
-    Truey,
+    dependent_check,
 )
+from ovld.types import HasMethod
 from ovld.utils import UsageError
+
+
+class Bounded(ParametrizedDependentType):
+    def default_bound(self, *parameters):
+        return type(parameters[0])
+
+    def check(self, value):
+        min, max = self.parameters
+        return min <= value <= max
+
+    def __lt__(self, other):
+        smin, smax = self.parameters
+        omin, omax = other.parameters
+        return (smin < omin and smax >= omax) or (smin <= omin and smax > omax)
 
 
 def test_equality():
@@ -59,6 +72,28 @@ def test_dependent_func():
     assert f(-2) == "negative"
 
 
+def test_dependent_func():
+    @dependent_check
+    def InBetween(value: Number, min, max):
+        return min <= value <= max
+
+    @ovld
+    def f(x: InBetween[1, 10]):
+        return "A"
+
+    @ovld
+    def f(x: Number):
+        return "B"
+
+    @f.register
+    def f(x):
+        return "C"
+
+    assert f(0) == "B"
+    assert f(5) == "A"
+    assert f("x") == "C"
+
+
 def test_literal():
     @ovld
     def f(x: Literal[0]):
@@ -73,7 +108,7 @@ def test_literal():
         return "two or three"
 
     @f.register
-    def f(x: int):
+    def f(x: object):
         return "nah"
 
     assert f(0) == "zero"
@@ -132,12 +167,27 @@ def test_dependent_ambiguity():
         return "A"
 
     @f.register
-    def f(s: Dependent[str, StartsWith("hello")]):
+    def f(s: Dependent[str, EndsWith("ello")]):
         return "B"
 
     assert f("hell") == "A"
     with pytest.raises(TypeError, match="Ambiguous resolution"):
         f("hello")
+
+
+def test_regexp():
+    @ovld
+    def f(s: Regexp[r"hell+o"]):
+        return "hello"
+
+    @ovld
+    def f(s: str):
+        return "bye"
+
+    assert f("hello") == "hello"
+    assert f("helllllllllo") == "hello"
+    assert f("helllllllll") == "bye"
+    assert f("oh helllllo there") == "hello"
 
 
 def test_with_keys():
@@ -161,20 +211,34 @@ def test_with_keys():
 
 
 def test_dependent_lists():
+    HasLen = HasMethod["__len__"]
+
+    @dependent_check
+    def Nonempty(x: HasLen):
+        return len(x) > 0
+
+    @dependent_check
+    def Length(x: HasLen, n):
+        return len(x) == n
+
+    @dependent_check
+    def MinLength(x: HasLen, n):
+        return len(x) >= n
+
     @ovld
-    def f(li: Dependent[list, Nonempty]):
+    def f(li: Nonempty):
         return "nonempty"
 
     @f.register(priority=1)
-    def f(li: Dependent[list, Length(3)]):
+    def f(li: Length[3]):
         return "three"
 
     @f.register(priority=1)
-    def f(li: Dependent[list, MinLength(5)]):
+    def f(li: MinLength[5]):
         return ">=five"
 
     @f.register
-    def f(li: list):
+    def f(li: HasLen):
         return "other"
 
     assert f([]) == "other"
@@ -183,30 +247,6 @@ def test_dependent_lists():
     assert f([1, 2, 3, 4]) == "nonempty"
     assert f([1, 2, 3, 4, 5]) == ">=five"
     assert f([1, 2, 3, 4, 5, 6, 7, 8]) == ">=five"
-
-
-def test_truey_falsey():
-    @ovld
-    def f(x: Dependent[object, Truey]):
-        return "yay"
-
-    @f.register
-    def f(x: Dependent[object, Falsey]):
-        return "nay"
-
-    @f.register
-    def f(x: Dependent[int, Falsey]):
-        return "zero"
-
-    @f.register
-    def f(x: object):
-        return "other"
-
-    assert f(0) == "zero"
-    assert f(1) == "yay"
-    assert f([]) == "nay"
-    assert f({}) == "nay"
-    assert f([1]) == "yay"
 
 
 def test_bounded():
@@ -237,10 +277,13 @@ def test_bound():
 
 
 def test_no_type_bound():
+    class XXX(ParametrizedDependentType):
+        pass
+
     with pytest.raises(UsageError):
 
         @ovld
-        def f(x: Truey):
+        def f(x: XXX[1, 2, 3]):
             return "123"
 
         f(123)
@@ -258,3 +301,37 @@ def test_vs_catchall():
     assert f(1) == "0-10"
     assert f(25) == "other"
     assert f("zazz") == "other"
+
+
+def test_or():
+    @ovld
+    def f(x: Equals[0] | Equals[1]):
+        return 2
+
+    assert f(0) == 2
+    assert f(1) == 2
+
+
+def test_and():
+    @ovld
+    def f(x: Bounded[0, 100] & Bounded[-50, 50]):
+        return "yes"
+
+    @ovld
+    def f(x: object):
+        return "no"
+
+    assert f(-50) == "no"
+    assert f(1) == "yes"
+    assert f(100) == "no"
+
+
+def test_or_and_errors():
+    with pytest.raises(TypeError, match="unsupported operand"):
+        Equals[0] | int
+    with pytest.raises(TypeError, match="unsupported operand"):
+        Equals[0] & int
+    with pytest.raises(TypeError, match="unsupported operand"):
+        int | Equals[0]
+    with pytest.raises(TypeError, match="unsupported operand"):
+        int & Equals[0]

@@ -22,8 +22,7 @@ _tempfiles = []
 
 
 dispatch_template = """
-class MISSING:
-    pass
+from ovld.utils import MISSING
 
 def __DISPATCH__(self, {args}):
     {inits}

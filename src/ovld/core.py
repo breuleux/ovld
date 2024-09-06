@@ -10,7 +10,6 @@ from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from types import GenericAlias
 
-from .dependent import DependentType, Equals
 from .recode import (
     Conformer,
     adapt_function,
@@ -18,6 +17,7 @@ from .recode import (
     rename_function,
 )
 from .typemap import MultiTypeMap, is_type_of_type
+from .types import normalize_type
 from .utils import UsageError, keyword_decorator
 
 try:
@@ -65,44 +65,6 @@ def arg0_is_self(fn):
     sgn = inspect.signature(fn)
     params = list(sgn.parameters.values())
     return params and params[0].name == "self"
-
-
-def normalize_type(t, fn):
-    if isinstance(t, str):
-        t = eval(t, getattr(fn, "__globals__", {}))
-
-    if t is type:
-        t = type[object]
-    elif t is typing.Any:
-        t = object
-    elif t is inspect._empty:
-        t = object
-    elif isinstance(t, typing._AnnotatedAlias):
-        t = t.__origin__
-
-    origin = getattr(t, "__origin__", None)
-    if UnionType and isinstance(t, UnionType):
-        return normalize_type(t.__args__, fn)
-    elif origin is type:
-        return t
-    elif origin is typing.Union:
-        return normalize_type(t.__args__, fn)
-    elif origin is typing.Literal:
-        return Equals(*t.__args__)
-    elif origin and not getattr(t, "__args__", None):
-        return t
-    elif origin is not None:
-        raise TypeError(
-            f"ovld does not accept generic types except type, Union, Optional, Literal, but not: {t}"
-        )
-    elif isinstance(t, tuple):
-        return typing.Union[tuple(normalize_type(t2, fn) for t2 in t)]
-    elif isinstance(t, DependentType) and not t.bound:
-        raise UsageError(
-            f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
-        )
-    else:
-        return t
 
 
 @dataclass(frozen=True)

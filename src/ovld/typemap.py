@@ -4,7 +4,7 @@ import typing
 from itertools import count
 from types import CodeType
 
-from .dependent import DependentType, dependent_match
+from .dependent import DependentType
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
 from .utils import MISSING
@@ -240,6 +240,15 @@ class MultiTypeMap(dict):
             print(f"{'':{width-2}} @ {co.co_filename}:{co.co_firstlineno}")
 
     def display_resolution(self, *args, **kwargs):
+        def dependent_match(tup, args):
+            for t, a in zip(tup, args):
+                if isinstance(t, tuple):
+                    t = t[1]
+                    a = a[1]
+                if isinstance(t, DependentType) and not t.check(a):
+                    return False
+            return True
+
         message = "No method will be called."
         argt = [
             *map(self.transform, args),
