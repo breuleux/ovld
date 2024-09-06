@@ -1,6 +1,6 @@
 import inspect
 import re
-from typing import TYPE_CHECKING, Mapping, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Mapping, TypeVar, Union
 
 from .types import (
     Intersection,
@@ -37,9 +37,9 @@ class DependentType:
             order = typeorder(self.bound, other.bound)
             if order is Order.SAME:
                 if self < other:
-                    return TypeRelationship(Order.MORE, matches=False)
-                elif other < self:
                     return TypeRelationship(Order.LESS, matches=False)
+                elif other < self:
+                    return TypeRelationship(Order.MORE, matches=False)
                 else:
                     return TypeRelationship(Order.NONE, matches=False)
             else:  # pragma: no cover
@@ -105,6 +105,19 @@ class FuncDependentType(ParametrizedDependentType):
         return normalize_type(
             list(inspect.signature(fn).parameters.values())[0].annotation, fn
         )
+
+    def __lt__(self, other):
+        if len(self.parameters) != len(other.parameters):
+            return False
+        p1g = sum(
+            p1 is Any and p2 is not Any
+            for p1, p2 in zip(self.parameters, other.parameters)
+        )
+        p2g = sum(
+            p2 is Any and p1 is not Any
+            for p1, p2 in zip(self.parameters, other.parameters)
+        )
+        return p2g and not p1g
 
     def check(self, value):
         return type(self).func(value, *self.parameters)

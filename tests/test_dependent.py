@@ -29,7 +29,7 @@ class Bounded(ParametrizedDependentType):
     def __lt__(self, other):
         smin, smax = self.parameters
         omin, omax = other.parameters
-        return (smin < omin and smax >= omax) or (smin <= omin and smax > omax)
+        return (omin < smin and omax >= smax) or (omin <= smin and omax > smax)
 
 
 def test_equality():
@@ -258,7 +258,7 @@ def test_bounded():
     def f(x: Dependent[Number, Bounded(2, 6)]):
         return "2-6"
 
-    assert Bounded(0, 10) < Bounded(2, 6)
+    assert Bounded(0, 10) > Bounded(2, 6)
     assert f(1) == "0-10"
     assert f(5) == "2-6"
 
