@@ -112,6 +112,18 @@ wheels = [
 ]
 
 [[package]]
+name = "fastcore"
+version = "1.7.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/57/eb5ddf3ee18180040860ae93b5d0ce7c96eefa29e1c5b056755598b21125/fastcore-1.7.4.tar.gz", hash = "sha256:4195e3f14882aea02c7768b6bc7b686125f6164206ab81a200c83baf4230e1e8", size = 75936 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/fa/343c24b933bb697d992955b587210097e75cf027974956781284bbed4df5/fastcore-1.7.4-py3-none-any.whl", hash = "sha256:0523d15a89e7242db3a71126877550e7783f5a81d3c3881d27cf80e2ee37153e", size = 79593 },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -167,6 +179,7 @@ source = { editable = "." }
 [package.dev-dependencies]
 dev = [
     { name = "codefind" },
+    { name = "fastcore" },
     { name = "multimethod" },
     { name = "multipledispatch" },
     { name = "plum-dispatch" },
@@ -182,6 +195,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "codefind", specifier = "~=0.1.6" },
+    { name = "fastcore", specifier = ">=1.7.4" },
     { name = "multimethod", specifier = ">=1.12" },
     { name = "multipledispatch", specifier = ">=1.0.0" },
     { name = "plum-dispatch", specifier = ">=2.5.2" },

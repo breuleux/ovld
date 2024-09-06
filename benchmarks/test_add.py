@@ -1,6 +1,7 @@
 import pytest
 
 from .common import (
+    fastcore_dispatch,
     multimethod_dispatch,
     multipledispatch_dispatch,
     ovld_dispatch,
@@ -89,6 +90,7 @@ test_add_plum = make_test(make_add(plum_dispatch))
 test_add_multimethod = make_test(make_add(multimethod_dispatch))
 test_add_multipledispatch = make_test(make_add(multipledispatch_dispatch))
 test_add_runtype = make_test(make_add(runtype_dispatch))
+test_add_fastcore = make_test(make_add(fastcore_dispatch))
 
 test_add_custom_isinstance = make_test(add_isinstance)
 test_add_custom_match = make_test(add_match)

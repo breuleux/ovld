@@ -7,6 +7,7 @@ from ovld import recurse
 from ovld.core import OvldBase
 
 from .common import (
+    fastcore_dispatch,
     multimethod_dispatch,
     ovld_dispatch,
     plum_dispatch,
@@ -153,5 +154,6 @@ test_multer_multimethod = make_test(make_multer(multimethod_dispatch))
 test_multer_singledispatch = make_test(SingleDispatchMulter)
 test_multer_multipledispatch = make_test(MultipleDispatchMulter)
 test_multer_runtype = make_test(make_multer(runtype_dispatch))
+test_multer_fastcore = make_test(make_multer(fastcore_dispatch))
 
 test_multer_custom_isinstance = make_test(IsinstanceMulter)

@@ -3,6 +3,7 @@ from numbers import Number
 import pytest
 
 from .common import (
+    fastcore_dispatch,
     multimethod_dispatch,
     multipledispatch_dispatch,
     ovld_dispatch,
@@ -124,6 +125,7 @@ test_trivial_multipledispatch = make_test(
     make_trivial(multipledispatch_dispatch)
 )
 test_trivial_runtype = make_test(make_trivial(runtype_dispatch))
+test_trivial_fastcore = make_test(make_trivial(fastcore_dispatch))
 test_trivial_singledispatch = make_test(make_trivial(singledispatch_dispatch))
 
 test_trivial_custom_isinstance = make_test(trivial_isinstance)
