@@ -1,0 +1,12 @@
+site_name: Ovld documentation
+theme: readthedocs
+markdown_extensions:
+  - admonition
+repo_url: https://github.com/breuleux/ovld/
+nav:
+  - index.md
+  - usage.md
+  - types.md
+  - dependent.md
+  - features.md
+  - compare.md
