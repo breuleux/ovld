@@ -211,6 +211,7 @@ __all__ = [
     "Dataclass",
     "Deferred",
     "Exactly",
+    "HasMethod",
     "Intersection",
     "StrictSubclass",
     "class_check",

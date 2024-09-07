@@ -1,8 +1,8 @@
 import ast
 import inspect
-import runpy
-import tempfile
+import linecache
 import textwrap
+from ast import _splitlines_no_ff as splitlines
 from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
@@ -16,9 +16,6 @@ recurse = Unusable(
 call_next = Unusable(
     "call_next() can only be used from inside an @ovld-registered function."
 )
-
-
-_tempfiles = []
 
 
 dispatch_template = """
@@ -38,14 +35,24 @@ return method({posargs})
 
 
 def instantiate_code(symbol, code, inject={}):
-    tf = tempfile.NamedTemporaryFile("w")
-    _tempfiles.append(tf)
-    tf.write(code)
-    tf.flush()
-    glb = runpy.run_path(tf.name)
-    rval = glb[symbol]
-    rval.__globals__.update(inject)
-    return rval
+    virtual_file = f"<ovld{hash(code)}>"
+    linecache.cache[virtual_file] = (None, None, splitlines(code), virtual_file)
+    code = compile(source=code, filename=virtual_file, mode="exec")
+    glb = {**inject}
+    exec(code, glb, glb)
+    return glb[symbol]
+
+
+# # Previous version: generate a temporary file
+# def instantiate_code(symbol, code, inject={}):
+#     tf = tempfile.NamedTemporaryFile("w")
+#     _tempfiles.append(tf)
+#     tf.write(code)
+#     tf.flush()
+#     glb = runpy.run_path(tf.name)
+#     rval = glb[symbol]
+#     rval.__globals__.update(inject)
+#     return rval
 
 
 def generate_dispatch(arganal):
