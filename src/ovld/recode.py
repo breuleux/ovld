@@ -228,6 +228,9 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     for i, (h, types) in enumerate(handlers):
         relevant = [k for k in tup if isinstance(types[k], DependentType)]
+        if len(relevant) > 1:
+            # The keyexpr method only works if there is only one condition to check.
+            keyexpr = keyed = None
         codes = [codegen(types[k], argname(k)) for k in relevant]
         conj = " and ".join(codes)
         if not conj:  # pragma: no cover
@@ -240,13 +243,13 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     body = []
     if keyexpr:
-        body.append(f"HANDLER = {gen.add(keyed)}.get({keyexpr}, HANDLERN)")
+        body.append(f"HANDLER = {gen.add(keyed)}.get({keyexpr}, FALLTHROUGH)")
         body.append(f"return HANDLER({slf}{argcall})")
 
     elif exclusive:
         for i, conj in enumerate(conjs):
             body.append(f"if {conj}: return HANDLER{i}({slf}{argcall})")
-        body.append(f"return HANDLERN({slf}{argcall})")
+        body.append(f"return FALLTHROUGH({slf}{argcall})")
 
     else:
         for i, conj in enumerate(conjs):
@@ -258,7 +261,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         for i, (h, types) in enumerate(handlers):
             body.append(f"    if MATCH{i}: return HANDLER{i}({slf}{argcall})")
         body.append("elif SUMMATION == 0:")
-        body.append(f"    return HANDLERN({slf}{argcall})")
+        body.append(f"    return FALLTHROUGH({slf}{argcall})")
         body.append("else:")
         body.append(f"    raise {gen.add(err)}")
 
@@ -272,7 +275,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
     def raise_error(*args, **kwargs):
         raise nerr
 
-    inject["HANDLERN"] = next_call[0] if next_call else raise_error
+    inject["FALLTHROUGH"] = (next_call and next_call[0]) or raise_error
 
     fn = instantiate_code(
         symbol="__DEPENDENT_DISPATCH__", code=code, inject=inject

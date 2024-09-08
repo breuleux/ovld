@@ -92,7 +92,9 @@ class Signature:
     vararg: bool
     priority: float
     is_method: bool = False
-    arginfo: list[Arginfo] = field(default_factory=list, hash=False)
+    arginfo: list[Arginfo] = field(
+        default_factory=list, hash=False, compare=False
+    )
 
     @classmethod
     def extract(cls, fn):
@@ -445,7 +447,7 @@ class _Ovld:
 
         cls = type(self)
         if self.name is None:
-            self.name = self.__name__ = f"ovld{id(self)}"
+            self.name = self.__name__ = f"ovld{self.id}"
 
         name = self.__name__
         self.map = MultiTypeMap(name=name, key_error=self._key_error)
@@ -686,6 +688,8 @@ class ovld_cls_dict(dict):
 
             if is_ovld(prev):
                 if is_ovld(value) and prev is not value:
+                    if prev.name is None:
+                        prev.rename(value.name)
                     prev.add_mixins(value)
                     value = prev
                 elif inspect.isfunction(value):

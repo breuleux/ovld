@@ -335,3 +335,22 @@ def test_or_and_errors():
         int | Equals[0]
     with pytest.raises(TypeError, match="unsupported operand"):
         int & Equals[0]
+
+
+def test_keyed_plus_other():
+    # Tests a failure mode of generating dispatch code like HANDLER = HANDLERS[x]
+    # if you also have to check a condition on y.
+
+    for i in range(10):
+
+        @ovld
+        def f(x: Literal[i], y: Bounded[0, 100]):
+            return "yes"
+
+    @ovld
+    def f(x: int, y: int):
+        return "no"
+
+    assert f(0, 50) == "yes"
+    assert f(3, 50) == "yes"
+    assert f(0, 150) == "no"
