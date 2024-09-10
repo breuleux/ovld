@@ -179,6 +179,51 @@ In the above, two methods are defined for the same type signature, except one ha
 !!!note
     It is also possible to call `f.next(...)`, but it is slightly less efficient, and `call_next` also works with variants.
 
+## Mixins
+
+When creating an ovld or variant, you can merge any number of ovlds together:
+
+```python
+@ovld
+def iterate_over_lists(xs: list):
+    return [recurse(x) for x in xs]
+
+@ovld
+def iterate_over_dicts(xs: dict):
+    return {k: recurse(v) for k, v in xs.items()}
+
+@ovld(mixins=[iterate_over_lists, iterate_over_dicts])
+def double(x):
+    return x * 2
+
+assert double([1, 2, 3]) == [2, 4, 6]
+assert double({"x": 10, "y": 20}) == {"x": 20, "y": 40}
+```
+
+Using `@extend_super` on a method in a class defined with `metaclass=OvldMC` (or inheriting from one) will merge all parent methods:
+
+```python
+class IOL(metaclass=OvldMC):
+    def __call__(self, xs: list):
+        return [recurse(x) for x in xs]
+
+class IOD:
+    def __call__(self, xs: dict):
+        return {k: recurse(v) for k, v in xs.items()}
+
+class Mul(IOL, IOD):
+    def __init__(self, n):
+        self.n = n
+
+    @extend_super
+    def __call__(self, x):
+        return x * self.n
+
+assert Mul(2)([1, 2, 3]) == [2, 4, 6]
+assert Mul(2)({"x": 10, "y": 20}) == {"x": 20, "y": 40}
+```
+
+
 ## Priority
 
 Methods registered with `@ovld` can be given a numeric priority with `@ovld(priority=N)`. Methods with higher priority are called first. The default priority is always `0`.

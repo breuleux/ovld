@@ -15,7 +15,7 @@ Current as of September 2024: I have investigated and benchmarked six other mult
 ## Other libraries
 
 * [**plum**](https://github.com/beartype/plum): The most featureful alternative. Supports convert/promote functionality. Unfortunately, plum's code paths for Literal or Union appear to have massive overhead. `ovld` is *much* faster.
-* [**multimethod**](https://github.com/coady/multimethod): Also pretty featureful. Performs somewhat better than plum.
+* [**multimethod**](https://github.com/coady/multimethod): Also pretty featureful. Performs a bit worse than plum in simple cases, but better in more complicated cases.
 * [**multipledispatch**](https://github.com/mrocklin/multipledispatch/): Fair performance, interface is a bit dated, does not support dependent types.
 * [**runtype**](https://github.com/erezsh/runtype): Fair performance. Runtype supports Literal in theory, but it unfortunately bugged out on the calc and fib benchmarks.
 * [**fastcore**](https://github.com/fastai/fastcore): Somewhat limited (seems like it only dispatches on two arguments at most), and for a library with "fast" in its name, I must say it is impressively slow.

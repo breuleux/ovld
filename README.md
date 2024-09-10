@@ -3,19 +3,18 @@
 
 Fast multiple dispatch in Python, with many extra features.
 
-With ovld, you can write a version of the same function for every type signature using annotations instead of writing an awkward sequence of `isinstance` statements. Unlike Python `singledispatch`, it works for multiple arguments.
+[📋 Documentation](https://ovld.readthedocs.io/en/latest/)
 
-Other features of `ovld`:
+With ovld, you can write a version of the same function for every type signature using annotations instead of writing an awkward sequence of `isinstance` statements. Unlike Python's `singledispatch`, it works for multiple arguments.
 
-* **Fast:** Thanks to some automatic code rewriting, `ovld` is very fast.
-* **Extensible:** Easily define variants of recursive functions.
-* **Dependent types:** Overloaded functions can depend on more than argument types: they can depend on actual values.
-* **Nice stack traces:** Functions are renamed to reflect their type signature.
-* Multiple dispatch for **methods** (with `OvldBase` or `metaclass=ovld.OvldMC`)
+* ⚡️ **[Fast](https://ovld.readthedocs.io/en/latest/compare/#results):** `ovld` is the fastest multiple dispatch library around, by some margin.
+* 🚀 [**Variants**](https://ovld.readthedocs.io/en/latest/usage/#variants) and [**mixins**](https://ovld.readthedocs.io/en/latest/usage/#mixins) of functions and methods.
+* 🦄 **[Dependent types](https://ovld.readthedocs.io/en/latest/dependent/):** Overloaded functions can depend on more than argument types: they can depend on actual values.
+* 🔑 Dispatch on functions, methods, positional arguments, **[keyword arguments](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments)** (with some restrictions).
 
 ## Example
 
-Here's a function that adds lists, tuples and dictionaries:
+Here's a function that recursively adds lists, tuples and dictionaries:
 
 ```python
 from ovld import ovld, recurse
@@ -60,17 +59,6 @@ Simple! This means you can define one `ovld` that recursively walks generic data
 
 
 ## Priority and call_next
-
-In order to determine which of its methods to call on a list of arguments, `ovld` proceeds as follows:
-
-1. The matching method with highest user-defined **priority** is called first.
-2. In case of equal user-defined priority, the more **specific** method is called. In order of specificity, if `Cat` subclass of `Mammal` subclass of `Animal`, and `Meower` and `Woofer` are protocols:
-   * Single argument: `Cat > Mammal > Animal`
-   * Multiple arguments: `(Cat, Cat) > (Cat, Mammal) > (Animal, Mammal)`
-   * Multiple arguments: `(Cat, Mammal) <> (Animal, Cat)` (one argument more specific, the other less specific: unordered!)
-   * `Cat > Meower`, but `Meower <> Woofer` (protocols are unordered)
-   * If matching methods are unordered, an error will be raised
-3. If a method calls the special function `call_next`, they will call the next method in the list.
 
 You can define a numeric priority for each method (the default priority is 0):
 
@@ -126,10 +114,37 @@ fact(-1)   # Error!
 
 The first argument to `Dependent` must be a type bound. The bound must match before the logic is called, which also ensures we don't get a performance hit for unrelated types. For type checking purposes, `Dependent[T, A]` is equivalent to `Annotated[T, A]`.
 
-**Note:** It is important to write `n > 0` above and not `n >= 0`, because in the latter case there will be an ambiguity for `f(0)`, as both rules match `0`. It is of course possible to disambiguate using explicit priorities.
+### dependent_check
 
-**Note 2:** `Dependent` is considered more specific than the bound *and* any of the bound's subclasses, which means that `Dependent[object, ...]` will be called before `object`, `int`, `Cat`, protocols, and so on. I would argue this is usually the behavior you want, but it may throw you off if you are not careful. In any case, try to provide the tightest bound possible!
+Define your own types with the `@dependent_check` decorator:
 
+```python
+import torch
+from ovld import ovld, dependent_check
+
+@dependent_check
+def Shape(tensor: torch.Tensor, *shape):
+    return (
+        len(tensor.shape) == len(shape)
+        and all(s2 is Any or s1 == s2 for s1, s2 in zip(tensor.shape, shape))
+    )
+
+@dependent_check
+def Dtype(tensor: torch.Tensor, dtype):
+    return tensor.dtype == dtype
+
+@ovld
+def f(tensor: Shape[3, Any]):
+    # Matches 3xN tensors
+    ...
+
+@ovld
+def f(tensor: Shape[2, 2] & Dtype[torch.float32]):
+    # Only matches 2x2 tensors that also have the float32 dtype
+    ...
+```
+
+The first parameter is the value to check. The type annotation (e.g. `value: torch.Tensor` above) is interpreted by `ovld` to be the bound for this type, so `Shape` will only be called on parameters of type `torch.Tensor`.
 
 ## Methods
 
@@ -171,158 +186,18 @@ assert Two().f(1) == "an integer"
 assert Two().f("s") == "a string"
 ```
 
-## Ambiguous calls
+# Benchmarks
 
-The following definitions will cause a TypeError at runtime when called with two ints, because it is unclear which function is the right match:
+`ovld` is pretty fast: the overhead is comparable to `isinstance` or `match`, and only 2-3x slower when dispatching on `Literal` types. Compared to other multiple dispatch libraries, it is 1.5x to 100x faster.
 
-```python
-@ovld
-def ambig(x: int, y: object):
-    print("io")
+Time relative to the fastest implementation (1.00) (lower is better).
 
-@ovld
-def ambig(x: object, y: int):
-    print("oi")
-
-ambig(8, 8)  # ???
-```
-
-You may define an additional function with signature (int, int) to disambiguate, or define one of them with a higher priority:
-
-```python
-@ovld
-def ambig(x: int, y: int):
-    print("ii")
-```
-
-Other ambiguity situations are:
-
-* If multiple Protocols match the same type (and there is nothing more specific)
-* If multiple Dependent match
-* Multiple inheritance: a class that inherits from X and Y will ambiguously match rules for X and Y. Yes, Python's full mro order says X comes before Y, but `ovld` does not use it. This may change in the future or if this causes legitimate issues.
-
-
-## Other features
-
-### Dataclass
-
-For your convenience, `ovld` exports `Dataclass` as a protocol:
-
-```python
-from dataclasses import dataclass
-from ovld.types import Dataclass
-
-@dataclass
-class Point:
-    x: int
-    y: int
-
-@ovld
-def f(x: Dataclass):
-    return "dataclass"
-
-assert f(Point(1, 2)) == "dataclass"
-```
-
-### Type arguments
-
-Use `type[t]` as an argument's type in order to match types given as arguments.
-
-```python
-@ovld
-def f(cls: type[list[object]], xs: list):
-    return [recurse(cls.__args__[0], x) for x in xs]
-
-@ovld
-def f(cls: type[int], x: int):
-    return x * 2
-
-assert f(list[int], [1, 2, 3]) == [2, 4, 6]
-f(list[int], [1, "X", 3])  # type error!
-```
-
-This lets you implement things like serialization based on type annotations, etc.
-
-
-### Deferred
-
-You may define overloads for certain classes from external packages without
-having to import them:
-
-```python
-from ovld import ovld, Deferred
-
-@ovld
-def f(x: Deferred["numpy.ndarray"]):
-    return "ndarray"
-
-# numpy is not imported
-assert "numpy" not in sys.modules
-
-# But once we import it, the ovld works:
-import numpy
-assert f(numpy.arange(10)) == "ndarray"
-```
-
-
-### Exactly and StrictSubclass
-
-You can prevent matching of subclasses with `Exactly`, or prevent matching the bound with `StrictSubclass`:
-
-```python
-from ovld.types import Exactly, StrictSubclass
-
-@ovld
-def f(x: Exactly[BaseException]):
-    return "=BaseException"
-
-@ovld
-def f(x: StrictSubclass[Exception]):
-    return ">Exception"
-
-assert f(TypeError()) == ">Exception"
-assert f(BaseException()) == "=BaseException"
-
-f(Exception())  # ERROR!
-```
-
-
-### Tracebacks
-
-`ovld` automagically renames functions so that the stack trace is more informative. For instance, running the `add` function defined earlier on bad inputs:
-
-```python
-add([[[1]]], [[[[2]]]])
-```
-
-Will produce the following traceback (Python 3.12):
-
-```
-Traceback (most recent call last):
-  File "/Users/olivier/code/ovld/example.py", line 37, in <module>
-    add([[[1]]], [[[[2]]]])
-  File "/Users/olivier/code/ovld/src/ovld/core.py", line 46, in first_entry
-    return method(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/olivier/code/ovld/src/ovld/core.py", line 409, in add.dispatch
-    return method(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/olivier/code/ovld/example.py", line 18, in add[list, list]
-    return [recurse(a, b) for a, b in zip(x, y)]
-            ^^^^^^^^^^^^^
-  File "/Users/olivier/code/ovld/example.py", line 18, in add[list, list]
-    return [recurse(a, b) for a, b in zip(x, y)]
-            ^^^^^^^^^^^^^
-  File "/Users/olivier/code/ovld/example.py", line 18, in add[list, list]
-    return [recurse(a, b) for a, b in zip(x, y)]
-            ^^^^^^^^^^^^^
-  File "/Users/olivier/code/ovld/example.py", line 30, in add[*, *]
-    return x + y
-           ~~^~~
-TypeError: unsupported operand type(s) for +: 'int' and 'list'
-```
-
-* The functions on the stack have names like `add.dispatch`, `add[list, list]` and `add[*, *]` (`*` stands for `object`), which lets you better understand what happened just from the stack trace. It also helps distinguish various paths when profiling.
-* When calling `recurse` or `call_next`, the dispatch logic is inlined, leading to a flatter and less noisy stack. (This inlining also reduces `ovld`'s overhead.)
-
-Note: `first_entry` is only called the very first time you call the `ovld` and performs some setup, then it replaces itself with `add.dispatch`.
+| Bench | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch/) | [runtype](https://github.com/erezsh/runtype) | [fastcore](https://github.com/fastai/fastcore) | [singled](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+|[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.14|1.00|2.53|3.64|1.61|1.86|41.31|1.54|
+|[add](https://github.com/breuleux/ovld/tree/master/benchmarks/test_add.py)|1.01|1.00|3.46|4.83|2.21|2.66|56.08|x|
+|[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.00|1.06|9.79|4.11|7.19|1.89|40.37|6.34|
+|[ast](https://github.com/breuleux/ovld/tree/master/benchmarks/test_ast.py)|1.00|1.06|23.07|3.04|1.68|1.87|29.11|1.63|
+|[calc](https://github.com/breuleux/ovld/tree/master/benchmarks/test_calc.py)|1.00|1.96|80.00|43.21|x|x|x|x|
+|[fib](https://github.com/breuleux/ovld/tree/master/benchmarks/test_fib.py)|1.00|3.58|438.97|123.58|x|x|x|x|
+|[tweak](https://github.com/breuleux/ovld/tree/master/benchmarks/test_tweaknum.py)|1.00|2.59|x|x|x|x|x|x|
