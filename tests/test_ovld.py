@@ -1560,6 +1560,14 @@ def test_keywords_recurse():
     assert f([1, 2, 3], factor=3) == [3, 6, 9]
 
 
+def test_passing_types_to_normal_func():
+    @ovld
+    def f(x):
+        return x
+
+    assert f(list[int]) == list[int]
+
+
 def test_doc(file_regression):
     @ovld
     def mushroom(x: int):

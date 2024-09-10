@@ -140,6 +140,11 @@ def subclasscheck(t1, t2):
     elif o1 is typing.Union:
         return all(subclasscheck(t, t2) for t in t1.__args__)
 
+    if not isinstance(o1, type):
+        o1 = None
+    if not isinstance(o2, type):
+        o2 = None
+
     if o1 or o2:
         o1 = o1 or t1
         o2 = o2 or t2
