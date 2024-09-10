@@ -670,31 +670,45 @@ class ovld_cls_dict(dict):
     """
 
     def __init__(self, bases):
-        self._mock = type("MockSuper", bases, {})
+        self._bases = bases
 
     def __setitem__(self, attr, value):
+        prev = None
         if attr in self:
             prev = self[attr]
+            if inspect.isfunction(prev):
+                prev = ovld(prev, fresh=True)
+            elif not is_ovld(prev):  # pragma: no cover
+                prev = None
         elif is_ovld(value) and getattr(value, "_extend_super", False):
-            prev = getattr(self._mock, attr, None)
-            if is_ovld(prev):
-                prev = prev.copy()
+            mixins = []
+            for base in self._bases:
+                if (candidate := getattr(base, attr, None)) is not None:
+                    if is_ovld(candidate) or inspect.isfunction(candidate):
+                        mixins.append(candidate)
+            if mixins:
+                prev, *others = mixins
+                if is_ovld(prev):
+                    prev = prev.copy()
+                else:
+                    prev = ovld(prev, fresh=True)
+                for other in others:
+                    if is_ovld(other):
+                        prev.add_mixins(other)
+                    else:
+                        prev.register(other)
         else:
             prev = None
 
         if prev is not None:
-            if inspect.isfunction(prev):
-                prev = ovld(prev, fresh=True)
-
-            if is_ovld(prev):
-                if is_ovld(value) and prev is not value:
-                    if prev.name is None:
-                        prev.rename(value.name)
-                    prev.add_mixins(value)
-                    value = prev
-                elif inspect.isfunction(value):
-                    prev.register(value)
-                    value = prev
+            if is_ovld(value) and prev is not value:
+                if prev.name is None:
+                    prev.rename(value.name)
+                prev.add_mixins(value)
+                value = prev
+            elif inspect.isfunction(value):
+                prev.register(value)
+                value = prev
 
         super().__setitem__(attr, value)
 

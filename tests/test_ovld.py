@@ -920,6 +920,35 @@ def test_multiple_inherit_2():
     assert g.perform("cheese") == "cheesess"
 
 
+def test_multiple_inherit_3():
+    class One(metaclass=OvldMC):
+        def __init__(self, n):
+            self.n = n
+
+        def perform(self, x: int):
+            return x + self.n
+
+    class Two:
+        @ovld
+        def perform(self, x: float):
+            return x * self.n
+
+    class Three:
+        def perform(self, x: str):
+            return x + "s" * self.n
+
+    class Four(One, Two, Three):
+        @extend_super
+        def perform(self, x: int, y: int):
+            return x * y
+
+    g = Four(2)
+    assert g.perform(7) == 9
+    assert g.perform(7.0) == 14
+    assert g.perform("cheese") == "cheesess"
+    assert g.perform(5, 4) == 20
+
+
 def test_metaclass_dispatch():
     class One(metaclass=OvldMC):
         def __init__(self, n):
