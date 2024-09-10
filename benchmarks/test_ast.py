@@ -93,9 +93,6 @@ class NT(ast.NodeTransformer):
 # Test definitions #
 ####################
 
-expr = ("add", ("mul", ("sqrt", 4), 7), ("div", ("add", 6, 4), ("sub", 5, 3)))
-expected_result = 19
-
 
 def make_test(fn):
     @pytest.mark.benchmark(group="ast")
