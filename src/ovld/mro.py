@@ -2,7 +2,6 @@ import typing
 from dataclasses import dataclass
 from enum import Enum
 from graphlib import TopologicalSorter
-from itertools import product
 
 
 class Order(Enum):
@@ -166,10 +165,14 @@ def sort_types(cls, avail):
     # the object represented by cls.
     avail = [t for t in avail if subclasscheck(cls, t)]
     deps = {t: set() for t in avail}
-    for t1, t2 in product(avail, avail):
-        order = typeorder(t1, t2)
-        if order is Order.LESS:
-            deps[t2].add(t1)
+    for i, t1 in enumerate(avail):
+        for t2 in avail[i + 1 :]:
+            # NOTE: this is going to scale poorly when there's a hundred Literal in the pool
+            order = typeorder(t1, t2)
+            if order is Order.LESS:
+                deps[t2].add(t1)
+            elif order is Order.MORE:
+                deps[t1].add(t2)
     sorter = TopologicalSorter(deps)
     sorter.prepare()
     while sorter.is_active():

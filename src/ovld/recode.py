@@ -187,9 +187,9 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         return f"ARG{x}" if isinstance(x, int) else f"{x}={x}"
 
     def codegen(typ, arg):
-        template, fill_in = typ.codegen()
-        return template.format(
-            arg=arg, **{k: gen.add(v) for k, v in fill_in.items()}
+        cg = typ.codegen()
+        return cg.template.format(
+            arg=arg, **{k: gen.add(v) for k, v in cg.substitutions.items()}
         )
 
     tup = to_dict(tup)

@@ -1,5 +1,7 @@
 import inspect
 import re
+from dataclasses import dataclass
+from itertools import count
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, Union
 
 from .types import (
@@ -10,6 +12,39 @@ from .types import (
     subclasscheck,
     typeorder,
 )
+
+_current = count()
+
+
+@dataclass
+class CodeGen:
+    template: str
+    substitutions: dict
+
+    def mangle(self):
+        renamings = {
+            k: f"{{{k}__{next(_current)}}}" for k in self.substitutions
+        }
+        renamings["arg"] = "{arg}"
+        new_subs = {
+            newk[1:-1]: self.substitutions[k]
+            for k, newk in renamings.items()
+            if k in self.substitutions
+        }
+        return CodeGen(
+            template=self.template.format(**renamings),
+            substitutions=new_subs,
+        )
+
+
+def combine(master_template, args):
+    fmts = []
+    subs = {}
+    for cg in args:
+        mangled = cg.mangle()
+        fmts.append(mangled.template)
+        subs.update(mangled.substitutions)
+    return CodeGen(master_template.format(*fmts), subs)
 
 
 class DependentType:
@@ -30,15 +65,17 @@ class DependentType:
         raise NotImplementedError()
 
     def codegen(self):
-        return "{this}.check({arg})", {"this": self}
+        return CodeGen("{this}.check({arg})", {"this": self})
 
     def __typeorder__(self, other):
         if isinstance(other, DependentType):
             order = typeorder(self.bound, other.bound)
             if order is Order.SAME:
-                if self < other:
+                # It isn't fully deterministic which of these will be called
+                # because of set ordering between the types we compare
+                if self < other:  # pragma: no cover
                     return TypeRelationship(Order.LESS, matches=False)
-                elif other < self:
+                elif other < self:  # pragma: no cover
                     return TypeRelationship(Order.MORE, matches=False)
                 else:
                     return TypeRelationship(Order.NONE, matches=False)
@@ -148,9 +185,9 @@ class Equals(ParametrizedDependentType):
 
     def codegen(self):
         if len(self.parameters) == 1:
-            return "({arg} == {p})", {"p": self.parameter}
+            return CodeGen("({arg} == {p})", {"p": self.parameter})
         else:
-            return "({arg} in {ps})", {"ps": self.parameters}
+            return CodeGen("({arg} in {ps})", {"ps": self.parameters})
 
 
 @dependent_check
@@ -189,6 +226,10 @@ class Or(DependentType):
     def default_bound(self):
         return Union[tuple([t.bound for t in self.types])]
 
+    def codegen(self):
+        template = " or ".join("{}" for t in self.types)
+        return combine(template, [t.codegen() for t in self.types])
+
     def check(self, value):
         return any(t.check(value) for t in self.types)
 
@@ -201,6 +242,10 @@ class And(DependentType):
     def default_bound(self):
         bounds = frozenset(t.bound for t in self.types)
         return Intersection[tuple(bounds)]
+
+    def codegen(self):
+        template = " and ".join("{}" for t in self.types)
+        return combine(template, [t.codegen() for t in self.types])
 
     def check(self, value):
         return all(t.check(value) for t in self.types)

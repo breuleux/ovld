@@ -10,7 +10,7 @@ With ovld, you can write a version of the same function for every type signature
 * ⚡️ **[Fast](https://ovld.readthedocs.io/en/latest/compare/#results):** `ovld` is the fastest multiple dispatch library around, by some margin.
 * 🚀 [**Variants**](https://ovld.readthedocs.io/en/latest/usage/#variants) and [**mixins**](https://ovld.readthedocs.io/en/latest/usage/#mixins) of functions and methods.
 * 🦄 **[Dependent types](https://ovld.readthedocs.io/en/latest/dependent/):** Overloaded functions can depend on more than argument types: they can depend on actual values.
-* 🔑 Dispatch on functions, methods, positional arguments, **[keyword arguments](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments)** (with some restrictions).
+* 🔑 **Extensive:** Dispatch on functions, methods, positional arguments and even [keyword arguments](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments) (with some restrictions).
 
 ## Example
 

@@ -304,8 +304,13 @@ def test_vs_catchall():
 
 
 def test_or():
+    o = Equals[0] | Equals[1]
+    assert o.check(0)
+    assert o.check(1)
+    assert not o.check(2)
+
     @ovld
-    def f(x: Equals[0] | Equals[1]):
+    def f(x: o):
         return 2
 
     assert f(0) == 2
@@ -313,8 +318,13 @@ def test_or():
 
 
 def test_and():
+    a = Bounded[0, 100] & Bounded[-50, 50]
+    assert not a.check(-50)
+    assert a.check(1)
+    assert not a.check(100)
+
     @ovld
-    def f(x: Bounded[0, 100] & Bounded[-50, 50]):
+    def f(x: a):
         return "yes"
 
     @ovld
