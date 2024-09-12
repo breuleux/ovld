@@ -25,6 +25,16 @@ class TypeRelationship:
     matches: bool = None
 
 
+def _issubclass(t1, t2):
+    try:
+        return issubclass(t1, t2)
+    except TypeError:
+        try:
+            return isinstance(t1, t2)
+        except TypeError:
+            return False
+
+
 def typeorder(t1, t2):
     """Order relation between two types.
 
@@ -56,6 +66,8 @@ def typeorder(t1, t2):
     o2 = getattr(t2, "__origin__", None)
 
     if o2 is typing.Union:
+        if t1 is typing.Union:
+            return Order.MORE
         compare = [
             x for t in t2.__args__ if (x := typeorder(t1, t)) is not Order.NONE
         ]
@@ -105,8 +117,8 @@ def typeorder(t1, t2):
             # Not sure when t1 != t2 and that happens
             return Order.SAME
 
-    sx = issubclass(t1, t2)
-    sy = issubclass(t2, t1)
+    sx = _issubclass(t1, t2)
+    sy = _issubclass(t2, t1)
     if sx and sy:  # pragma: no cover
         # Not sure when t1 != t2 and that happens
         return Order.SAME
@@ -136,9 +148,13 @@ def subclasscheck(t1, t2):
     o2 = getattr(t2, "__origin__", None)
 
     if o2 is typing.Union:
-        return any(subclasscheck(t1, t) for t in t2.__args__)
+        return t1 is typing.Union or any(
+            subclasscheck(t1, t) for t in t2.__args__
+        )
     elif o1 is typing.Union:
-        return all(subclasscheck(t, t2) for t in t1.__args__)
+        return t2 is typing.Union or all(
+            subclasscheck(t, t2) for t in t1.__args__
+        )
 
     if not isinstance(o1, type):
         o1 = None
@@ -148,7 +164,7 @@ def subclasscheck(t1, t2):
     if o1 or o2:
         o1 = o1 or t1
         o2 = o2 or t2
-        if issubclass(o1, o2):
+        if _issubclass(o1, o2):
             if o2 is t2:  # pragma: no cover
                 return True
             else:
@@ -162,7 +178,7 @@ def subclasscheck(t1, t2):
         else:
             return False
     else:
-        return issubclass(t1, t2)
+        return _issubclass(t1, t2)
 
 
 def sort_types(cls, avail):
