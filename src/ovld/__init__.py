@@ -70,4 +70,5 @@ __all__ = [
     "keyword_decorator",
     "call_next",
     "recurse",
+    "__version__",
 ]
