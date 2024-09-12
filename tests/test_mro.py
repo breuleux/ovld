@@ -1,4 +1,9 @@
-from types import UnionType
+try:
+    from types import UnionType
+except ImportError:  # pragma: no cover
+    UnionType = None
+
+import sys
 from typing import Union
 
 from ovld.mro import Order, subclasscheck, typeorder
@@ -32,13 +37,15 @@ def test_subclasscheck_type():
 
 
 def test_subclasscheck_type_union():
-    assert subclasscheck(type[int | str], type[UnionType])
+    if sys.version_info >= (3, 10):
+        assert subclasscheck(type[int | str], type[UnionType])
     assert subclasscheck(type[Union[int, str]], type[Union])
     assert subclasscheck(type[Union], object)
     assert not subclasscheck(object, type[Union])
 
 
 def test_typeorder_type_union():
-    assert typeorder(type[int | str], type[UnionType]) is Order.LESS
+    if sys.version_info >= (3, 10):
+        assert typeorder(type[int | str], type[UnionType]) is Order.LESS
     assert typeorder(type[Union[int, str]], type[Union]) is Order.LESS
     assert typeorder(object, type[Union]) is Order.MORE

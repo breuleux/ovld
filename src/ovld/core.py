@@ -20,12 +20,6 @@ from .typemap import MultiTypeMap, is_type_of_type
 from .types import normalize_type
 from .utils import UsageError, keyword_decorator
 
-try:
-    from types import UnionType
-except ImportError:  # pragma: no cover
-    UnionType = None
-
-
 _current_id = itertools.count()
 
 

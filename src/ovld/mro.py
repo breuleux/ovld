@@ -31,7 +31,7 @@ def _issubclass(t1, t2):
     except TypeError:
         try:
             return isinstance(t1, t2)
-        except TypeError:
+        except TypeError:  # pragma: no cover
             return False
 
 
