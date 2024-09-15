@@ -373,6 +373,7 @@ class NameConverter(ast.NodeTransformer):
         self.call_next_sym = call_next_sym
         self.ovld_mangled = ovld_mangled
         self.code_mangled = code_mangled
+        self.count = count()
 
     def visit_Name(self, node):
         if node.id == self.recurse_sym:
@@ -396,15 +397,16 @@ class NameConverter(ast.NodeTransformer):
             return self.generic_visit(node)
 
         cn = node.func.id == self.call_next_sym
+        tmp = f"__TMP{next(self.count)}_"
 
         def _make_lookup_call(key, arg):
             value = ast.NamedExpr(
-                target=ast.Name(id=f"__TMP{key}", ctx=ast.Store()),
+                target=ast.Name(id=f"{tmp}{key}", ctx=ast.Store()),
                 value=self.visit(arg),
             )
             if self.analysis.lookup_for(key) == "self.map.transform":
                 func = ast.Attribute(
-                    value=ast.Name(id="__TMPM", ctx=ast.Load()),
+                    value=ast.Name(id=f"{tmp}M", ctx=ast.Load()),
                     attr="transform",
                     ctx=ast.Load(),
                 )
@@ -437,7 +439,7 @@ class NameConverter(ast.NodeTransformer):
             type_parts.insert(0, ast.Name(id=self.code_mangled, ctx=ast.Load()))
         method = ast.Subscript(
             value=ast.NamedExpr(
-                target=ast.Name(id="__TMPM", ctx=ast.Store()),
+                target=ast.Name(id=f"{tmp}M", ctx=ast.Store()),
                 value=ast.Attribute(
                     value=ast.Name(id=self.ovld_mangled, ctx=ast.Load()),
                     attr="map",
@@ -464,13 +466,13 @@ class NameConverter(ast.NodeTransformer):
         new_node = ast.Call(
             func=method,
             args=[
-                ast.Name(id=f"__TMP{i}", ctx=ast.Load())
+                ast.Name(id=f"{tmp}{i}", ctx=ast.Load())
                 for i, arg in enumerate(node.args)
             ],
             keywords=[
                 ast.keyword(
                     arg=kw.arg,
-                    value=ast.Name(id=f"__TMP{kw.arg}", ctx=ast.Load()),
+                    value=ast.Name(id=f"{tmp}{kw.arg}", ctx=ast.Load()),
                 )
                 for kw in node.keywords
             ],

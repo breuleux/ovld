@@ -559,6 +559,22 @@ def test_recurse_method():
     assert C().f([1, 2, 3]) == [2, 3, 4]
 
 
+def test_recurse_nested():
+    @ovld
+    def f(xs: list):
+        return recurse(sum(recurse(x) for x in xs))
+
+    @ovld
+    def f(x: str):
+        return len(x)
+
+    @ovld
+    def f(x: int):
+        return x * x
+
+    assert f(["a", "bbb", "cc"]) == 36
+
+
 def test_call_next():
     f = Ovld()
 
@@ -571,6 +587,26 @@ def test_call_next():
         return x * 2
 
     assert f(3) == 8
+
+
+def test_call_next_unrelated():
+    f = Ovld()
+
+    @f.register
+    def f(x: int):
+        return f.next(str(x))
+
+    @f.register
+    def f(x: str):
+        return x * 2
+
+    @f.register
+    def f(x: object):
+        return "no"
+
+    assert f(3) == "33"
+    for k, v in f.map.items():
+        print(k, v)
 
 
 def test_recurse_renamed():
