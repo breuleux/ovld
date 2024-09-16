@@ -1576,11 +1576,16 @@ def test_keywords():
     def f(name: str, *, hello: int):
         return "hello" * hello + " " + name
 
+    @ovld
+    def f(name: str, *, hello: str):
+        return hello + " " + name
+
     @f.register
     def f(name: str, *, goodbye: int):
         return "goodbye" * goodbye + " " + name
 
     assert f("Helena", hello=3) == "hellohellohello Helena"
+    assert f("Helena", hello="Bonjour") == "Bonjour Helena"
     assert f("Gertrude", goodbye=2) == "goodbyegoodbye Gertrude"
 
 
