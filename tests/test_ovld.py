@@ -609,6 +609,24 @@ def test_call_next_unrelated():
         print(k, v)
 
 
+def test_call_next_same_priority():
+    f = Ovld()
+
+    @f.register
+    def f(x: int):
+        return x * 2
+
+    @f.register
+    def f(x: int):
+        return call_next(x + 1)
+
+    @f.register
+    def f(x: int):
+        return call_next(-x)
+
+    assert f(5) == -8
+
+
 def test_recurse_renamed():
     f = Ovld()
 

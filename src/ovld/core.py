@@ -85,6 +85,7 @@ class Signature:
     req_names: frozenset
     vararg: bool
     priority: float
+    tiebreak: int = 0
     is_method: bool = False
     arginfo: list[Arginfo] = field(
         default_factory=list, hash=False, compare=False
@@ -393,8 +394,8 @@ class _Ovld:
             )
         else:
             hlp = ""
-            for p, prio, spc in possibilities:
-                hlp += f"* {p.__name__}  (priority: {prio}, specificity: {list(spc)})\n"
+            for c in possibilities:
+                hlp += f"* {c.handler.__name__}  (priority: {c.priority}, specificity: {list(c.specificity)})\n"
             return TypeError(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
@@ -503,7 +504,15 @@ class _Ovld:
             raise TypeError(
                 f"There is already a method for {sigstring(sig.types)}"
             )
-        self._defns[sig] = fn
+
+        def _set(sig, fn):
+            if sig in self._defns:
+                # Push down the existing handler with a lower tiebreak
+                msig = replace(sig, tiebreak=sig.tiebreak - 1)
+                _set(msig, self._defns[sig])
+            self._defns[sig] = fn
+
+        _set(sig, fn)
 
         self._update()
         return self

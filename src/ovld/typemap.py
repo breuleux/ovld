@@ -1,6 +1,7 @@
 import inspect
 import math
 import typing
+from dataclasses import dataclass
 from itertools import count
 from types import CodeType
 
@@ -69,6 +70,27 @@ class TypeMap(dict):
             raise KeyError(obj_t)
 
 
+@dataclass
+class Candidate:
+    handler: object
+    priority: float
+    specificity: tuple
+    tiebreak: int
+
+    def sort_key(self):
+        return self.priority, sum(self.specificity), self.tiebreak
+
+    def dominates(self, other):
+        if self.priority > other.priority:
+            return True
+        elif self.specificity != other.specificity:
+            return all(
+                s1 >= s2 for s1, s2 in zip(self.specificity, other.specificity)
+            )
+        else:
+            return self.tiebreak > other.tiebreak
+
+
 class MultiTypeMap(dict):
     """Represents a mapping from tuples of types to handlers.
 
@@ -91,6 +113,7 @@ class MultiTypeMap(dict):
     def __init__(self, name="_ovld", key_error=KeyError):
         self.maps = {}
         self.priorities = {}
+        self.tiebreaks = {}
         self.dependent = {}
         self.type_tuples = {}
         self.empty = MISSING
@@ -155,7 +178,12 @@ class MultiTypeMap(dict):
                 specificities.setdefault(c, []).append(results[c])
 
         candidates = [
-            (c, self.priorities.get(c, 0), tuple(specificities[c]))
+            Candidate(
+                handler=c,
+                priority=self.priorities.get(c, 0),
+                specificity=tuple(specificities[c]),
+                tiebreak=self.tiebreaks.get(c, 0),
+            )
             for c in candidates
         ]
 
@@ -164,33 +192,30 @@ class MultiTypeMap(dict):
         # other possibilities on all arguments, so the sum of all specificities
         # has to be greater.
         # Note: priority is always more important than specificity
-        candidates.sort(key=lambda cspc: (cspc[1], sum(cspc[2])), reverse=True)
+
+        candidates.sort(key=Candidate.sort_key, reverse=True)
 
         self.all[obj_t_tup] = {
-            getattr(c[0], "__code__", None) for c in candidates
+            getattr(c.handler, "__code__", None) for c in candidates
         }
 
         processed = set()
 
         def _pull(candidates):
-            candidates = [
-                (c, a, b) for (c, a, b) in candidates if c not in processed
-            ]
+            candidates = [c for c in candidates if c.handler not in processed]
             if not candidates:
                 return
             rval = [candidates[0]]
-            c1, p1, spc1 = candidates[0]
-            for c2, p2, spc2 in candidates[1:]:
-                if p1 > p2 or (
-                    spc1 != spc2 and all(s1 >= s2 for s1, s2 in zip(spc1, spc2))
-                ):
+            c1 = candidates[0]
+            for c2 in candidates[1:]:
+                if c1.dominates(c2):
                     # Candidate 1 dominates candidate 2
                     continue
                 else:
-                    processed.add(c2)
+                    processed.add(c2.handler)
                     # Candidate 1 does not dominate candidate 2, so we add it
                     # to the list.
-                    rval.append((c2, p2, spc2))
+                    rval.append(c2)
             yield rval
             if len(rval) >= 1:
                 yield from _pull(candidates[1:])
@@ -212,6 +237,7 @@ class MultiTypeMap(dict):
             self.empty = entry
 
         self.priorities[handler] = sig.priority
+        self.tiebreaks[handler] = sig.tiebreak
         self.type_tuples[handler] = obj_t_tup
         self.dependent[handler] = any(
             isinstance(t[1] if isinstance(t, tuple) else t, DependentType)
@@ -257,15 +283,16 @@ class MultiTypeMap(dict):
         finished = False
         rank = 1
         for grp in self.mro(tuple(argt)):
-            grp.sort(key=lambda x: x[0].__name__)
+            grp.sort(key=lambda x: x.handler.__name__)
             match = [
                 dependent_match(
-                    self.type_tuples[handler], [*args, *kwargs.items()]
+                    self.type_tuples[c.handler], [*args, *kwargs.items()]
                 )
-                for handler, _, _ in grp
+                for c in grp
             ]
             ambiguous = len([m for m in match if m]) > 1
-            for m, (handler, prio, spec) in zip(match, grp):
+            for m, c in zip(match, grp):
+                handler = c.handler
                 color = "\033[0m"
                 if finished:
                     bullet = "--"
@@ -282,8 +309,8 @@ class MultiTypeMap(dict):
                         message = f"{handler.__name__} will be called first."
                         color = "\033[1;32m"
                     rank += 1
-                spec = ".".join(map(str, spec))
-                lvl = f"[{prio}:{spec}]"
+                spec = ".".join(map(str, c.specificity))
+                lvl = f"[{c.priority}:{spec}]"
                 width = 2 * len(args) + 6
                 print(f"{color}{bullet} {lvl:{width}} {handler.__name__}")
                 co = handler.__code__
@@ -320,8 +347,8 @@ class MultiTypeMap(dict):
 
         funcs = []
         for group in reversed(results):
-            handlers = [fn for (fn, _, _) in group]
-            dependent = any(self.dependent[fn] for (fn, _, _) in group)
+            handlers = [c.handler for c in group]
+            dependent = any(self.dependent[c.handler] for c in group)
             if dependent:
                 nxt = self.wrap_dependent(
                     obj_t_tup, handlers, group, funcs[-1] if funcs else None

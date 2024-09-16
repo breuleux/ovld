@@ -31,7 +31,7 @@ def _get(tm, *key):
     try:
         return [tm[key]]
     except KeyError as err:
-        return [x for x, _, _ in err.args[1]]
+        return [x.handler for x in err.args[1]]
 
 
 def test_empty():
