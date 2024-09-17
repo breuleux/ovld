@@ -15,6 +15,11 @@ from .dependent import (
     ParametrizedDependentType,
     dependent_check,
 )
+from .mro import (
+    TypeRelationship,
+    subclasscheck,
+    typeorder,
+)
 from .recode import call_next, recurse
 from .typemap import (
     MultiTypeMap,
@@ -66,6 +71,9 @@ __all__ = [
     "Intersection",
     "StrictSubclass",
     "class_check",
+    "subclasscheck",
+    "typeorder",
+    "TypeRelationship",
     "parametrized_class_check",
     "keyword_decorator",
     "call_next",
