@@ -144,6 +144,12 @@ def subclasscheck(t1, t2):
     ):
         return result.matches
 
+    if (
+        hasattr(t1, "__rtypeorder__")
+        and (result := t1.__rtypeorder__(t2)) is not NotImplemented
+    ):
+        return result.matches
+
     o1 = getattr(t1, "__origin__", None)
     o2 = getattr(t2, "__origin__", None)
 

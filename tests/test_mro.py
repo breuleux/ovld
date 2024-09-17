@@ -6,7 +6,7 @@ except ImportError:  # pragma: no cover
 import sys
 from typing import Union
 
-from ovld.mro import Order, subclasscheck, typeorder
+from ovld.mro import Order, TypeRelationship, subclasscheck, typeorder
 
 
 class A:
@@ -15,6 +15,27 @@ class A:
 
 class B(A):
     pass
+
+
+class Prox:
+    _cls = object
+
+    def __class_getitem__(cls, other):
+        return type(f"Prox[{other.__name__}]", (Prox,), {"_cls": other})
+
+    @classmethod
+    def __typeorder__(cls, other):
+        return TypeRelationship(
+            order=typeorder(cls._cls, other),
+            matches=subclasscheck(other, cls._cls),
+        )
+
+    @classmethod
+    def __rtypeorder__(cls, other):
+        return TypeRelationship(
+            order=typeorder(other, cls._cls),
+            matches=subclasscheck(cls._cls, other),
+        )
 
 
 def test_subclasscheck():
@@ -49,3 +70,21 @@ def test_typeorder_type_union():
         assert typeorder(type[int | str], type[UnionType]) is Order.LESS
     assert typeorder(type[Union[int, str]], type[Union]) is Order.LESS
     assert typeorder(object, type[Union]) is Order.MORE
+
+
+def test_subclasscheck_proxy():
+    assert subclasscheck(Prox[int], int)
+    assert subclasscheck(int, Prox[int])
+    assert subclasscheck(Prox[int], Prox)
+    assert not subclasscheck(Prox, Prox[int])
+
+    assert subclasscheck(Prox[B], A)
+    assert not subclasscheck(Prox[A], B)
+    assert subclasscheck(B, Prox[A])
+    assert not subclasscheck(A, Prox[B])
+    assert subclasscheck(Prox[B], Prox[A])
+
+    assert typeorder(Prox[int], int) is Order.SAME
+    assert typeorder(int, Prox[int]) is Order.SAME
+    assert typeorder(Prox[int], Prox) is Order.LESS
+    assert typeorder(Prox, Prox[int]) is Order.MORE
