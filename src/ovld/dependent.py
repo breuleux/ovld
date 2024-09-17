@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Mapping, TypeVar, Union
 from .types import (
     Intersection,
     Order,
-    TypeRelationship,
     normalize_type,
     subclasscheck,
     typeorder,
@@ -67,26 +66,34 @@ class DependentType:
     def codegen(self):
         return CodeGen("{this}.check({arg})", {"this": self})
 
-    def __typeorder__(self, other):
+    def __type_order__(self, other):
         if isinstance(other, DependentType):
             order = typeorder(self.bound, other.bound)
             if order is Order.SAME:
                 # It isn't fully deterministic which of these will be called
                 # because of set ordering between the types we compare
                 if self < other:  # pragma: no cover
-                    return TypeRelationship(Order.LESS, matches=False)
+                    return Order.LESS
                 elif other < self:  # pragma: no cover
-                    return TypeRelationship(Order.MORE, matches=False)
+                    return Order.MORE
                 else:
-                    return TypeRelationship(Order.NONE, matches=False)
+                    return Order.NONE
             else:  # pragma: no cover
-                return TypeRelationship(order, matches=False)
-        elif (matches := subclasscheck(other, self.bound)) or subclasscheck(
+                return order
+        elif subclasscheck(other, self.bound) or subclasscheck(
             self.bound, other
         ):
-            return TypeRelationship(Order.LESS, matches=matches)
+            return Order.LESS
         else:
-            return TypeRelationship(Order.NONE, matches=False)
+            return Order.NONE
+
+    def __is_supertype__(self, other):
+        if isinstance(other, DependentType):
+            return False
+        elif subclasscheck(other, self.bound):
+            return True
+        else:
+            return False
 
     def __lt__(self, other):
         return False

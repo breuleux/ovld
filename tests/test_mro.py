@@ -6,7 +6,12 @@ except ImportError:  # pragma: no cover
 import sys
 from typing import Union
 
-from ovld.mro import Order, TypeRelationship, subclasscheck, typeorder
+from ovld.dependent import Dependent
+from ovld.mro import Order, subclasscheck, typeorder
+
+
+def identity(x):
+    return x
 
 
 class A:
@@ -24,18 +29,16 @@ class Prox:
         return type(f"Prox[{other.__name__}]", (Prox,), {"_cls": other})
 
     @classmethod
-    def __typeorder__(cls, other):
-        return TypeRelationship(
-            order=typeorder(cls._cls, other),
-            matches=subclasscheck(other, cls._cls),
-        )
+    def __is_supertype__(cls, other):
+        return subclasscheck(other, cls._cls)
 
     @classmethod
-    def __rtypeorder__(cls, other):
-        return TypeRelationship(
-            order=typeorder(other, cls._cls),
-            matches=subclasscheck(cls._cls, other),
-        )
+    def __is_subtype__(cls, other):
+        return subclasscheck(cls._cls, other)
+
+    @classmethod
+    def __type_order__(cls, other):
+        return typeorder(cls._cls, other)
 
 
 def test_subclasscheck():
@@ -70,6 +73,25 @@ def test_typeorder_type_union():
         assert typeorder(type[int | str], type[UnionType]) is Order.LESS
     assert typeorder(type[Union[int, str]], type[Union]) is Order.LESS
     assert typeorder(object, type[Union]) is Order.MORE
+
+
+def test_subclasscheck_dependent():
+    assert subclasscheck(B, Dependent[A, identity])
+    assert not subclasscheck(
+        Dependent[int, identity], Dependent[float, identity]
+    )
+
+
+def test_typeorder_dependent():
+    assert typeorder(Dependent[int, identity], float) is Order.NONE
+    assert (
+        typeorder(Dependent[int, identity], Dependent[A, identity])
+        is Order.NONE
+    )
+    assert (
+        typeorder(Dependent[int, identity], Dependent[float, identity])
+        is Order.NONE
+    )
 
 
 def test_subclasscheck_proxy():

@@ -61,19 +61,31 @@ class MetaMC(type):
     def __init__(cls, name, order):
         pass
 
-    def __typeorder__(cls, other):
-        order = cls.order(other)
-        if isinstance(order, bool):
-            return NotImplemented
+    def __type_order__(cls, other):
+        results = cls.order(other)
+        if isinstance(results, TypeRelationship):
+            return results.order
         else:
-            return order
+            return NotImplemented
+
+    def __is_supertype__(cls, other):
+        results = cls.order(other)
+        if isinstance(results, bool):
+            return results
+        elif isinstance(results, TypeRelationship):
+            return results.supertype
+        else:  # pragma: no cover
+            return NotImplemented
+
+    def __is_subtype__(cls, other):
+        results = cls.order(other)
+        if isinstance(results, TypeRelationship):
+            return results.subtype
+        else:  # pragma: no cover
+            return NotImplemented
 
     def __subclasscheck__(cls, sub):
-        result = cls.order(sub)
-        if isinstance(result, TypeRelationship):
-            return result.order in (Order.MORE, Order.SAME)
-        else:
-            return result
+        return cls.__is_supertype__(sub)
 
 
 def class_check(condition):
@@ -164,7 +176,7 @@ def Exactly(cls, base_cls):
     """Match the class but not its subclasses."""
     return TypeRelationship(
         order=Order.LESS if cls is base_cls else typeorder(base_cls, cls),
-        matches=cls is base_cls,
+        supertype=cls is base_cls,
     )
 
 
@@ -184,11 +196,11 @@ def Intersection(cls, *classes):
     matches = all(subclasscheck(cls, t) for t in classes)
     compare = [x for t in classes if (x := typeorder(t, cls)) is not Order.NONE]
     if not compare:
-        return TypeRelationship(Order.NONE, matches=matches)
+        return TypeRelationship(Order.NONE, supertype=matches)
     elif any(x is Order.LESS or x is Order.SAME for x in compare):
-        return TypeRelationship(Order.LESS, matches=matches)
+        return TypeRelationship(Order.LESS, supertype=matches)
     else:
-        return TypeRelationship(Order.MORE, matches=matches)
+        return TypeRelationship(Order.MORE, supertype=matches)
 
 
 @parametrized_class_check

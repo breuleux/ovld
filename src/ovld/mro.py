@@ -22,7 +22,8 @@ class Order(Enum):
 @dataclass
 class TypeRelationship:
     order: Order
-    matches: bool = None
+    supertype: bool = NotImplemented
+    subtype: bool = NotImplemented
 
 
 def _issubclass(t1, t2):
@@ -48,19 +49,16 @@ def typeorder(t1, t2):
     if t1 == t2:
         return Order.SAME
 
-    t1 = getattr(t1, "__proxy_for__", t1)
-    t2 = getattr(t2, "__proxy_for__", t2)
-
     if (
-        hasattr(t1, "__typeorder__")
-        and (result := t1.__typeorder__(t2)) is not NotImplemented
+        hasattr(t1, "__type_order__")
+        and (result := t1.__type_order__(t2)) is not NotImplemented
     ):
-        return result.order
+        return result
     elif (
-        hasattr(t2, "__typeorder__")
-        and (result := t2.__typeorder__(t1)) is not NotImplemented
+        hasattr(t2, "__type_order__")
+        and (result := t2.__type_order__(t1)) is not NotImplemented
     ):
-        return result.order.opposite()
+        return result.opposite()
 
     o1 = getattr(t1, "__origin__", None)
     o2 = getattr(t2, "__origin__", None)
@@ -135,20 +133,17 @@ def subclasscheck(t1, t2):
     if t1 == t2:
         return True
 
-    t1 = getattr(t1, "__proxy_for__", t1)
-    t2 = getattr(t2, "__proxy_for__", t2)
+    if (
+        hasattr(t2, "__is_supertype__")
+        and (result := t2.__is_supertype__(t1)) is not NotImplemented
+    ):
+        return result
 
     if (
-        hasattr(t2, "__typeorder__")
-        and (result := t2.__typeorder__(t1)) is not NotImplemented
+        hasattr(t1, "__is_subtype__")
+        and (result := t1.__is_subtype__(t2)) is not NotImplemented
     ):
-        return result.matches
-
-    if (
-        hasattr(t1, "__rtypeorder__")
-        and (result := t1.__rtypeorder__(t2)) is not NotImplemented
-    ):
-        return result.matches
+        return result
 
     o1 = getattr(t1, "__origin__", None)
     o2 = getattr(t2, "__origin__", None)
