@@ -33,19 +33,18 @@ class Bounded(ParametrizedDependentType):
 
 
 def test_equality():
-    assert Equals(0) == Equals(0)
-    assert Equals[0] == Equals(0)
-    assert Equals(0) != Equals(1)
-    assert Bounded(0, 10) == Bounded(0, 10)
+    assert Equals[0] == Equals[0]
+    assert Equals[0] != Equals[1]
+    assert Bounded[0, 10] == Bounded[0, 10]
 
 
 def test_dependent_type():
     @ovld
-    def f(x: Equals(0)):
+    def f(x: Equals[0]):
         return "zero"
 
     @f.register
-    def f(x: Equals(1)):
+    def f(x: Equals[1]):
         return "one"
 
     @f.register

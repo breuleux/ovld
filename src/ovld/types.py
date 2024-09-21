@@ -52,7 +52,9 @@ class TypeNormalizer:
             if origin in self.generic_handlers:
                 return self.generic_handlers[origin](self, t, fn)
             else:
-                raise TypeError(f"ovld does not understand generic type {origin}")
+                raise TypeError(
+                    f"ovld does not understand generic type {origin}"
+                )
         elif isinstance(t, tuple):
             return typing.Union[tuple(self(t2, fn) for t2 in t)]
         elif isinstance(t, DependentType) and not t.bound:
@@ -134,6 +136,9 @@ class MetaMC(type):
 
     def __subclasscheck__(cls, sub):
         return cls.__is_supertype__(sub)
+
+    def __instancecheck__(cls, obj):
+        return issubclass(type(obj), cls)
 
 
 def class_check(condition):

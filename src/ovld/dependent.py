@@ -47,9 +47,26 @@ def combine(master_template, args):
     return CodeGen(master_template.format(*fmts), subs)
 
 
-class DependentType:
+def is_dependent(t):
+    if isinstance(t, DependentType):
+        return True
+    elif any(is_dependent(subt) for subt in getattr(t, "__args__", ())):
+        return True
+    return False
+
+
+class DependentType(type):
     exclusive_type = False
     keyable_type = False
+
+    @classmethod
+    def make_name(cls, *args, **kwargs):
+        return cls.__name__
+
+    def __new__(cls, *args, **kwargs):
+        name = cls.make_name(*args, **kwargs)
+        value = super().__new__(cls, name, (), {})
+        return value
 
     def __init__(self, bound):
         self.bound = bound
@@ -61,11 +78,14 @@ class DependentType:
     def with_bound(self, new_bound):  # pragma: no cover
         return type(self)(new_bound)
 
+    def __instancecheck__(self, other):
+        return isinstance(other, self.bound) and self.check(other)
+
     def check(self, value):  # pragma: no cover
         raise NotImplementedError()
 
     def codegen(self):
-        return CodeGen("{this}.check({arg})", {"this": self})
+        return CodeGen("isinstance({arg}, {this})", {"this": self})
 
     def __type_order__(self, other):
         if isinstance(other, DependentType):
@@ -111,11 +131,16 @@ class DependentType:
 
 
 class ParametrizedDependentType(DependentType):
+    @classmethod
+    def make_name(cls, *parameters, bound=None):
+        params = ", ".join(map(repr, parameters))
+        return f"{cls.__name__}({params})"
+
     def __init__(self, *parameters, bound=None):
         super().__init__(
             self.default_bound(*parameters) if bound is None else bound
         )
-        self.parameters = parameters
+        self.__args__ = self.parameters = parameters
 
     @property
     def parameter(self):

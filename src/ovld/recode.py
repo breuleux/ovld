@@ -7,7 +7,7 @@ from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .dependent import DependentType
+from .dependent import CodeGen, is_dependent
 from .utils import Unusable, UsageError
 
 recurse = Unusable(
@@ -187,7 +187,10 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         return f"ARG{x}" if isinstance(x, int) else f"{x}={x}"
 
     def codegen(typ, arg):
-        cg = typ.codegen()
+        if hasattr(typ, "codegen"):
+            cg = typ.codegen()
+        else:
+            cg = CodeGen("isinstance({arg}, {this})", {"this": typ})
         return cg.template.format(
             arg=arg, **{k: gen.add(v) for k, v in cg.substitutions.items()}
         )
@@ -227,7 +230,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
                     exclusive = getattr(focus, "exclusive_type", False)
 
     for i, (h, types) in enumerate(handlers):
-        relevant = [k for k in tup if isinstance(types[k], DependentType)]
+        relevant = [k for k in tup if is_dependent(types[k])]
         if len(relevant) > 1:
             # The keyexpr method only works if there is only one condition to check.
             keyexpr = keyed = None

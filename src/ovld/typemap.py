@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from itertools import count
 from types import CodeType
 
-from .dependent import DependentType
+from .dependent import is_dependent
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
 from .utils import MISSING
@@ -240,8 +240,7 @@ class MultiTypeMap(dict):
         self.tiebreaks[handler] = sig.tiebreak
         self.type_tuples[handler] = obj_t_tup
         self.dependent[handler] = any(
-            isinstance(t[1] if isinstance(t, tuple) else t, DependentType)
-            for t in obj_t_tup
+            is_dependent(t[1] if isinstance(t, tuple) else t) for t in obj_t_tup
         )
 
         for i, cls in enumerate(obj_t_tup):
@@ -271,7 +270,7 @@ class MultiTypeMap(dict):
                 if isinstance(t, tuple):
                     t = t[1]
                     a = a[1]
-                if isinstance(t, DependentType) and not t.check(a):
+                if is_dependent(t) and not isinstance(a, t):
                     return False
             return True
 
