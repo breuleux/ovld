@@ -303,6 +303,39 @@ def test_vs_catchall():
     assert f("zazz") == "other"
 
 
+def test_tuples():
+    @ovld
+    def f(t: tuple[()]):
+        return 0
+
+    @ovld
+    def f(t: tuple[int]):
+        return 1
+
+    @ovld
+    def f(t: tuple[str]):
+        return 2
+
+    @ovld
+    def f(t: tuple[int, str]):
+        return 3
+
+    @ovld
+    def f(t: tuple[Literal["z"]]):
+        return 4
+
+    @ovld
+    def f(t: tuple[tuple[tuple[int]]]):
+        return 5
+
+    assert f(()) == 0
+    assert f((1,)) == 1
+    assert f(("x",)) == 2
+    assert f((2, "y")) == 3
+    assert f(("z",)) == 4
+    assert f((((1,),),)) == 5
+
+
 def test_or():
     o = Equals[0] | Equals[1]
     assert o.check(0)

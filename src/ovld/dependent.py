@@ -2,8 +2,9 @@ import inspect
 import re
 from dataclasses import dataclass
 from itertools import count
-from typing import TYPE_CHECKING, Any, Mapping, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Mapping, Sequence, TypeVar, Union
 
+from .mro import instancecheck
 from .types import (
     Intersection,
     Order,
@@ -195,6 +196,56 @@ class Equals(ParametrizedDependentType):
             return CodeGen("({arg} == {p})", {"p": self.parameter})
         else:
             return CodeGen("({arg} in {ps})", {"ps": self.parameters})
+
+
+class ProductType(ParametrizedDependentType):
+    def default_bound(self, *subtypes):
+        return tuple
+
+    def check(self, value):
+        return (
+            isinstance(value, tuple)
+            and len(value) == len(self.parameters)
+            and all(instancecheck(x, t) for x, t in zip(value, self.parameters))
+        )
+
+    def codegen(self):
+        checks = ["len({arg}) == {n}"]
+        params = {"ichk": instancecheck, "n": len(self.parameters)}
+        for i, p in enumerate(self.parameters):
+            checks.append(f"{{ichk}}({{arg}}[{i}], {{p{i}}})")
+            params[f"p{i}"] = p
+        return CodeGen(" and ".join(checks), params)
+
+    def __type_order__(self, other):
+        if isinstance(other, ProductType):
+            if len(other.parameters) == len(self.parameters):
+                return Order.merge(
+                    typeorder(a, b)
+                    for a, b in zip(self.parameters, other.parameters)
+                )
+            else:
+                return Order.NONE
+        else:
+            return NotImplemented
+
+
+@dependent_check
+def SequenceFastCheck(value: Sequence, typ):
+    return isinstance(value, Sequence) and (
+        not value or instancecheck(value[0], typ)
+    )
+
+
+@dependent_check
+def MappingFastCheck(value: Mapping, kt, vt):
+    if not isinstance(value, Mapping):
+        return False
+    if not value:
+        return True
+    for k in value:
+        break
+    return instancecheck(k, kt) and instancecheck(value[k], vt)
 
 
 @dependent_check

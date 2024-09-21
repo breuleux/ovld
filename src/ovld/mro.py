@@ -18,6 +18,18 @@ class Order(Enum):
         else:
             return self
 
+    @staticmethod
+    def merge(orders):
+        orders = set(orders)
+        if orders == {Order.SAME}:
+            return Order.SAME
+        elif not (orders - {Order.LESS, Order.SAME}):
+            return Order.LESS
+        elif not (orders - {Order.MORE, Order.SAME}):
+            return Order.MORE
+        else:
+            return Order.NONE
+
 
 @dataclass
 class TypeRelationship:
@@ -180,6 +192,12 @@ def subclasscheck(t1, t2):
             return False
     else:
         return _issubclass(t1, t2)
+
+
+def instancecheck(x, t):
+    from .dependent import DependentType
+
+    return t.check(x) if isinstance(t, DependentType) else isinstance(x, t)
 
 
 def sort_types(cls, avail):

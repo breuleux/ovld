@@ -1,7 +1,9 @@
 import inspect
 import sys
 import typing
+from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import Protocol, runtime_checkable
 
 from ovld.utils import UsageError
@@ -14,44 +16,90 @@ except ImportError:  # pragma: no cover
     UnionType = None
 
 
-def normalize_type(t, fn):
-    from .dependent import DependentType, Equals
+class TypeNormalizer:
+    def __init__(self, generic_handlers=None):
+        self.generic_handlers = generic_handlers or {}
 
-    if isinstance(t, str):
-        t = eval(t, getattr(fn, "__globals__", {}))
+    def register_generic(self, generic, handler=None):
+        if handler is None:
+            return partial(self.register_generic, generic)
+        else:
+            self.generic_handlers[generic] = handler
 
-    if t is type:
-        t = type[object]
-    elif t is typing.Any:
-        t = object
-    elif t is inspect._empty:
-        t = object
-    elif isinstance(t, typing._AnnotatedAlias):
-        t = t.__origin__
+    def __call__(self, t, fn):
+        from .dependent import DependentType
 
-    origin = getattr(t, "__origin__", None)
-    if UnionType and isinstance(t, UnionType):
-        return normalize_type(t.__args__, fn)
-    elif origin is type:
-        return t
-    elif origin is typing.Union:
-        return normalize_type(t.__args__, fn)
-    elif origin is typing.Literal:
-        return Equals(*t.__args__)
-    elif origin and not getattr(t, "__args__", None):
-        return t
-    elif origin is not None:
-        raise TypeError(
-            f"ovld does not accept generic types except type, Union, Optional, Literal, but not: {t}"
-        )
-    elif isinstance(t, tuple):
-        return typing.Union[tuple(normalize_type(t2, fn) for t2 in t)]
-    elif isinstance(t, DependentType) and not t.bound:
-        raise UsageError(
-            f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
-        )
-    else:
-        return t
+        if isinstance(t, str):
+            t = eval(t, getattr(fn, "__globals__", {}))
+
+        if t is type:
+            t = type[object]
+        elif t is typing.Any:
+            t = object
+        elif t is inspect._empty:
+            t = object
+        elif isinstance(t, typing._AnnotatedAlias):
+            t = t.__origin__
+
+        origin = getattr(t, "__origin__", None)
+        if UnionType and isinstance(t, UnionType):
+            return self(t.__args__, fn)
+        elif origin is type:
+            return t
+        elif origin and getattr(t, "__args__", None) is None:
+            return t
+        elif origin is not None:
+            if origin in self.generic_handlers:
+                return self.generic_handlers[origin](self, t, fn)
+            else:
+                raise TypeError(f"ovld does not understand generic type {origin}")
+        elif isinstance(t, tuple):
+            return typing.Union[tuple(self(t2, fn) for t2 in t)]
+        elif isinstance(t, DependentType) and not t.bound:
+            raise UsageError(
+                f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
+            )
+        else:
+            return t
+
+
+normalize_type = TypeNormalizer()
+
+
+@normalize_type.register_generic(typing.Union)
+def _(self, t, fn):
+    return self(t.__args__, fn)
+
+
+@normalize_type.register_generic(typing.Literal)
+def _(self, t, fn):
+    from .dependent import Equals
+
+    return Equals(*t.__args__)
+
+
+@normalize_type.register_generic(tuple)
+def _(self, t, fn):
+    from .dependent import ProductType
+
+    args = [self(arg, fn) for arg in t.__args__]
+    return ProductType(*args)
+
+
+@normalize_type.register_generic(dict)
+def _(self, t, fn):
+    from .dependent import MappingFastCheck
+
+    args = [self(arg, fn) for arg in t.__args__]
+    return MappingFastCheck(*args)
+
+
+@normalize_type.register_generic(Sequence)
+def _(self, t, fn):
+    from .dependent import SequenceFastCheck
+
+    args = [self(arg, fn) for arg in t.__args__]
+    return SequenceFastCheck(*args)
 
 
 class MetaMC(type):
