@@ -8,7 +8,7 @@ from ovld.dependent import (
     Dependent,
     EndsWith,
     Equals,
-    HasKeys,
+    HasKey,
     ParametrizedDependentType,
     Regexp,
     StartsWith,
@@ -144,10 +144,10 @@ def test_dependent_method():
             self.n = n
 
         @ovld
-        def f(self, x: Equals(0)):
+        def f(self, x: Equals[0]):
             return "zero"
 
-        def f(self, x: Equals(1)):
+        def f(self, x: Equals[1]):
             return "one"
 
         def f(self, x: int):
@@ -162,11 +162,11 @@ def test_dependent_method():
 
 def test_dependent_ambiguity():
     @ovld
-    def f(s: Dependent[str, StartsWith("hell")]):
+    def f(s: Dependent[str, StartsWith["hell"]]):
         return "A"
 
     @f.register
-    def f(s: Dependent[str, EndsWith("ello")]):
+    def f(s: Dependent[str, EndsWith["ello"]]):
         return "B"
 
     assert f("hell") == "A"
@@ -191,11 +191,11 @@ def test_regexp():
 
 def test_with_keys():
     @ovld
-    def f(d: Dependent[dict, HasKeys("a")]):
+    def f(d: Dependent[dict, HasKey["a"]]):
         return "a"
 
     @f.register
-    def f(d: Dependent[dict, HasKeys("b", "c")]):
+    def f(d: Dependent[dict, HasKey["b", "c"]]):
         return "b|c"
 
     @f.register
@@ -290,7 +290,7 @@ def test_no_type_bound():
 
 def test_vs_catchall():
     @ovld
-    def f(x: Dependent[Number, Bounded(0, 10)]):
+    def f(x: Dependent[Number, Bounded[0, 10]]):
         return "0-10"
 
     @f.register
@@ -337,9 +337,9 @@ def test_tuples():
 
 def test_or():
     o = Equals[0] | Equals[1]
-    assert o.check(0)
-    assert o.check(1)
-    assert not o.check(2)
+    assert isinstance(0, o)
+    assert isinstance(1, o)
+    assert not isinstance(2, o)
 
     @ovld
     def f(x: o):
@@ -349,11 +349,28 @@ def test_or():
     assert f(1) == 2
 
 
+def test_or_mix():
+    o = str | Equals[0]
+
+    assert isinstance("x", o)
+    assert isinstance(0, o)
+    assert not isinstance(1, o)
+
+    @ovld
+    def f(x: o):
+        return x
+
+    assert f(0) == 0
+    assert f("x") == "x"
+    with pytest.raises(TypeError):
+        f(1)
+
+
 def test_and():
     a = Bounded[0, 100] & Bounded[-50, 50]
-    assert not a.check(-50)
-    assert a.check(1)
-    assert not a.check(100)
+    assert not isinstance(-50, a)
+    assert isinstance(1, a)
+    assert not isinstance(100, a)
 
     @ovld
     def f(x: a):
@@ -368,15 +385,19 @@ def test_and():
     assert f(100) == "no"
 
 
-def test_or_and_errors():
-    with pytest.raises(TypeError, match="unsupported operand"):
-        Equals[0] | int
-    with pytest.raises(TypeError, match="unsupported operand"):
-        Equals[0] & int
-    with pytest.raises(TypeError, match="unsupported operand"):
-        int | Equals[0]
-    with pytest.raises(TypeError, match="unsupported operand"):
-        int & Equals[0]
+def test_and_with_static_type():
+    @ovld
+    def f(x: str & Dependent[object, lambda obj: bool(obj)]):  # type: ignore
+        return "yes"
+
+    @ovld
+    def f(x: object):
+        return "no"
+
+    assert f("hello") == "yes"
+    assert f("") == "no"
+    assert f([1, 2, 3]) == "no"
+    assert f(100) == "no"
 
 
 def test_keyed_plus_other():

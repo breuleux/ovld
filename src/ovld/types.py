@@ -1,9 +1,10 @@
 import inspect
+import operator
 import sys
 import typing
 from collections.abc import Sequence
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, reduce
 from typing import Protocol, runtime_checkable
 
 from ovld.utils import UsageError
@@ -56,7 +57,7 @@ class TypeNormalizer:
                     f"ovld does not understand generic type {origin}"
                 )
         elif isinstance(t, tuple):
-            return typing.Union[tuple(self(t2, fn) for t2 in t)]
+            return reduce(operator.or_, [self(t2, fn) for t2 in t])
         elif isinstance(t, DependentType) and not t.bound:
             raise UsageError(
                 f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
@@ -77,15 +78,15 @@ def _(self, t, fn):
 def _(self, t, fn):
     from .dependent import Equals
 
-    return Equals(*t.__args__)
+    return Equals[t.__args__]
 
 
 @normalize_type.register_generic(tuple)
 def _(self, t, fn):
     from .dependent import ProductType
 
-    args = [self(arg, fn) for arg in t.__args__]
-    return ProductType(*args)
+    args = tuple(self(arg, fn) for arg in t.__args__)
+    return ProductType[args]
 
 
 @normalize_type.register_generic(dict)
@@ -93,7 +94,7 @@ def _(self, t, fn):
     from .dependent import MappingFastCheck
 
     args = [self(arg, fn) for arg in t.__args__]
-    return MappingFastCheck(*args)
+    return MappingFastCheck[args]
 
 
 @normalize_type.register_generic(Sequence)
@@ -101,25 +102,55 @@ def _(self, t, fn):
     from .dependent import SequenceFastCheck
 
     args = [self(arg, fn) for arg in t.__args__]
-    return SequenceFastCheck(*args)
+    return SequenceFastCheck[args]
 
 
 class MetaMC(type):
-    def __new__(T, name, order):
-        return super().__new__(T, name, (), {"order": order})
+    def __new__(T, name, handler):
+        return super().__new__(T, name, (), {"_handler": handler})
 
-    def __init__(cls, name, order):
-        pass
+    def __init__(cls, name, handler):
+        cls.__args__ = getattr(handler, "__args__", ())
+
+    def codegen(cls):
+        return cls._handler.codegen()
 
     def __type_order__(cls, other):
-        results = cls.order(other)
+        return cls._handler.__type_order__(other)
+
+    def __is_supertype__(cls, other):
+        return cls._handler.__is_supertype__(other)
+
+    def __is_subtype__(cls, other):
+        return cls._handler.__is_subtype__(other)
+
+    def __subclasscheck__(cls, sub):
+        return cls._handler.__subclasscheck__(sub)
+
+    def __instancecheck__(cls, obj):
+        return cls._handler.__instancecheck__(obj)
+
+    def __and__(cls, other):
+        return Intersection[cls, other]
+
+    def __rand__(cls, other):
+        return Intersection[other, cls]
+
+
+class SingleFunctionHandler:
+    def __init__(self, handler, args):
+        self.handler = handler
+        self.args = args
+
+    def __type_order__(self, other):
+        results = self.handler(other, *self.args)
         if isinstance(results, TypeRelationship):
             return results.order
         else:
             return NotImplemented
 
-    def __is_supertype__(cls, other):
-        results = cls.order(other)
+    def __is_supertype__(self, other):
+        results = self.handler(other, *self.args)
         if isinstance(results, bool):
             return results
         elif isinstance(results, TypeRelationship):
@@ -127,18 +158,18 @@ class MetaMC(type):
         else:  # pragma: no cover
             return NotImplemented
 
-    def __is_subtype__(cls, other):
-        results = cls.order(other)
+    def __is_subtype__(self, other):
+        results = self.handler(other, *self.args)
         if isinstance(results, TypeRelationship):
             return results.subtype
         else:  # pragma: no cover
             return NotImplemented
 
-    def __subclasscheck__(cls, sub):
-        return cls.__is_supertype__(sub)
+    def __subclasscheck__(self, sub):
+        return self.__is_supertype__(sub)
 
-    def __instancecheck__(cls, obj):
-        return issubclass(type(obj), cls)
+    def __instancecheck__(self, obj):
+        return issubclass(type(obj), self)
 
 
 def class_check(condition):
@@ -152,7 +183,7 @@ def class_check(condition):
         condition: A function that takes a class as an argument and returns
             True or False depending on whether it matches some condition.
     """
-    return MetaMC(condition.__name__, condition)
+    return MetaMC(condition.__name__, SingleFunctionHandler(condition, ()))
 
 
 def parametrized_class_check(fn):
@@ -178,7 +209,10 @@ def parametrized_class_check(fn):
                     return repr(x)
 
             name = f"{fn.__name__}[{', '.join(map(arg_to_str, arg))}]"
-            return MetaMC(name, lambda sub: fn(sub, *arg))
+            if isinstance(fn, type):
+                return MetaMC(name, fn(*arg))
+            else:
+                return MetaMC(name, SingleFunctionHandler(fn, arg))
 
     _C.__name__ = fn.__name__
     _C.__qualname__ = fn.__qualname__
@@ -221,7 +255,7 @@ class Deferred:
             else:
                 return False
 
-        return MetaMC(f"Deferred[{ref}]", check)
+        return MetaMC(f"Deferred[{ref}]", SingleFunctionHandler(check, ()))
 
 
 @parametrized_class_check
@@ -244,16 +278,41 @@ def StrictSubclass(cls, base_cls):
 
 
 @parametrized_class_check
-def Intersection(cls, *classes):
-    """Match all classes."""
-    matches = all(subclasscheck(cls, t) for t in classes)
-    compare = [x for t in classes if (x := typeorder(t, cls)) is not Order.NONE]
-    if not compare:
-        return TypeRelationship(Order.NONE, supertype=matches)
-    elif any(x is Order.LESS or x is Order.SAME for x in compare):
-        return TypeRelationship(Order.LESS, supertype=matches)
-    else:
-        return TypeRelationship(Order.MORE, supertype=matches)
+class Intersection:
+    def __init__(self, *types):
+        self.__args__ = self.types = types
+
+    def codegen(self):
+        from .dependent import combine, generate_checking_code
+
+        template = " and ".join("{}" for t in self.types)
+        return combine(
+            template, [generate_checking_code(t) for t in self.types]
+        )
+
+    def __type_order__(self, other):
+        classes = self.types
+        compare = [
+            x for t in classes if (x := typeorder(t, other)) is not Order.NONE
+        ]
+        if not compare:
+            return Order.NONE
+        elif any(x is Order.LESS or x is Order.SAME for x in compare):
+            return Order.LESS
+        else:
+            return Order.MORE
+
+    def __is_supertype__(self, other):
+        return all(subclasscheck(other, t) for t in self.types)
+
+    def __is_subtype__(self, other):
+        return NotImplemented
+
+    def __subclasscheck__(self, sub):
+        return self.__is_supertype__(sub)
+
+    def __instancecheck__(self, obj):
+        return all(isinstance(obj, t) for t in self.types)
 
 
 @parametrized_class_check

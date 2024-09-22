@@ -1,7 +1,8 @@
-import typing
+import types
 from dataclasses import dataclass
 from enum import Enum
 from graphlib import TopologicalSorter
+from typing import get_args, get_origin
 
 
 class Order(Enum):
@@ -38,16 +39,6 @@ class TypeRelationship:
     subtype: bool = NotImplemented
 
 
-def _issubclass(t1, t2):
-    try:
-        return issubclass(t1, t2)
-    except TypeError:
-        try:
-            return isinstance(t1, t2)
-        except TypeError:  # pragma: no cover
-            return False
-
-
 def typeorder(t1, t2):
     """Order relation between two types.
 
@@ -72,14 +63,14 @@ def typeorder(t1, t2):
     ):
         return result.opposite()
 
-    o1 = getattr(t1, "__origin__", None)
-    o2 = getattr(t2, "__origin__", None)
+    o1 = get_origin(t1)
+    o2 = get_origin(t2)
 
-    if o2 is typing.Union:
-        if t1 is typing.Union:
+    if o2 is types.UnionType:
+        if t1 is types.UnionType:
             return Order.MORE
         compare = [
-            x for t in t2.__args__ if (x := typeorder(t1, t)) is not Order.NONE
+            x for t in get_args(t2) if (x := typeorder(t1, t)) is not Order.NONE
         ]
         if not compare:
             return Order.NONE
@@ -88,14 +79,14 @@ def typeorder(t1, t2):
         else:
             return Order.MORE
 
-    if o1 is typing.Union:
+    if o1 is types.UnionType:
         return typeorder(t2, t1).opposite()
 
     if o2 and not o1:
         return typeorder(t2, t1).opposite()
 
     if o1:
-        if not o2:  # or getattr(t2, "__args__", None) is None:
+        if not o2:
             order = typeorder(o1, t2)
             if order is order.SAME:
                 order = order.LESS
@@ -104,8 +95,8 @@ def typeorder(t1, t2):
         if (order := typeorder(o1, o2)) is not Order.SAME:
             return order
 
-        args1 = getattr(t1, "__args__", ())
-        args2 = getattr(t2, "__args__", ())
+        args1 = get_args(t1)
+        args2 = get_args(t2)
 
         if args1 and not args2:
             return Order.LESS
@@ -127,8 +118,8 @@ def typeorder(t1, t2):
             # Not sure when t1 != t2 and that happens
             return Order.SAME
 
-    sx = _issubclass(t1, t2)
-    sy = _issubclass(t2, t1)
+    sx = issubclass(t1, t2)
+    sy = issubclass(t2, t1)
     if sx and sy:  # pragma: no cover
         # Not sure when t1 != t2 and that happens
         return Order.SAME
@@ -157,16 +148,16 @@ def subclasscheck(t1, t2):
     ):
         return result
 
-    o1 = getattr(t1, "__origin__", None)
-    o2 = getattr(t2, "__origin__", None)
+    o1 = get_origin(t1)
+    o2 = get_origin(t2)
 
-    if o2 is typing.Union:
-        return t1 is typing.Union or any(
-            subclasscheck(t1, t) for t in t2.__args__
+    if o2 is types.UnionType:
+        return t1 is types.UnionType or any(
+            subclasscheck(t1, t) for t in get_args(t2)
         )
-    elif o1 is typing.Union:
-        return t2 is typing.Union or all(
-            subclasscheck(t, t2) for t in t1.__args__
+    elif o1 is types.UnionType:
+        return t2 is types.UnionType or all(
+            subclasscheck(t, t2) for t in get_args(t1)
         )
 
     if not isinstance(o1, type):
@@ -177,12 +168,12 @@ def subclasscheck(t1, t2):
     if o1 or o2:
         o1 = o1 or t1
         o2 = o2 or t2
-        if _issubclass(o1, o2):
+        if issubclass(o1, o2):
             if o2 is t2:  # pragma: no cover
                 return True
             else:
-                args1 = getattr(t1, "__args__", ())
-                args2 = getattr(t2, "__args__", ())
+                args1 = get_args(t1)
+                args2 = get_args(t2)
                 if len(args1) != len(args2):
                     return False
                 return all(
@@ -191,13 +182,7 @@ def subclasscheck(t1, t2):
         else:
             return False
     else:
-        return _issubclass(t1, t2)
-
-
-def instancecheck(x, t):
-    from .dependent import DependentType
-
-    return t.check(x) if isinstance(t, DependentType) else isinstance(x, t)
+        return issubclass(t1, t2)
 
 
 def sort_types(cls, avail):

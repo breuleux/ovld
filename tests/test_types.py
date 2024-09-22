@@ -43,7 +43,7 @@ def noorder(*seq):
 
 def test_typeorder():
     inorder(object, int)
-    inorder(object, Union[int, str], str)
+    inorder(object, int | str, str)
     inorder(object, Dataclass, Point)
     inorder(object, type, type[Dataclass])
     inorder(type[list], type[list[int]])
@@ -62,7 +62,7 @@ def test_typeorder():
     noorder(float, int)
     noorder(int, str)
     noorder(int, Dataclass)
-    noorder(Union[int, str], float)
+    noorder(int | str, float)
 
 
 def test_meta():

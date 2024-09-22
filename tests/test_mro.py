@@ -3,7 +3,6 @@ try:
 except ImportError:  # pragma: no cover
     UnionType = None
 
-import sys
 from typing import Union
 
 from ovld.dependent import Dependent
@@ -46,8 +45,8 @@ def test_subclasscheck():
     assert not subclasscheck(A, B)
     assert subclasscheck(A, A)
     assert subclasscheck(A, object)
-    assert subclasscheck(A, Union[A, int])
-    assert subclasscheck(int, Union[A, int])
+    assert subclasscheck(A, A | int)
+    assert subclasscheck(int, A | int)
 
 
 def test_subclasscheck_generic():
@@ -61,16 +60,13 @@ def test_subclasscheck_type():
 
 
 def test_subclasscheck_type_union():
-    if sys.version_info >= (3, 10):
-        assert subclasscheck(type[int | str], type[UnionType])
-    assert subclasscheck(type[Union[int, str]], type[Union])
-    assert subclasscheck(type[Union], object)
-    assert not subclasscheck(object, type[Union])
+    assert subclasscheck(type[int | str], type[UnionType])
+    assert subclasscheck(type[UnionType], object)
+    assert not subclasscheck(object, type[UnionType])
 
 
 def test_typeorder_type_union():
-    if sys.version_info >= (3, 10):
-        assert typeorder(type[int | str], type[UnionType]) is Order.LESS
+    assert typeorder(type[int | str], type[UnionType]) is Order.LESS
     assert typeorder(type[Union[int, str]], type[Union]) is Order.LESS
     assert typeorder(object, type[Union]) is Order.MORE
 

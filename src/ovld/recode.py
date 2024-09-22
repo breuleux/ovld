@@ -7,7 +7,7 @@ from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .dependent import CodeGen, is_dependent
+from .dependent import generate_checking_code, is_dependent
 from .utils import Unusable, UsageError
 
 recurse = Unusable(
@@ -187,10 +187,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         return f"ARG{x}" if isinstance(x, int) else f"{x}={x}"
 
     def codegen(typ, arg):
-        if hasattr(typ, "codegen"):
-            cg = typ.codegen()
-        else:
-            cg = CodeGen("isinstance({arg}, {this})", {"this": typ})
+        cg = generate_checking_code(typ)
         return cg.template.format(
             arg=arg, **{k: gen.add(v) for k, v in cg.substitutions.items()}
         )

@@ -2,9 +2,16 @@ import inspect
 import re
 from dataclasses import dataclass
 from itertools import count
-from typing import TYPE_CHECKING, Any, Mapping, Sequence, TypeVar, Union
+from types import UnionType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Mapping,
+    Sequence,
+    TypeVar,
+    get_args,
+)
 
-from .mro import instancecheck
 from .types import (
     Intersection,
     Order,
@@ -14,6 +21,18 @@ from .types import (
 )
 
 _current = count()
+
+
+def generate_checking_code(typ):
+    if hasattr(typ, "codegen"):
+        return typ.codegen()
+    elif isinstance(typ, UnionType):
+        template = " or ".join("{}" for t in get_args(typ))
+        return combine(
+            template, [generate_checking_code(t) for t in get_args(typ)]
+        )
+    else:
+        return CodeGen("isinstance({arg}, {this})", {"this": typ})
 
 
 @dataclass
@@ -60,7 +79,7 @@ class DependentType(type):
     keyable_type = False
 
     @classmethod
-    def make_name(cls, *args, **kwargs):
+    def make_name(cls, *args, **kwargs):  # pragma: no cover
         return cls.__name__
 
     def __new__(cls, *args, **kwargs):
@@ -78,14 +97,11 @@ class DependentType(type):
     def with_bound(self, new_bound):  # pragma: no cover
         return type(self)(new_bound)
 
-    def __instancecheck__(self, other):
-        return isinstance(other, self.bound) and self.check(other)
-
     def check(self, value):  # pragma: no cover
         raise NotImplementedError()
 
     def codegen(self):
-        return CodeGen("isinstance({arg}, {this})", {"this": self})
+        return CodeGen("{this}.check({arg})", {"this": self})
 
     def __type_order__(self, other):
         if isinstance(other, DependentType):
@@ -116,18 +132,17 @@ class DependentType(type):
         else:
             return False
 
+    def __instancecheck__(self, other):
+        return isinstance(other, self.bound) and self.check(other)
+
     def __lt__(self, other):
         return False
 
-    def __or__(self, other):
-        if not isinstance(other, DependentType):
-            return NotImplemented
-        return Or(self, other)
-
     def __and__(self, other):
-        if not isinstance(other, DependentType):
-            return NotImplemented
-        return And(self, other)
+        return Intersection[self, other]
+
+    def __rand__(self, other):
+        return Intersection[other, self]
 
 
 class ParametrizedDependentType(DependentType):
@@ -231,14 +246,14 @@ class ProductType(ParametrizedDependentType):
         return (
             isinstance(value, tuple)
             and len(value) == len(self.parameters)
-            and all(instancecheck(x, t) for x, t in zip(value, self.parameters))
+            and all(isinstance(x, t) for x, t in zip(value, self.parameters))
         )
 
     def codegen(self):
         checks = ["len({arg}) == {n}"]
-        params = {"ichk": instancecheck, "n": len(self.parameters)}
+        params = {"n": len(self.parameters)}
         for i, p in enumerate(self.parameters):
-            checks.append(f"{{ichk}}({{arg}}[{i}], {{p{i}}})")
+            checks.append(f"isinstance({{arg}}[{i}], {{p{i}}})")
             params[f"p{i}"] = p
         return CodeGen(" and ".join(checks), params)
 
@@ -258,7 +273,7 @@ class ProductType(ParametrizedDependentType):
 @dependent_check
 def SequenceFastCheck(value: Sequence, typ):
     return isinstance(value, Sequence) and (
-        not value or instancecheck(value[0], typ)
+        not value or isinstance(value[0], typ)
     )
 
 
@@ -270,11 +285,11 @@ def MappingFastCheck(value: Mapping, kt, vt):
         return True
     for k in value:
         break
-    return instancecheck(k, kt) and instancecheck(value[k], vt)
+    return isinstance(k, kt) and isinstance(value[k], vt)
 
 
 @dependent_check
-def HasKeys(value: Mapping, *keys):
+def HasKey(value: Mapping, *keys):
     return all(k in value for k in keys)
 
 
@@ -301,44 +316,6 @@ class Dependent:
         return dt.with_bound(bound)
 
 
-class Or(DependentType):
-    def __init__(self, *types, bound=None):
-        self.types = types
-        super().__init__(bound or self.default_bound())
-
-    def default_bound(self):
-        return Union[tuple([t.bound for t in self.types])]
-
-    def codegen(self):
-        template = " or ".join("{}" for t in self.types)
-        return combine(template, [t.codegen() for t in self.types])
-
-    def check(self, value):
-        return any(t.check(value) for t in self.types)
-
-
-class And(DependentType):
-    def __init__(self, *types, bound=None):
-        self.types = types
-        super().__init__(bound or self.default_bound())
-
-    def default_bound(self):
-        bounds = frozenset(t.bound for t in self.types)
-        return Intersection[tuple(bounds)]
-
-    def codegen(self):
-        template = " and ".join("{}" for t in self.types)
-        return combine(template, [t.codegen() for t in self.types])
-
-    def check(self, value):
-        return all(t.check(value) for t in self.types)
-
-    def __str__(self):
-        return " & ".join(map(repr, self.types))
-
-    __repr__ = __str__
-
-
 if TYPE_CHECKING:  # pragma: no cover
     from typing import Annotated, TypeAlias
 
@@ -351,7 +328,7 @@ __all__ = [
     "Dependent",
     "DependentType",
     "Equals",
-    "HasKeys",
+    "HasKey",
     "StartsWith",
     "EndsWith",
     "dependent_check",
