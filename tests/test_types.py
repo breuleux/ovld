@@ -108,7 +108,7 @@ def test_exactly():
     class Apple(Fruit):
         pass
 
-    assert Exactly[Fruit].__name__ == "Exactly[Fruit]"
+    assert str(Exactly[Fruit]) == "Exactly[Fruit]"
 
     @ovld
     def f(x: Exactly[Fruit]):

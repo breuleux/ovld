@@ -16,8 +16,8 @@ from .recode import (
     generate_dispatch,
     rename_function,
 )
-from .typemap import MultiTypeMap, is_type_of_type
-from .types import normalize_type
+from .typemap import MultiTypeMap
+from .types import clsstring, normalize_type
 from .utils import UsageError, keyword_decorator
 
 _current_id = itertools.count()
@@ -151,28 +151,16 @@ class Signature:
         )
 
 
-def clsstring(cls):
-    if cls is object:
-        return "*"
-    elif isinstance(cls, tuple):
+def typemap_entry_string(cls):
+    if isinstance(cls, tuple):
         key, typ = cls
         return f"{key}: {clsstring(typ)}"
-    elif is_type_of_type(cls):
-        arg = clsstring(cls.__args__[0])
-        return f"type[{arg}]"
-    elif hasattr(cls, "__origin__"):
-        if cls.__origin__ is typing.Union:
-            return "|".join(map(clsstring, cls.__args__))
-        else:
-            return repr(cls)
-    elif hasattr(cls, "__name__"):
-        return cls.__name__
     else:
-        return repr(cls)
+        return clsstring(cls)
 
 
 def sigstring(types):
-    return ", ".join(map(clsstring, types))
+    return ", ".join(map(typemap_entry_string, types))
 
 
 class ArgumentAnalyzer:

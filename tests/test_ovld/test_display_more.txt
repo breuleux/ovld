@@ -1,0 +1,8 @@
+[0]    [1mf[int | str][0m
+     @ THIS_FILE:1
+[0]    [1mf[int & Equals[0]][0m
+     @ THIS_FILE:5
+[0]    [1mf[dict[str, int]][0m
+     @ THIS_FILE:9
+[0]    [1mf[tuple[list[int], set[float]]][0m
+     @ THIS_FILE:13

@@ -11,6 +11,21 @@ from .typemap import TypeMap
 from .utils import UsageError
 
 
+def clsstring(cls):
+    if cls is object:
+        return "*"
+    elif args := typing.get_args(cls):
+        origin = typing.get_origin(cls) or cls
+        args = ", ".join(map(clsstring, args))
+        return f"{origin.__name__}[{args}]"
+    else:
+        r = repr(cls)
+        if r.startswith("<class "):
+            return cls.__name__
+        else:
+            return r
+
+
 class TypeNormalizer:
     def __init__(self, generic_handlers=None):
         self.generic_handlers = generic_handlers or TypeMap()
@@ -114,11 +129,16 @@ class MetaMC(type):
     def __rand__(cls, other):
         return Intersection[other, cls]
 
+    def __str__(self):
+        return str(self._handler)
+
+    __repr__ = __str__
+
 
 class SingleFunctionHandler:
     def __init__(self, handler, args):
         self.handler = handler
-        self.args = args
+        self.args = self.__args__ = args
 
     def __type_order__(self, other):
         results = self.handler(other, *self.args)
@@ -148,6 +168,10 @@ class SingleFunctionHandler:
 
     def __instancecheck__(self, obj):
         return issubclass(type(obj), self)
+
+    def __str__(self):
+        args = ", ".join(map(clsstring, self.__args__))
+        return f"{self.handler.__name__}[{args}]"
 
 
 def class_check(condition):
@@ -180,17 +204,10 @@ def parametrized_class_check(fn):
             if not isinstance(arg, tuple):
                 arg = (arg,)
 
-            def arg_to_str(x):
-                if isinstance(x, type):
-                    return x.__name__
-                else:
-                    return repr(x)
-
-            name = f"{fn.__name__}[{', '.join(map(arg_to_str, arg))}]"
             if isinstance(fn, type):
-                return MetaMC(name, fn(*arg))
+                return MetaMC(fn.__name__, fn(*arg))
             else:
-                return MetaMC(name, SingleFunctionHandler(fn, arg))
+                return MetaMC(fn.__name__, SingleFunctionHandler(fn, arg))
 
     _C.__name__ = fn.__name__
     _C.__qualname__ = fn.__qualname__
@@ -302,6 +319,9 @@ class Union:
     def __hash__(self):
         return hash(self.__args__)
 
+    def __str__(self):
+        return " | ".join(map(clsstring, self.__args__))
+
 
 @parametrized_class_check
 class Intersection:
@@ -349,6 +369,9 @@ class Intersection:
 
     def __hash__(self):
         return hash(self.__args__)
+
+    def __str__(self):
+        return " & ".join(map(clsstring, self.__args__))
 
 
 @parametrized_class_check

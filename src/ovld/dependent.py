@@ -3,6 +3,7 @@ import re
 from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from itertools import count
 from typing import (
     TYPE_CHECKING,
@@ -14,6 +15,7 @@ from typing import (
 from .types import (
     Intersection,
     Order,
+    clsstring,
     normalize_type,
     subclasscheck,
     typeorder,
@@ -71,14 +73,10 @@ def is_dependent(t):
 class DependentType(type):
     exclusive_type = False
     keyable_type = False
-
-    @classmethod
-    def make_name(cls, *args, **kwargs):  # pragma: no cover
-        return cls.__name__
+    bound_is_name = False
 
     def __new__(cls, *args, **kwargs):
-        name = cls.make_name(*args, **kwargs)
-        value = super().__new__(cls, name, (), {})
+        value = super().__new__(cls, cls.__name__, (), {})
         return value
 
     def __init__(self, bound):
@@ -138,13 +136,10 @@ class DependentType(type):
     def __rand__(self, other):
         return Intersection[other, self]
 
+    __repr__ = __str__ = clsstring
+
 
 class ParametrizedDependentType(DependentType):
-    @classmethod
-    def make_name(cls, *parameters, bound=None):
-        params = ", ".join(map(repr, parameters))
-        return f"{cls.__name__}({params})"
-
     def __init__(self, *parameters, bound=None):
         super().__init__(
             self.default_bound(*parameters) if bound is None else bound
@@ -172,8 +167,17 @@ class ParametrizedDependentType(DependentType):
         return hash(self.parameters) ^ hash(self.bound)
 
     def __str__(self):
-        params = ", ".join(map(repr, self.parameters))
-        return f"{type(self).__name__}({params})"
+        if self.bound_is_name:
+            origin = self.bound
+            bound = ""
+        else:
+            origin = self
+            if self.bound != self.default_bound(*self.parameters):
+                bound = f" < {clsstring(self.bound)}"
+            else:
+                bound = ""
+        args = ", ".join(map(clsstring, self.__args__))
+        return f"{origin.__name__}[{args}]{bound}"
 
     __repr__ = __str__
 
@@ -202,8 +206,14 @@ class FuncDependentType(ParametrizedDependentType):
         return type(self).func(value, *self.parameters)
 
 
-def dependent_check(fn):
-    t = type(fn.__name__, (FuncDependentType,), {"func": fn})
+def dependent_check(fn=None, bound_is_name=False):
+    if fn is None:
+        return partial(dependent_check, bound_is_name=bound_is_name)
+    t = type(
+        fn.__name__,
+        (FuncDependentType,),
+        {"func": fn, "bound_is_name": bound_is_name},
+    )
     if len(inspect.signature(fn).parameters) == 1:
         t = t()
     return t
@@ -233,6 +243,8 @@ class Equals(ParametrizedDependentType):
 
 
 class ProductType(ParametrizedDependentType):
+    bound_is_name = True
+
     def default_bound(self, *subtypes):
         return tuple
 
@@ -264,12 +276,12 @@ class ProductType(ParametrizedDependentType):
             return NotImplemented
 
 
-@dependent_check
+@dependent_check(bound_is_name=True)
 def SequenceFastCheck(value: Sequence, typ):
     return not value or isinstance(value[0], typ)
 
 
-@dependent_check
+@dependent_check(bound_is_name=True)
 def CollectionFastCheck(value: Collection, typ):
     for x in value:
         return isinstance(x, typ)
@@ -277,7 +289,7 @@ def CollectionFastCheck(value: Collection, typ):
         return True
 
 
-@dependent_check
+@dependent_check(bound_is_name=True)
 def MappingFastCheck(value: Mapping, kt, vt):
     if not value:
         return True

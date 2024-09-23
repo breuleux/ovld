@@ -19,10 +19,6 @@ class GenericAlias(metaclass=GenericAliasMC):
     pass
 
 
-def is_type_of_type(t):
-    return getattr(t, "__origin__", None) is type
-
-
 class TypeMap(dict):
     """Represents a mapping from types to handlers.
 

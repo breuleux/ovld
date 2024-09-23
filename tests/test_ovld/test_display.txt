@@ -1,12 +1,12 @@
 [10]   [1mf[*][0m
      @ THIS_FILE:29
-[0]    [1mf[Equals(0)][0m
+[0]    [1mf[Equals[0]][0m
      @ THIS_FILE:1
-[0]    [1mf[Equals(1)][0m
+[0]    [1mf[Equals[1]][0m
      @ THIS_FILE:5
-[0]    [1mf[StartsWith('hell')][0m
+[0]    [1mf[StartsWith['hell']][0m
      @ THIS_FILE:9
-[0]    [1mf[StartsWith('hello')][0m
+[0]    [1mf[StartsWith['hello']][0m
      @ THIS_FILE:13
 [0]    [1mf[int][0m
      @ THIS_FILE:17
@@ -21,9 +21,9 @@ Resolve f(13)
 ================================================================================
 [1;32m#1 [10:0]   f[*]
           @ THIS_FILE:29[0m
-[1;90m!= [0:2]    f[Equals(0)]
+[1;90m!= [0:2]    f[Equals[0]]
           @ THIS_FILE:1[0m
-[1;90m!= [0:2]    f[Equals(1)]
+[1;90m!= [0:2]    f[Equals[1]]
           @ THIS_FILE:5[0m
 [0m#2 [0:1]    f[int]
           @ THIS_FILE:17[0m
@@ -35,9 +35,9 @@ Resolve f(0)
 ================================================================================
 [1;32m#1 [10:0]   f[*]
           @ THIS_FILE:29[0m
-[0m#2 [0:2]    f[Equals(0)]
+[0m#2 [0:2]    f[Equals[0]]
           @ THIS_FILE:1[0m
-[1;90m!= [0:2]    f[Equals(1)]
+[1;90m!= [0:2]    f[Equals[1]]
           @ THIS_FILE:5[0m
 [0m#3 [0:1]    f[int]
           @ THIS_FILE:17[0m
@@ -49,9 +49,9 @@ Resolve f(1)
 ================================================================================
 [1;32m#1 [10:0]   f[*]
           @ THIS_FILE:29[0m
-[1;90m!= [0:2]    f[Equals(0)]
+[1;90m!= [0:2]    f[Equals[0]]
           @ THIS_FILE:1[0m
-[0m#2 [0:2]    f[Equals(1)]
+[0m#2 [0:2]    f[Equals[1]]
           @ THIS_FILE:5[0m
 [0m#3 [0:1]    f[int]
           @ THIS_FILE:17[0m
@@ -63,9 +63,9 @@ Resolve f('hello')
 ================================================================================
 [1;32m#1 [10:0]   f[*]
           @ THIS_FILE:29[0m
-[1;31m== [0:2]    f[StartsWith('hell')]
+[1;31m== [0:2]    f[StartsWith['hell']]
           @ THIS_FILE:9[0m
-[1;31m== [0:2]    f[StartsWith('hello')]
+[1;31m== [0:2]    f[StartsWith['hello']]
           @ THIS_FILE:13[0m
 [1;90m-- [0:1]    f[str]
           @ THIS_FILE:21[0m

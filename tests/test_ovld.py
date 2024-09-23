@@ -1469,6 +1469,38 @@ def test_display(capsys, file_regression):
     file_regression.check(out)
 
 
+def test_display_more(capsys, file_regression):
+    @ovld
+    def f(x: int | str):
+        return 0
+
+    @ovld
+    def f(x: int & Equals[0]):
+        return 1
+
+    @ovld
+    def f(x: dict[str, int]):
+        return 2
+
+    @ovld
+    def f(x: tuple[list[int], set[float]]):
+        return 3
+
+    f.display_methods()
+
+    out, err = capsys.readouterr()
+    assert not err
+    out = out.replace(__file__, "THIS_FILE")
+
+    def renumber(m):
+        return "THIS_FILE:" + str(
+            int(m[1]) - test_display_more.__code__.co_firstlineno
+        )
+
+    out = re.sub(string=out, pattern=r"THIS_FILE:([0-9]+)", repl=renumber)
+    file_regression.check(out)
+
+
 def test_closure():
     def make(n):
         @ovld
