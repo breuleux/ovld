@@ -1,9 +1,5 @@
-try:
-    from types import UnionType
-except ImportError:  # pragma: no cover
-    UnionType = None
-
 from dataclasses import dataclass
+from types import UnionType
 from typing import Iterable, Mapping, Union
 
 from ovld.dependent import Dependent
