@@ -1,7 +1,6 @@
 import os
 import sys
 from dataclasses import dataclass
-from typing import Union
 
 from ovld import ovld
 from ovld.types import (
@@ -12,6 +11,7 @@ from ovld.types import (
     Intersection,
     Order,
     StrictSubclass,
+    Union,
     class_check,
     parametrized_class_check,
     typeorder,
@@ -238,9 +238,33 @@ def test_intersection_issubclass():
     assert not issubclass(int, Intersection[int, str])
 
 
+def test_intersection_isinstance():
+    assert not isinstance(1234, Intersection[int, str])
+    assert isinstance(1234, Intersection[int])
+
+
 def test_intersection_typeorder():
     assert typeorder(Intersection[int, str], str) is Order.LESS
     assert typeorder(str, Intersection[int, str]) is Order.MORE
     assert typeorder(float, Intersection[int, str]) is Order.NONE
     assert typeorder(Intersection[float], Intersection[int, str]) is Order.NONE
     assert typeorder(Intersection[str], Intersection[int, str]) is Order.MORE
+    assert typeorder(Intersection, Intersection[int, str]) is Order.MORE
+
+
+def test_union_issubclass():
+    assert issubclass(int, Union[int, str])
+
+
+def test_union_isinstance():
+    assert isinstance(1234, Union[int, str])
+    assert not isinstance(1234, Union[float, str])
+
+
+def test_union_typeorder():
+    assert typeorder(Union[int, str], str) is Order.MORE
+    assert typeorder(str, Union[int, str]) is Order.LESS
+    assert typeorder(float, Union[int, str]) is Order.NONE
+    assert typeorder(Union[float], Union[int, str]) is Order.NONE
+    assert typeorder(Union[str], Union[int, str]) is Order.LESS
+    assert typeorder(Union, Union[int, str]) is Order.MORE

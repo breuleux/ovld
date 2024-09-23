@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from types import UnionType
-from typing import Iterable, Mapping, Union
+from typing import Iterable, Mapping
 
 from ovld.dependent import Dependent
 from ovld.mro import Order, subclasscheck, typeorder
@@ -8,6 +7,7 @@ from ovld.types import (
     Dataclass,
     Intersection,
     Order,
+    Union,
     typeorder,
 )
 
@@ -79,7 +79,7 @@ def test_merge():
 
 def test_typeorder():
     inorder(object, int)
-    inorder(object, int | str, str)
+    inorder(object, Union[int, str], str)
     inorder(object, Dataclass, Point)
     inorder(object, type, type[Dataclass])
     inorder(type[list], type[list[int]])
@@ -99,7 +99,7 @@ def test_typeorder():
     noorder(float, int)
     noorder(int, str)
     noorder(int, Dataclass)
-    noorder(int | str, float)
+    noorder(Union[int, str], float)
 
 
 def test_subclasscheck():
@@ -107,8 +107,8 @@ def test_subclasscheck():
     assert not subclasscheck(A, B)
     assert subclasscheck(A, A)
     assert subclasscheck(A, object)
-    assert subclasscheck(A, A | int)
-    assert subclasscheck(int, A | int)
+    assert subclasscheck(A, Union[A, int])
+    assert subclasscheck(int, Union[A, int])
 
 
 def test_subclasscheck_generic():
@@ -122,13 +122,13 @@ def test_subclasscheck_type():
 
 
 def test_subclasscheck_type_union():
-    assert subclasscheck(type[int | str], type[UnionType])
-    assert subclasscheck(type[UnionType], object)
-    assert not subclasscheck(object, type[UnionType])
+    assert subclasscheck(type[Union[int, str]], type[Union])
+    assert subclasscheck(type[Union], object)
+    assert not subclasscheck(object, type[Union])
 
 
 def test_typeorder_type_union():
-    assert typeorder(type[int | str], type[UnionType]) is Order.LESS
+    # assert typeorder(type[int | str], type[UnionType]) is Order.LESS
     assert typeorder(type[Union[int, str]], type[Union]) is Order.LESS
     assert typeorder(object, type[Union]) is Order.MORE
 

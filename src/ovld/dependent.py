@@ -4,13 +4,11 @@ from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import count
-from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
     TypeVar,
-    get_args,
 )
 
 from .types import (
@@ -27,11 +25,6 @@ _current = count()
 def generate_checking_code(typ):
     if hasattr(typ, "codegen"):
         return typ.codegen()
-    elif isinstance(typ, UnionType):
-        template = " or ".join("{}" for t in get_args(typ))
-        return combine(
-            template, [generate_checking_code(t) for t in get_args(typ)]
-        )
     else:
         return CodeGen("isinstance({arg}, {this})", {"this": typ})
 

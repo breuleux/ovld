@@ -1,4 +1,3 @@
-import types
 from dataclasses import dataclass
 from enum import Enum
 from graphlib import TopologicalSorter
@@ -66,22 +65,6 @@ def typeorder(t1, t2):
     o1 = get_origin(t1)
     o2 = get_origin(t2)
 
-    if o2 is types.UnionType:
-        if t1 is types.UnionType:
-            return Order.MORE
-        compare = [
-            x for t in get_args(t2) if (x := typeorder(t1, t)) is not Order.NONE
-        ]
-        if not compare:
-            return Order.NONE
-        elif any(x is Order.LESS or x is Order.SAME for x in compare):
-            return Order.LESS
-        else:
-            return Order.MORE
-
-    if o1 is types.UnionType:
-        return typeorder(t2, t1).opposite()
-
     if o2 and not o1:
         return typeorder(t2, t1).opposite()
 
@@ -140,15 +123,6 @@ def subclasscheck(t1, t2):
 
     o1 = get_origin(t1)
     o2 = get_origin(t2)
-
-    if o2 is types.UnionType:
-        return t1 is types.UnionType or any(
-            subclasscheck(t1, t) for t in get_args(t2)
-        )
-    elif o1 is types.UnionType:
-        return t2 is types.UnionType or all(
-            subclasscheck(t, t2) for t in get_args(t1)
-        )
 
     if not isinstance(o1, type):
         o1 = None

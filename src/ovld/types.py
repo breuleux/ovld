@@ -1,9 +1,8 @@
 import inspect
-import operator
 import sys
 import typing
 from dataclasses import dataclass
-from functools import partial, reduce
+from functools import partial
 from types import UnionType
 from typing import Protocol, runtime_checkable
 
@@ -57,7 +56,7 @@ class TypeNormalizer:
             except KeyError:  # pragma: no cover
                 raise TypeError(f"ovld does not understand generic type {t}")
         elif isinstance(t, tuple):
-            return reduce(operator.or_, [self(t2, fn) for t2 in t])
+            return Union[tuple(self(t2, fn) for t2 in t)]
         elif isinstance(t, DependentType) and not t.bound:
             raise UsageError(
                 f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
@@ -98,6 +97,16 @@ class MetaMC(type):
 
     def __instancecheck__(cls, obj):
         return cls._handler.__instancecheck__(obj)
+
+    def __eq__(cls, other):
+        return (
+            type(cls) is type(other)
+            and type(cls._handler) is type(other._handler)
+            and cls._handler == other._handler
+        )
+
+    def __hash__(cls):
+        return hash(cls._handler)
 
     def __and__(cls, other):
         return Intersection[cls, other]
@@ -247,6 +256,54 @@ def StrictSubclass(cls, base_cls):
 
 
 @parametrized_class_check
+class Union:
+    def __init__(self, *types):
+        self.__args__ = self.types = types
+
+    def codegen(self):
+        from .dependent import combine, generate_checking_code
+
+        template = " or ".join("{}" for t in self.types)
+        return combine(
+            template, [generate_checking_code(t) for t in self.types]
+        )
+
+    def __type_order__(self, other):
+        if other is Union:
+            return Order.LESS
+        classes = self.types
+        compare = [
+            x for t in classes if (x := typeorder(t, other)) is not Order.NONE
+        ]
+        if not compare:
+            return Order.NONE
+        elif any(x is Order.MORE or x is Order.SAME for x in compare):
+            return Order.MORE
+        else:
+            return Order.LESS
+
+    def __is_supertype__(self, other):
+        return any(subclasscheck(other, t) for t in self.types)
+
+    def __is_subtype__(self, other):
+        if other is Union:
+            return True
+        return NotImplemented  # pragma: no cover
+
+    def __subclasscheck__(self, sub):
+        return self.__is_supertype__(sub)
+
+    def __instancecheck__(self, obj):
+        return any(isinstance(obj, t) for t in self.types)
+
+    def __eq__(self, other):
+        return self.__args__ == other.__args__
+
+    def __hash__(self):
+        return hash(self.__args__)
+
+
+@parametrized_class_check
 class Intersection:
     def __init__(self, *types):
         self.__args__ = self.types = types
@@ -260,6 +317,8 @@ class Intersection:
         )
 
     def __type_order__(self, other):
+        if other is Intersection:
+            return Order.LESS
         classes = self.types
         compare = [
             x for t in classes if (x := typeorder(t, other)) is not Order.NONE
@@ -275,6 +334,8 @@ class Intersection:
         return all(subclasscheck(other, t) for t in self.types)
 
     def __is_subtype__(self, other):  # pragma: no cover
+        if other is Intersection:
+            return True
         return NotImplemented
 
     def __subclasscheck__(self, sub):
@@ -282,6 +343,12 @@ class Intersection:
 
     def __instancecheck__(self, obj):
         return all(isinstance(obj, t) for t in self.types)
+
+    def __eq__(self, other):
+        return self.__args__ == other.__args__
+
+    def __hash__(self):
+        return hash(self.__args__)
 
 
 @parametrized_class_check
