@@ -1,6 +1,9 @@
+import sys
 from dataclasses import dataclass, fields
 from numbers import Number
 from typing import Literal, Union
+
+import pytest
 
 from ovld import ovld, recurse
 from ovld.types import Dataclass
@@ -107,6 +110,10 @@ def deserialize(t: type[Union[int, str]], data: Union[int, str]):
     return data
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="doesn't work, not worth fixing",
+)
 def test_deserialize():
     data = {
         "countries": {

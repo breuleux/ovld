@@ -3,12 +3,16 @@ import sys
 import typing
 from dataclasses import dataclass
 from functools import partial
-from types import UnionType
 from typing import Protocol, runtime_checkable
 
 from .mro import Order, TypeRelationship, subclasscheck, typeorder
 from .typemap import TypeMap
 from .utils import UsageError
+
+try:
+    from types import UnionType
+except ImportError:  # pragma: no cover
+    UnionType = None
 
 
 def clsstring(cls):

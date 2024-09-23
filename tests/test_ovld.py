@@ -1469,6 +1469,10 @@ def test_display(capsys, file_regression):
     file_regression.check(out)
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="union syntax requires python3.10 or higher",
+)
 def test_display_more(capsys, file_regression):
     @ovld
     def f(x: int | str):

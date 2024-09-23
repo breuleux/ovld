@@ -14,7 +14,7 @@ from ovld.dependent import (
     StartsWith,
     dependent_check,
 )
-from ovld.types import HasMethod
+from ovld.types import HasMethod, Union
 from ovld.utils import UsageError
 
 
@@ -258,7 +258,7 @@ def test_vs_catchall():
 
 
 def test_or():
-    o = Equals[0] | Equals[1]
+    o = Union[Equals[0], Equals[1]]
     assert isinstance(0, o)
     assert isinstance(1, o)
     assert not isinstance(2, o)
@@ -272,7 +272,7 @@ def test_or():
 
 
 def test_or_mix():
-    o = str | Equals[0]
+    o = Union[str, Equals[0]]
 
     assert isinstance("x", o)
     assert isinstance(0, o)
