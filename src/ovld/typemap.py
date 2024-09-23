@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from itertools import count
 from types import CodeType
 
-from .dependent import is_dependent
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
 from .utils import MISSING
@@ -229,6 +228,8 @@ class MultiTypeMap(dict):
             sig: A Signature object.
             handler: A function to handle the tuple.
         """
+        from .dependent import is_dependent
+
         self.clear()
 
         obj_t_tup = sig.types
@@ -265,6 +266,8 @@ class MultiTypeMap(dict):
             print(f"{'':{width-2}} @ {co.co_filename}:{co.co_firstlineno}")
 
     def display_resolution(self, *args, **kwargs):
+        from .dependent import is_dependent
+
         def dependent_match(tup, args):
             for t, a in zip(tup, args):
                 if isinstance(t, tuple):

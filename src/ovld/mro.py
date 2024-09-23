@@ -172,7 +172,10 @@ def subclasscheck(t1, t2):
         else:
             return False
     else:
-        return issubclass(t1, t2)
+        try:
+            return issubclass(t1, t2)
+        except TypeError:
+            return False
 
 
 def sort_types(cls, avail):

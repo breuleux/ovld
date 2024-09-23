@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Protocol, runtime_checkable
 
-from ovld.utils import UsageError
-
 from .mro import Order, TypeRelationship, subclasscheck, typeorder
+from .typemap import TypeMap
+from .utils import UsageError
 
 try:
     from types import UnionType
@@ -18,13 +18,13 @@ except ImportError:  # pragma: no cover
 
 class TypeNormalizer:
     def __init__(self, generic_handlers=None):
-        self.generic_handlers = generic_handlers or {}
+        self.generic_handlers = generic_handlers or TypeMap()
 
     def register_generic(self, generic, handler=None):
         if handler is None:
             return partial(self.register_generic, generic)
         else:
-            self.generic_handlers[generic] = handler
+            self.generic_handlers.register(generic, handler)
 
     def __call__(self, t, fn):
         from .dependent import DependentType
@@ -49,12 +49,17 @@ class TypeNormalizer:
         elif origin and getattr(t, "__args__", None) is None:
             return t
         elif origin is not None:
-            if origin in self.generic_handlers:
-                return self.generic_handlers[origin](self, t, fn)
-            else:  # pragma: no cover
-                raise TypeError(
-                    f"ovld does not understand generic type {origin}"
-                )
+            try:
+                results = self.generic_handlers[origin]
+                results = list(results.items())
+                results.sort(key=lambda x: x[1], reverse=True)
+                assert results
+                rval = results[0][0](self, t, fn)
+                if isinstance(origin, type) and hasattr(rval, "with_bound"):
+                    rval = rval.with_bound(origin)
+                return rval
+            except KeyError:  # pragma: no cover
+                raise TypeError(f"ovld does not understand generic type {t}")
         elif isinstance(t, tuple):
             return reduce(operator.or_, [self(t2, fn) for t2 in t])
         elif isinstance(t, DependentType) and not t.bound:

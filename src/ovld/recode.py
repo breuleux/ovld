@@ -7,7 +7,6 @@ from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .dependent import generate_checking_code, is_dependent
 from .utils import Unusable, UsageError
 
 recurse = Unusable(
@@ -174,6 +173,8 @@ class GenSym:
 
 
 def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
+    from .dependent import generate_checking_code, is_dependent
+
     def to_dict(tup):
         return dict(
             entry if isinstance(entry, tuple) else (i, entry)

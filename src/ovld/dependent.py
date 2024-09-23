@@ -1,6 +1,5 @@
 import inspect
 import re
-import typing
 from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -9,6 +8,7 @@ from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
+    Collection,
     TypeVar,
     get_args,
 )
@@ -277,6 +277,14 @@ def SequenceFastCheck(value: Sequence, typ):
 
 
 @dependent_check
+def CollectionFastCheck(value: Collection, typ):
+    for x in value:
+        return isinstance(x, typ)
+    else:
+        return True
+
+
+@dependent_check
 def MappingFastCheck(value: Mapping, kt, vt):
     if not value:
         return True
@@ -292,6 +300,7 @@ def Callable(fn: _Callable, argt, rett):
     sig = Signature.extract(fn)
     return (
         sig.max_pos >= len(argt) >= sig.req_pos
+        and not sig.req_names
         and all(subclasscheck(t1, t2) for t1, t2 in zip(argt, sig.types))
         and subclasscheck(sig.return_type, rett)
     )
@@ -323,48 +332,6 @@ class Dependent:
         if not isinstance(dt, DependentType):
             dt = dependent_check(dt)
         return dt.with_bound(bound)
-
-
-@normalize_type.register_generic(typing.Literal)
-def _(self, t, fn):
-    return Equals[t.__args__]
-
-
-@normalize_type.register_generic(tuple)
-def _(self, t, fn):
-    args = tuple(self(arg, fn) for arg in t.__args__)
-    return ProductType[args]
-
-
-@normalize_type.register_generic(Sequence)
-def _(self, t, fn):
-    args = tuple(self(arg, fn) for arg in t.__args__)
-    return SequenceFastCheck[args]
-
-
-@normalize_type.register_generic(Mapping)
-def _(self, t, fn):
-    args = tuple(self(arg, fn) for arg in t.__args__)
-    return MappingFastCheck[args]
-
-
-@normalize_type.register_generic(dict)
-def _(self, t, fn):
-    args = tuple(self(arg, fn) for arg in t.__args__)
-    return MappingFastCheck[args].with_bound(dict)
-
-
-@normalize_type.register_generic(list)
-def _(self, t, fn):
-    args = tuple(self(arg, fn) for arg in t.__args__)
-    return SequenceFastCheck[args].with_bound(list)
-
-
-@normalize_type.register_generic(_Callable)
-def _(self, t, fn):
-    *at, rt = t.__args__
-    at = tuple(self(arg, fn) for arg in at)
-    return Callable[at, self(rt, fn)]
 
 
 if TYPE_CHECKING:  # pragma: no cover
