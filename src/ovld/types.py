@@ -2,7 +2,6 @@ import inspect
 import operator
 import sys
 import typing
-from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import partial, reduce
 from typing import Protocol, runtime_checkable
@@ -52,7 +51,7 @@ class TypeNormalizer:
         elif origin is not None:
             if origin in self.generic_handlers:
                 return self.generic_handlers[origin](self, t, fn)
-            else:
+            else:  # pragma: no cover
                 raise TypeError(
                     f"ovld does not understand generic type {origin}"
                 )
@@ -74,37 +73,6 @@ def _(self, t, fn):
     return self(t.__args__, fn)
 
 
-@normalize_type.register_generic(typing.Literal)
-def _(self, t, fn):
-    from .dependent import Equals
-
-    return Equals[t.__args__]
-
-
-@normalize_type.register_generic(tuple)
-def _(self, t, fn):
-    from .dependent import ProductType
-
-    args = tuple(self(arg, fn) for arg in t.__args__)
-    return ProductType[args]
-
-
-@normalize_type.register_generic(dict)
-def _(self, t, fn):
-    from .dependent import MappingFastCheck
-
-    args = [self(arg, fn) for arg in t.__args__]
-    return MappingFastCheck[args]
-
-
-@normalize_type.register_generic(Sequence)
-def _(self, t, fn):
-    from .dependent import SequenceFastCheck
-
-    args = [self(arg, fn) for arg in t.__args__]
-    return SequenceFastCheck[args]
-
-
 class MetaMC(type):
     def __new__(T, name, handler):
         return super().__new__(T, name, (), {"_handler": handler})
@@ -121,7 +89,7 @@ class MetaMC(type):
     def __is_supertype__(cls, other):
         return cls._handler.__is_supertype__(other)
 
-    def __is_subtype__(cls, other):
+    def __is_subtype__(cls, other):  # pragma: no cover
         return cls._handler.__is_subtype__(other)
 
     def __subclasscheck__(cls, sub):
@@ -158,11 +126,11 @@ class SingleFunctionHandler:
         else:  # pragma: no cover
             return NotImplemented
 
-    def __is_subtype__(self, other):
+    def __is_subtype__(self, other):  # pragma: no cover
         results = self.handler(other, *self.args)
         if isinstance(results, TypeRelationship):
             return results.subtype
-        else:  # pragma: no cover
+        else:
             return NotImplemented
 
     def __subclasscheck__(self, sub):
@@ -305,7 +273,7 @@ class Intersection:
     def __is_supertype__(self, other):
         return all(subclasscheck(other, t) for t in self.types)
 
-    def __is_subtype__(self, other):
+    def __is_subtype__(self, other):  # pragma: no cover
         return NotImplemented
 
     def __subclasscheck__(self, sub):

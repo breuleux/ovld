@@ -106,17 +106,7 @@ def typeorder(t1, t2):
             return Order.NONE
 
         ords = [typeorder(a1, a2) for a1, a2 in zip(args1, args2)]
-        if Order.MORE in ords and Order.LESS in ords:
-            return Order.NONE
-        elif Order.NONE in ords:
-            return Order.NONE
-        elif Order.MORE in ords:
-            return Order.MORE
-        elif Order.LESS in ords:
-            return Order.LESS
-        else:  # pragma: no cover
-            # Not sure when t1 != t2 and that happens
-            return Order.SAME
+        return Order.merge(ords)
 
     sx = issubclass(t1, t2)
     sy = issubclass(t2, t1)

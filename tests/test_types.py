@@ -1,13 +1,14 @@
 import os
 import sys
 from dataclasses import dataclass
-from typing import Iterable, Union
+from typing import Iterable, Mapping, Union
 
 from ovld import ovld
 from ovld.types import (
     Dataclass,
     Deferred,
     Exactly,
+    HasMethod,
     Intersection,
     Order,
     StrictSubclass,
@@ -41,6 +42,16 @@ def noorder(*seq):
         assert typeorder(b, a) is Order.NONE
 
 
+def test_merge():
+    assert Order.merge([Order.SAME, Order.SAME]) is Order.SAME
+    assert Order.merge([Order.SAME, Order.MORE]) is Order.MORE
+    assert Order.merge([Order.SAME, Order.LESS]) is Order.LESS
+    assert Order.merge([Order.MORE]) is Order.MORE
+    assert Order.merge([Order.LESS]) is Order.LESS
+    assert Order.merge([Order.LESS, Order.MORE]) is Order.NONE
+    assert Order.merge([Order.LESS, Order.LESS, Order.NONE]) is Order.NONE
+
+
 def test_typeorder():
     inorder(object, int)
     inorder(object, int | str, str)
@@ -54,6 +65,7 @@ def test_typeorder():
     inorder(list, list[int])
 
     sameorder(int, int)
+    sameorder(Mapping[str, int], Mapping[str, int])
 
     noorder(tuple[int, int], tuple[int])
     noorder(dict[str, int], dict[int, str])
@@ -242,5 +254,46 @@ def test_intersection():
     assert f(1.5) == "other"
 
 
+def test_hasmethod():
+    assert isinstance([1, 2, 3], HasMethod["__len__"])
+
+
+def test_intersection_operator():
+    class Base:
+        def f(self):
+            pass
+
+    class X(Base):
+        def g(self):
+            pass
+
+    class Y(Base):
+        def h(self):
+            pass
+
+    @ovld
+    def f(x: HasMethod["f"] & HasMethod["g"]):  # type: ignore
+        return "yes"
+
+    @ovld
+    def f(x: Base & HasMethod["h"]):  # type: ignore
+        return "yeah"
+
+    @ovld
+    def f(x: object):
+        return "no"
+
+    assert f(X()) == "yes"
+    assert f(Y()) == "yeah"
+
+
 def test_intersection_issubclass():
     assert not issubclass(int, Intersection[int, str])
+
+
+def test_intersection_typeorder():
+    assert typeorder(Intersection[int, str], str) is Order.LESS
+    assert typeorder(str, Intersection[int, str]) is Order.MORE
+    assert typeorder(float, Intersection[int, str]) is Order.NONE
+    assert typeorder(Intersection[float], Intersection[int, str]) is Order.NONE
+    assert typeorder(Intersection[str], Intersection[int, str]) is Order.MORE

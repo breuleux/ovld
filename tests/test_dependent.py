@@ -1,5 +1,5 @@
 from numbers import Number
-from typing import Literal
+from typing import Literal, Mapping, Sequence
 
 import pytest
 
@@ -333,6 +333,47 @@ def test_tuples():
     assert f((2, "y")) == 3
     assert f(("z",)) == 4
     assert f((((1,),),)) == 5
+
+
+def test_list():
+    @ovld
+    def f(li: list[int]):
+        return 0
+
+    @ovld
+    def f(li: list[str]):
+        return 1
+
+    @ovld
+    def f(li: Sequence[float]):
+        return 2
+
+    assert f([1, 2, 3]) == 0
+    assert f(["x", "y"]) == 1
+    assert f([1.5, 3.5]) == 2
+    with pytest.raises(TypeError):
+        f([])
+
+
+def test_dict():
+    @ovld
+    def f(d: dict[str, int]):
+        return 0
+
+    @ovld
+    def f(d: dict[int, list[int]]):
+        return 1
+
+    @ovld
+    def f(d: Mapping[float, float]):
+        return 1
+
+    assert f({"x": 1, "y": 2}) == 0
+    assert f({1: [0, 3], 3: [9, 0, 7], 4: []}) == 1
+    with pytest.raises(TypeError):
+        assert f({1: 3})
+    with pytest.raises(TypeError):
+        assert f({})
 
 
 def test_or():

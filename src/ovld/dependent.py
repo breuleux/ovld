@@ -1,13 +1,13 @@
 import inspect
 import re
+import typing
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import count
 from types import UnionType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Mapping,
-    Sequence,
     TypeVar,
     get_args,
 )
@@ -272,15 +272,11 @@ class ProductType(ParametrizedDependentType):
 
 @dependent_check
 def SequenceFastCheck(value: Sequence, typ):
-    return isinstance(value, Sequence) and (
-        not value or isinstance(value[0], typ)
-    )
+    return not value or isinstance(value[0], typ)
 
 
 @dependent_check
 def MappingFastCheck(value: Mapping, kt, vt):
-    if not isinstance(value, Mapping):
-        return False
     if not value:
         return True
     for k in value:
@@ -314,6 +310,41 @@ class Dependent:
         if not isinstance(dt, DependentType):
             dt = dependent_check(dt)
         return dt.with_bound(bound)
+
+
+@normalize_type.register_generic(typing.Literal)
+def _(self, t, fn):
+    return Equals[t.__args__]
+
+
+@normalize_type.register_generic(tuple)
+def _(self, t, fn):
+    args = tuple(self(arg, fn) for arg in t.__args__)
+    return ProductType[args]
+
+
+@normalize_type.register_generic(Sequence)
+def _(self, t, fn):
+    args = tuple(self(arg, fn) for arg in t.__args__)
+    return SequenceFastCheck[args]
+
+
+@normalize_type.register_generic(Mapping)
+def _(self, t, fn):
+    args = tuple(self(arg, fn) for arg in t.__args__)
+    return MappingFastCheck[args]
+
+
+@normalize_type.register_generic(dict)
+def _(self, t, fn):
+    args = tuple(self(arg, fn) for arg in t.__args__)
+    return MappingFastCheck[args].with_bound(dict)
+
+
+@normalize_type.register_generic(list)
+def _(self, t, fn):
+    args = tuple(self(arg, fn) for arg in t.__args__)
+    return SequenceFastCheck[args].with_bound(list)
 
 
 if TYPE_CHECKING:  # pragma: no cover

@@ -337,16 +337,6 @@ def test_optional():
     assert f(1.0) == "f"
 
 
-def test_no_generics():
-    o = Ovld()
-
-    with pytest.raises(TypeError):
-
-        @o.register
-        def f(x: typing.List[int]):
-            return "hmm"
-
-
 def test_abstract_types():
     from collections.abc import Iterable
 
