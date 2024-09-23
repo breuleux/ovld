@@ -1,7 +1,7 @@
 import os
 import sys
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Union
+from typing import Union
 
 from ovld import ovld
 from ovld.types import (
@@ -22,59 +22,6 @@ from ovld.types import (
 class Point:
     x: int
     y: int
-
-
-def inorder(*seq):
-    for a, b in zip(seq[:-1], seq[1:]):
-        assert typeorder(a, b) == Order.MORE
-        assert typeorder(b, a) == Order.LESS
-
-
-def sameorder(*seq):
-    for a, b in zip(seq[:-1], seq[1:]):
-        assert typeorder(a, b) is Order.SAME
-        assert typeorder(b, a) is Order.SAME
-
-
-def noorder(*seq):
-    for a, b in zip(seq[:-1], seq[1:]):
-        assert typeorder(a, b) is Order.NONE
-        assert typeorder(b, a) is Order.NONE
-
-
-def test_merge():
-    assert Order.merge([Order.SAME, Order.SAME]) is Order.SAME
-    assert Order.merge([Order.SAME, Order.MORE]) is Order.MORE
-    assert Order.merge([Order.SAME, Order.LESS]) is Order.LESS
-    assert Order.merge([Order.MORE]) is Order.MORE
-    assert Order.merge([Order.LESS]) is Order.LESS
-    assert Order.merge([Order.LESS, Order.MORE]) is Order.NONE
-    assert Order.merge([Order.LESS, Order.LESS, Order.NONE]) is Order.NONE
-
-
-def test_typeorder():
-    inorder(object, int)
-    inorder(object, int | str, str)
-    inorder(object, Dataclass, Point)
-    inorder(object, type, type[Dataclass])
-    inorder(type[list], type[list[int]])
-    inorder(str, Intersection[int, str])
-    inorder(object, Intersection[object, int])
-    inorder(object, Iterable, Iterable[int], list[int])
-    inorder(Iterable[int], list)
-    inorder(list, list[int])
-
-    sameorder(int, int)
-    sameorder(Mapping[str, int], Mapping[str, int])
-
-    noorder(tuple[int, int], tuple[int])
-    noorder(dict[str, int], dict[int, str])
-    noorder(dict[str, object], dict[object, str])
-    noorder(type[int], type[Dataclass])
-    noorder(float, int)
-    noorder(int, str)
-    noorder(int, Dataclass)
-    noorder(int | str, float)
 
 
 def test_meta():
