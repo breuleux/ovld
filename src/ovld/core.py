@@ -80,6 +80,7 @@ class Arginfo:
 @dataclass(frozen=True)
 class Signature:
     types: tuple
+    return_type: type
     req_pos: int
     max_pos: int
     req_names: frozenset
@@ -139,6 +140,7 @@ class Signature:
 
         return cls(
             types=tuple(typelist),
+            return_type=normalize_type(sig.return_annotation, fn),
             req_pos=req_pos,
             max_pos=max_pos,
             req_names=frozenset(req_names),

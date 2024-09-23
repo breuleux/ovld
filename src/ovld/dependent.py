@@ -1,6 +1,7 @@
 import inspect
 import re
 import typing
+from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import count
@@ -285,6 +286,18 @@ def MappingFastCheck(value: Mapping, kt, vt):
 
 
 @dependent_check
+def Callable(fn: _Callable, argt, rett):
+    from .core import Signature
+
+    sig = Signature.extract(fn)
+    return (
+        sig.max_pos >= len(argt) >= sig.req_pos
+        and all(subclasscheck(t1, t2) for t1, t2 in zip(argt, sig.types))
+        and subclasscheck(sig.return_type, rett)
+    )
+
+
+@dependent_check
 def HasKey(value: Mapping, *keys):
     return all(k in value for k in keys)
 
@@ -345,6 +358,13 @@ def _(self, t, fn):
 def _(self, t, fn):
     args = tuple(self(arg, fn) for arg in t.__args__)
     return SequenceFastCheck[args].with_bound(list)
+
+
+@normalize_type.register_generic(_Callable)
+def _(self, t, fn):
+    *at, rt = t.__args__
+    at = tuple(self(arg, fn) for arg in at)
+    return Callable[at, self(rt, fn)]
 
 
 if TYPE_CHECKING:  # pragma: no cover

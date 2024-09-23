@@ -1,5 +1,5 @@
 from numbers import Number
-from typing import Literal, Mapping, Sequence
+from typing import Callable, Literal, Mapping, Sequence
 
 import pytest
 
@@ -374,6 +374,41 @@ def test_dict():
         assert f({1: 3})
     with pytest.raises(TypeError):
         assert f({})
+
+
+class Animal:
+    pass
+
+
+class Mammal(Animal):
+    pass
+
+
+class Cat(Mammal):
+    pass
+
+
+def test_callable():
+    @ovld
+    def f(fn: Callable[[Mammal, Mammal], Mammal]):
+        return 1
+
+    @ovld
+    def f(fn: Callable[[Cat], Animal]):
+        return 2
+
+    def x1(x: Mammal, y: Mammal) -> Mammal:
+        pass
+
+    def x2(x: Animal, y: Animal) -> Cat:
+        pass
+
+    def x3(x: Animal) -> Cat:
+        pass
+
+    assert f(x1) == 1
+    assert f(x2) == 1
+    assert f(x3) == 2
 
 
 def test_or():
