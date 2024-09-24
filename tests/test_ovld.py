@@ -1717,3 +1717,16 @@ def test_method_doc(file_regression):
     )
 
     file_regression.check(doc)
+
+
+def test_possible_clobbering():
+    @ovld
+    def f(type: typing.Literal[0]):
+        return 0
+
+    @ovld
+    def f(type: typing.Literal[1]):
+        return 1
+
+    assert f(0) == 0
+    assert f(1) == 1

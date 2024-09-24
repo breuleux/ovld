@@ -1,13 +1,14 @@
 import ast
 import inspect
 import linecache
+import re
 import textwrap
 from ast import _splitlines_no_ff as splitlines
 from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .utils import Unusable, UsageError
+from .utils import MISSING, Unusable, UsageError
 
 recurse = Unusable(
     "recurse() can only be used from inside an @ovld-registered function."
@@ -18,8 +19,6 @@ call_next = Unusable(
 
 
 dispatch_template = """
-from ovld.utils import MISSING
-
 def __DISPATCH__(self, {args}):
     {body}
 """
@@ -52,6 +51,35 @@ def instantiate_code(symbol, code, inject={}):
 #     return rval
 
 
+class NameDatabase:
+    def __init__(self, default_name):
+        self.default_name = default_name
+        self.count = count()
+        self.variables = {}
+        self.names = {}
+        self.registered = set()
+
+    def register(self, name):
+        self.registered.add(name)
+
+    def __getitem__(self, value):
+        if isinstance(value, (int, float, str)):
+            return repr(value)
+        if id(value) in self.names:
+            return self.names[id(value)]
+        name = orig_name = getattr(value, "__name__", self.default_name)
+        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]+"):
+            name = self.default_name
+        i = 1
+        while name in self.registered:
+            name = f"{orig_name}{i}"
+            i += 1
+        self.variables[name] = value
+        self.names[id(value)] = name
+        self.registered.add(name)
+        return name
+
+
 def generate_dispatch(arganal):
     def join(li, sep=", ", trail=False):
         li = [x for x in li if x]
@@ -73,6 +101,13 @@ def generate_dispatch(arganal):
     lookup = []
 
     i = 0
+    ndb = NameDatabase(default_name="INJECT")
+
+    def lookup_for(x):
+        return ndb[arganal.lookup_for(x)]
+
+    for name in spr + spo + pr + po + kr:
+        ndb.register(name)
 
     for name in spr + spo:
         if name in spr:
@@ -80,7 +115,7 @@ def generate_dispatch(arganal):
         else:
             args.append(f"{name}=MISSING")
         posargs.append(name)
-        lookup.append(f"{arganal.lookup_for(i)}({name})")
+        lookup.append(f"{lookup_for(i)}({name})")
         i += 1
 
     if len(po) <= 1:
@@ -96,7 +131,7 @@ def generate_dispatch(arganal):
         else:
             args.append(f"{name}=MISSING")
         posargs.append(name)
-        lookup.append(f"{arganal.lookup_for(i)}({name})")
+        lookup.append(f"{lookup_for(i)}({name})")
         i += 1
 
     if len(po) > 1:
@@ -108,7 +143,7 @@ def generate_dispatch(arganal):
     for name in kr:
         args.append(f"{name}")
         posargs.append(f"{name}={name}")
-        lookup.append(f"({name!r}, {arganal.lookup_for(name)}({name}))")
+        lookup.append(f"({name!r}, {lookup_for(name)}({name}))")
 
     for name in ko:
         args.append(f"{name}=MISSING")
@@ -118,9 +153,7 @@ def generate_dispatch(arganal):
         inits.add("TARGS = []")
         body.append(f"if {name} is not MISSING:")
         body.append(f"    KWARGS[{name!r}] = {name}")
-        body.append(
-            f"    TARGS.append(({name!r}, {arganal.lookup_for(name)}({name})))"
-        )
+        body.append(f"    TARGS.append(({name!r}, {lookup_for(name)}({name})))")
 
     posargs.append(kwargsstar)
     lookup.append(targsstar)
@@ -147,21 +180,9 @@ def generate_dispatch(arganal):
         args=join(args),
         body=join(lines, sep="\n    ").lstrip(),
     )
-    return instantiate_code("__DISPATCH__", code)
-
-
-class GenSym:
-    def __init__(self, prefix):
-        self.prefix = prefix
-        self.count = count()
-        self.variables = {}
-
-    def add(self, value):
-        if isinstance(value, (int, float, str)):
-            return repr(value)
-        id = f"{self.prefix}{next(self.count)}"
-        self.variables[id] = value
-        return id
+    return instantiate_code(
+        "__DISPATCH__", code, inject={"MISSING": MISSING, **ndb.variables}
+    )
 
 
 def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
@@ -182,12 +203,12 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
     def codegen(typ, arg):
         cg = generate_checking_code(typ)
         return cg.template.format(
-            arg=arg, **{k: gen.add(v) for k, v in cg.substitutions.items()}
+            arg=arg, **{k: ndb[v] for k, v in cg.substitutions.items()}
         )
 
     tup = to_dict(tup)
     handlers = [(h, to_dict(types)) for h, types in handlers]
-    gen = GenSym(prefix="INJECT")
+    ndb = NameDatabase(default_name="INJECT")
     conjs = []
 
     exclusive = False
@@ -236,7 +257,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     body = []
     if keyexpr:
-        body.append(f"HANDLER = {gen.add(keyed)}.get({keyexpr}, FALLTHROUGH)")
+        body.append(f"HANDLER = {ndb[keyed]}.get({keyexpr}, FALLTHROUGH)")
         body.append(f"return HANDLER({slf}{argcall})")
 
     elif exclusive:
@@ -256,12 +277,12 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         body.append("elif SUMMATION == 0:")
         body.append(f"    return FALLTHROUGH({slf}{argcall})")
         body.append("else:")
-        body.append(f"    raise {gen.add(err)}")
+        body.append(f"    raise {ndb[err]}")
 
     body_text = textwrap.indent("\n".join(body), "    ")
     code = f"def __DEPENDENT_DISPATCH__({slf}{argspec}):\n{body_text}"
 
-    inject = gen.variables
+    inject = ndb.variables
     for i, (h, types) in enumerate(handlers):
         inject[f"HANDLER{i}"] = h
 
@@ -380,6 +401,8 @@ class NameConverter(ast.NodeTransformer):
             return node
 
     def visit_Call(self, node):
+        from .types import subtler_type
+
         if not isinstance(node.func, ast.Name) or node.func.id not in (
             self.recurse_sym,
             self.call_next_sym,
@@ -397,7 +420,7 @@ class NameConverter(ast.NodeTransformer):
                 target=ast.Name(id=f"{tmp}{key}", ctx=ast.Store()),
                 value=self.visit(arg),
             )
-            if self.analysis.lookup_for(key) == "self.map.transform":
+            if self.analysis.lookup_for(key) is subtler_type:
                 func = ast.Attribute(
                     value=ast.Name(id=f"{tmp}M", ctx=ast.Load()),
                     attr="transform",

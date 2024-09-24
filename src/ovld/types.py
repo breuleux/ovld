@@ -15,6 +15,15 @@ except ImportError:  # pragma: no cover
     UnionType = None
 
 
+class GenericAliasMC(type):
+    def __instancecheck__(cls, obj):
+        return hasattr(obj, "__origin__")
+
+
+class GenericAlias(metaclass=GenericAliasMC):
+    pass
+
+
 def clsstring(cls):
     if cls is object:
         return "*"
@@ -28,6 +37,17 @@ def clsstring(cls):
             return cls.__name__
         else:
             return r
+
+
+def subtler_type(obj):
+    if isinstance(obj, GenericAlias):
+        return type[obj]
+    elif obj is typing.Any:
+        return type[object]
+    elif isinstance(obj, type):
+        return type[obj]
+    else:
+        return type(obj)
 
 
 class TypeNormalizer:

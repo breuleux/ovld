@@ -17,7 +17,7 @@ from .recode import (
     rename_function,
 )
 from .typemap import MultiTypeMap
-from .types import clsstring, normalize_type
+from .types import clsstring, normalize_type, subtler_type
 from .utils import UsageError, keyword_decorator
 
 _current_id = itertools.count()
@@ -267,9 +267,7 @@ class ArgumentAnalyzer:
         )
 
     def lookup_for(self, key):
-        return (
-            "self.map.transform" if key in self.complex_transforms else "type"
-        )
+        return subtler_type if key in self.complex_transforms else type
 
 
 class _Ovld:
