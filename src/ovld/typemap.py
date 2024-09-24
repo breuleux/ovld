@@ -1,22 +1,12 @@
 import inspect
 import math
-import typing
 from dataclasses import dataclass
 from itertools import count
 from types import CodeType
 
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
-from .utils import MISSING
-
-
-class GenericAliasMC(type):
-    def __instancecheck__(cls, obj):
-        return hasattr(obj, "__origin__")
-
-
-class GenericAlias(metaclass=GenericAliasMC):
-    pass
+from .utils import MISSING, subtler_type
 
 
 class TypeMap(dict):
@@ -117,16 +107,6 @@ class MultiTypeMap(dict):
         self.dispatch_id = count()
         self.all = {}
         self.errors = {}
-
-    def transform(self, obj):
-        if isinstance(obj, GenericAlias):
-            return type[obj]
-        elif obj is typing.Any:
-            return type[object]
-        elif isinstance(obj, type):
-            return type[obj]
-        else:
-            return type(obj)
 
     def mro(self, obj_t_tup):
         specificities = {}
@@ -275,8 +255,8 @@ class MultiTypeMap(dict):
 
         message = "No method will be called."
         argt = [
-            *map(self.transform, args),
-            *[(k, self.transform(v)) for k, v in kwargs.items()],
+            *map(subtler_type, args),
+            *[(k, subtler_type(v)) for k, v in kwargs.items()],
         ]
         finished = False
         rank = 1

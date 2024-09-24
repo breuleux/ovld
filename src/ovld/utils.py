@@ -1,6 +1,7 @@
 """Miscellaneous utilities."""
 
 import functools
+import typing
 
 
 class Named:
@@ -58,6 +59,41 @@ class Unusable:
 
     def __getattr__(self, attr):
         raise UsageError(self.__message)
+
+
+class GenericAliasMC(type):
+    def __instancecheck__(cls, obj):
+        return hasattr(obj, "__origin__")
+
+
+class GenericAlias(metaclass=GenericAliasMC):
+    pass
+
+
+def clsstring(cls):
+    if cls is object:
+        return "*"
+    elif args := typing.get_args(cls):
+        origin = typing.get_origin(cls) or cls
+        args = ", ".join(map(clsstring, args))
+        return f"{origin.__name__}[{args}]"
+    else:
+        r = repr(cls)
+        if r.startswith("<class "):
+            return cls.__name__
+        else:
+            return r
+
+
+def subtler_type(obj):
+    if isinstance(obj, GenericAlias):
+        return type[obj]
+    elif obj is typing.Any:
+        return type[object]
+    elif isinstance(obj, type):
+        return type[obj]
+    else:
+        return type(obj)
 
 
 __all__ = [

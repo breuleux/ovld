@@ -17,8 +17,8 @@ from .recode import (
     rename_function,
 )
 from .typemap import MultiTypeMap
-from .types import clsstring, normalize_type, subtler_type
-from .utils import UsageError, keyword_decorator
+from .types import clsstring, normalize_type
+from .utils import UsageError, keyword_decorator, subtler_type
 
 _current_id = itertools.count()
 
@@ -461,7 +461,7 @@ class _Ovld:
     @_compile_first
     def resolve(self, *args):
         """Find the correct method to call for the given arguments."""
-        return self.map[tuple(map(self.map.transform, args))]
+        return self.map[tuple(map(subtler_type, args))]
 
     def register_signature(self, sig, orig_fn):
         """Register a function for the given signature."""
@@ -565,7 +565,7 @@ class _Ovld:
 
         This should be replaced by an auto-generated function.
         """
-        key = tuple(map(self.map.transform, args))
+        key = tuple(map(subtler_type, args))
         method = self.map[key]
         return method(*args)
 
@@ -574,7 +574,7 @@ class _Ovld:
     def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
         fr = sys._getframe(1)
-        key = (fr.f_code, *map(self.map.transform, args))
+        key = (fr.f_code, *map(subtler_type, args))
         method = self.map[key]
         return method(*args)
 
@@ -619,20 +619,20 @@ class OvldCall:
     def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
         fr = sys._getframe(1)
-        key = (fr.f_code, *map(self.map.transform, args))
+        key = (fr.f_code, *map(subtler_type, args))
         method = self.map[key]
         return method(self.obj, *args)
 
     def resolve(self, *args):
         """Find the right method to call for the given arguments."""
-        return self.map[tuple(map(self.map.transform, args))].__get__(self.obj)
+        return self.map[tuple(map(subtler_type, args))].__get__(self.obj)
 
     def __call__(self, *args):  # pragma: no cover
         """Call this overloaded function.
 
         This should be replaced by an auto-generated function.
         """
-        key = tuple(map(self.map.transform, args))
+        key = tuple(map(subtler_type, args))
         method = self.map[key]
         return method(self.obj, *args)
 

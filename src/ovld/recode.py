@@ -8,7 +8,7 @@ from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .utils import MISSING, Unusable, UsageError
+from .utils import MISSING, Unusable, UsageError, subtler_type
 
 recurse = Unusable(
     "recurse() can only be used from inside an @ovld-registered function."
@@ -401,8 +401,6 @@ class NameConverter(ast.NodeTransformer):
             return node
 
     def visit_Call(self, node):
-        from .types import subtler_type
-
         if not isinstance(node.func, ast.Name) or node.func.id not in (
             self.recurse_sym,
             self.call_next_sym,
@@ -416,18 +414,16 @@ class NameConverter(ast.NodeTransformer):
         tmp = f"__TMP{next(self.count)}_"
 
         def _make_lookup_call(key, arg):
+            name = (
+                "__SUBTLER_TYPE"
+                if self.analysis.lookup_for(key) is subtler_type
+                else "type"
+            )
             value = ast.NamedExpr(
                 target=ast.Name(id=f"{tmp}{key}", ctx=ast.Store()),
                 value=self.visit(arg),
             )
-            if self.analysis.lookup_for(key) is subtler_type:
-                func = ast.Attribute(
-                    value=ast.Name(id=f"{tmp}M", ctx=ast.Load()),
-                    attr="transform",
-                    ctx=ast.Load(),
-                )
-            else:
-                func = ast.Name(id="type", ctx=ast.Load())
+            func = ast.Name(id=name, ctx=ast.Load())
             return ast.Call(
                 func=func,
                 args=[value],
@@ -595,6 +591,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     new_fn.__kwdefaults__ = fn.__kwdefaults__
     new_fn.__annotations__ = fn.__annotations__
     new_fn = rename_function(new_fn, newname)
+    new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
     new_fn.__globals__[ovld_mangled] = ovld
     new_fn.__globals__[code_mangled] = new_fn.__code__
     return new_fn
