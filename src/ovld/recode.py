@@ -21,9 +21,7 @@ dispatch_template = """
 from ovld.utils import MISSING
 
 def __DISPATCH__(self, {args}):
-    {inits}
     {body}
-    {call}
 """
 
 
@@ -108,14 +106,9 @@ def generate_dispatch(arganal):
         args.append("*")
 
     for name in kr:
-        lookup_fn = (
-            "self.map.transform"
-            if name in arganal.complex_transforms
-            else "type"
-        )
         args.append(f"{name}")
         posargs.append(f"{name}={name}")
-        lookup.append(f"({name!r}, {lookup_fn}({name}))")
+        lookup.append(f"({name!r}, {arganal.lookup_for(name)}({name}))")
 
     for name in ko:
         args.append(f"{name}=MISSING")
@@ -149,11 +142,10 @@ def generate_dispatch(arganal):
             calls.append(f"\nif {arg} is MISSING:{call}")
     calls.append(fullcall)
 
+    lines = [*inits, *body, textwrap.indent("".join(calls), "    ")]
     code = dispatch_template.format(
-        inits=join(inits, sep="\n    "),
         args=join(args),
-        body=join(body, sep="\n    "),
-        call=textwrap.indent("".join(calls), "    "),
+        body=join(lines, sep="\n    ").lstrip(),
     )
     return instantiate_code("__DISPATCH__", code)
 
