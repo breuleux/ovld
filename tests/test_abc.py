@@ -1,8 +1,9 @@
-from typing import Callable, Literal, Mapping, Sequence
+from typing import Any, Callable, Literal, Mapping, Sequence
 
 import pytest
 
 from ovld.core import Ovld, ovld
+from ovld.types import All, Whatever
 
 
 def test_literal():
@@ -202,4 +203,68 @@ def test_callable():
 
     @iscase("MM.M")
     def _(x: Mammal, y: Mammal, *, z=3) -> Mammal:
+        pass
+
+
+def test_callable_whatever():
+    @ovld
+    def f(fn: Callable[[Whatever, Whatever], Whatever]):
+        return "yes"
+
+    @ovld
+    def f(fn: object):
+        return "no"
+
+    #########
+
+    def iscase(n):
+        def deco(fn):
+            assert f(fn) == n
+
+        return deco
+
+    #########
+
+    @iscase("yes")
+    def _(x: Mammal, y: Mammal) -> Mammal:
+        pass
+
+    @iscase("yes")
+    def _(x: int, y: Cat) -> str:
+        pass
+
+    @iscase("no")
+    def _(x: int) -> str:
+        pass
+
+
+def test_callable_all():
+    @ovld
+    def f(fn: Callable[[All, All], Any]):
+        return "yes"
+
+    @ovld
+    def f(fn: object):
+        return "no"
+
+    #########
+
+    def iscase(n):
+        def deco(fn):
+            assert f(fn) == n
+
+        return deco
+
+    #########
+
+    @iscase("yes")
+    def _(x: Mammal, y: Mammal) -> Mammal:
+        pass
+
+    @iscase("yes")
+    def _(x: int, y: Cat) -> str:
+        pass
+
+    @iscase("no")
+    def _(x: int) -> str:
         pass

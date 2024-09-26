@@ -129,6 +129,16 @@ f(123)  # ERROR
 ```
 
 
+## All
+
+`ovld.types.All` is the bottom/empty/void type. You can use it as a wildcard in a contravariant setting, e.g. all 2-argument functions are instances of `Callable[[All, All], Any]` because the arguments are contravariant.
+
+
+## Whatever
+
+`ovld.types.Whatever` acts like a superclass and a subclass of everything, as a convenience (a bit like saying "there's no type here"). It'll match anything anywhere, so you can write e.g. `Callable[[Whatever, Whatever], Whatever]` to match any function of two arguments, whereas otherwise you would need to use `Any` for the return type and `All` for the parameter types.
+
+
 ## Defining new types
 
 With the `@parametrized_class_check` decorator, you can define a new type or protocol extremely easily. For example, here is how to define `HasMethod` yourself:

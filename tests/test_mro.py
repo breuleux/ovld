@@ -4,10 +4,12 @@ from typing import Iterable, Mapping
 from ovld.dependent import Dependent
 from ovld.mro import Order, subclasscheck, typeorder
 from ovld.types import (
+    All,
     Dataclass,
     Intersection,
     Order,
     Union,
+    Whatever,
     typeorder,
 )
 
@@ -101,6 +103,9 @@ def test_typeorder():
     noorder(int, Dataclass)
     noorder(Union[int, str], float)
 
+    inorder(Whatever, object)
+    inorder(All, object)
+
 
 def test_subclasscheck():
     assert subclasscheck(B, A)
@@ -109,6 +114,12 @@ def test_subclasscheck():
     assert subclasscheck(A, object)
     assert subclasscheck(A, Union[A, int])
     assert subclasscheck(int, Union[A, int])
+
+    assert subclasscheck(All, int)
+    assert not subclasscheck(int, All)
+
+    assert subclasscheck(Whatever, int)
+    assert subclasscheck(int, Whatever)
 
 
 def test_subclasscheck_generic():

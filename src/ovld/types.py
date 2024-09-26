@@ -211,6 +211,56 @@ def _getcls(ref):
     return curr
 
 
+class AllMC(type):
+    def __type_order__(self, other):
+        return Order.MORE
+
+    def __is_subtype__(self, other):
+        return True
+
+    def __is_supertype__(self, other):
+        return False
+
+    def __subclasscheck__(self, other):  # pragma: no cover
+        return False
+
+    def __isinstance__(self, other):  # pragma: no cover
+        return False
+
+
+class All(metaclass=AllMC):
+    """All is the empty/void/bottom type -- it acts as a subtype of all types.
+
+    It is basically the opposite of Any: nothing is an instance of All. The main
+    place you want to use All is as a wildcard in contravariant settings, e.g.
+    all 2-argument functions are instances of Callable[[All, All], Any] because
+    the arguments are contravariant.
+    """
+
+
+class WhateverMC(AllMC):
+    def __is_supertype__(self, other):
+        return True
+
+    def __subclasscheck__(self, other):  # pragma: no cover
+        return True
+
+    def __isinstance__(self, other):  # pragma: no cover
+        return True
+
+
+class Whatever(metaclass=WhateverMC):
+    """This type is a superclass and a subclass of everything.
+
+    It's not a coherent type, more like a convenience.
+
+    It'll match anything anywhere, so you can write e.g.
+    Callable[[Whatever, Whatever], Whatever] to match any function of
+    two arguments. Any only works in covariant settings, and All only
+    works in contravariant settings.
+    """
+
+
 class Deferred:
     """Represent a class from an external module without importing it.
 
