@@ -30,7 +30,7 @@ return method({posargs})
 
 
 def instantiate_code(symbol, code, inject={}):
-    virtual_file = f"<ovld{hash(code)}>"
+    virtual_file = f"<ovld:{abs(hash(code)):x}>"
     linecache.cache[virtual_file] = (None, None, splitlines(code), virtual_file)
     code = compile(source=code, filename=virtual_file, mode="exec")
     glb = {**inject}
