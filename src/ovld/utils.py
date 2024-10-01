@@ -1,7 +1,9 @@
 """Miscellaneous utilities."""
 
 import functools
+import re
 import typing
+from itertools import count
 
 
 class Named:
@@ -94,6 +96,40 @@ def subtler_type(obj):
         return type[obj]
     else:
         return type(obj)
+
+
+class NameDatabase:
+    def __init__(self, default_name):
+        self.default_name = default_name
+        self.count = count()
+        self.variables = {}
+        self.names = {}
+        self.registered = set()
+
+    def register(self, name):
+        self.registered.add(name)
+
+    def gensym(self, desired_name):
+        i = 1
+        name = desired_name
+        while name in self.registered:
+            name = f"{desired_name}{i}"
+            i += 1
+        self.registered.add(name)
+        return name
+
+    def __getitem__(self, value):
+        if isinstance(value, (int, float, str)):
+            return repr(value)
+        if id(value) in self.names:
+            return self.names[id(value)]
+        name = getattr(value, "__name__", self.default_name)
+        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]+"):
+            name = self.default_name
+        name = self.gensym(name)
+        self.variables[name] = value
+        self.names[id(value)] = name
+        return name
 
 
 __all__ = [
