@@ -1,14 +1,13 @@
 import ast
 import inspect
 import linecache
-import re
 import textwrap
 from ast import _splitlines_no_ff as splitlines
 from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .utils import MISSING, Unusable, UsageError, subtler_type
+from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
 recurse = Unusable(
     "recurse() can only be used from inside an @ovld-registered function."
@@ -49,35 +48,6 @@ def instantiate_code(symbol, code, inject={}):
 #     rval = glb[symbol]
 #     rval.__globals__.update(inject)
 #     return rval
-
-
-class NameDatabase:
-    def __init__(self, default_name):
-        self.default_name = default_name
-        self.count = count()
-        self.variables = {}
-        self.names = {}
-        self.registered = set()
-
-    def register(self, name):
-        self.registered.add(name)
-
-    def __getitem__(self, value):
-        if isinstance(value, (int, float, str)):
-            return repr(value)
-        if id(value) in self.names:
-            return self.names[id(value)]
-        name = orig_name = getattr(value, "__name__", self.default_name)
-        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]+"):
-            name = self.default_name
-        i = 1
-        while name in self.registered:
-            name = f"{orig_name}{i}"
-            i += 1
-        self.variables[name] = value
-        self.names[id(value)] = name
-        self.registered.add(name)
-        return name
 
 
 def generate_dispatch(arganal):
