@@ -72,21 +72,6 @@ def test_nargs():
     assert f(0, 0, 0) == 3
 
 
-def test_getitem():
-    o = Ovld(name="f")
-
-    @o.register
-    def f(x: int):
-        return "int"
-
-    @o.register  # noqa: F811
-    def f(x: float):
-        return "float"
-
-    assert f[int].__name__ == "f[int]"
-    assert f[float].__name__ == "f[float]"
-
-
 def test_multimethod():
     o = Ovld()
 
@@ -1167,10 +1152,10 @@ def test_conform():
     f.register(intf)
     assert f([-2, -1, 0, 1, 2, 3]) == [4, 1, 0, 1, 4, 9]
 
-    f[int]._conformer.__conform__(intf2)
+    f.map[(int,)]._conformer.__conform__(intf2)
     assert f([-2, -1, 0, 1, 2, 3]) == [0, 0, 0, 1, 4, 9]
 
-    f[int]._conformer.__conform__(None)
+    f.map[(int,)]._conformer.__conform__(None)
     with pytest.raises(TypeError):
         f([-2, -1, 0, 1, 2, 3])
 
@@ -1192,7 +1177,7 @@ def test_conform_2():
     with pytest.raises(TypeError):
         f([-2.0, 5.5])
 
-    f[int]._conformer.__conform__(floatf)
+    f.map[(int,)]._conformer.__conform__(floatf)
 
     with pytest.raises(TypeError):
         f([-2, -1, 0, 1, 2, 3])
