@@ -324,8 +324,7 @@ class _Ovld:
 
     @property
     def __doc__(self):
-        if not self._compiled:
-            self.compile()
+        self.ensure_compiled()
 
         docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
         if len(docs) == 1:
@@ -348,8 +347,7 @@ class _Ovld:
 
     @property
     def __signature__(self):
-        if not self._compiled:
-            self.compile()
+        self.ensure_compiled()
 
         sig = inspect.signature(self._dispatch)
         if not self.argument_analysis.is_method:
@@ -413,6 +411,10 @@ class _Ovld:
             return rename_function(fn, f"{self.__name__}.{fn.rename}")
         else:
             return fn
+
+    def ensure_compiled(self):
+        if not self._compiled:
+            self.compile()
 
     def compile(self):
         """Finalize this overload.
@@ -553,12 +555,6 @@ class _Ovld:
         return rval
 
     @_compile_first
-    def __getitem__(self, t):
-        if not isinstance(t, tuple):
-            t = (t,)
-        return self.map[t]
-
-    @_compile_first
     @_setattrs(rename="dispatch")
     def __call__(self, *args):  # pragma: no cover
         """Call the overloaded function.
@@ -569,7 +565,6 @@ class _Ovld:
         method = self.map[key]
         return method(*args)
 
-    @_compile_first
     @_setattrs(rename="next")
     def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
@@ -581,12 +576,12 @@ class _Ovld:
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
 
-    @_compile_first
     def display_methods(self):
+        self.ensure_compiled()
         self.map.display_methods()
 
-    @_compile_first
     def display_resolution(self, *args, **kwargs):
+        self.ensure_compiled()
         self.map.display_resolution(*args, **kwargs)
 
 
