@@ -2,7 +2,6 @@ import inspect
 import re
 from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from functools import partial
 from itertools import count
 from typing import (
@@ -28,13 +27,13 @@ def generate_checking_code(typ):
     if hasattr(typ, "codegen"):
         return typ.codegen()
     else:
-        return CodeGen("isinstance({arg}, {this})", {"this": typ})
+        return CodeGen("isinstance({arg}, {this})", this=typ)
 
 
-@dataclass
 class CodeGen:
-    template: str
-    substitutions: dict
+    def __init__(self, template, substitutions={}, **substitutions_kw):
+        self.template = template
+        self.substitutions = {**substitutions, **substitutions_kw}
 
     def mangle(self):
         renamings = {
@@ -46,10 +45,7 @@ class CodeGen:
             for k, newk in renamings.items()
             if k in self.substitutions
         }
-        return CodeGen(
-            template=self.template.format(**renamings),
-            substitutions=new_subs,
-        )
+        return CodeGen(self.template.format(**renamings), new_subs)
 
 
 def combine(master_template, args):
@@ -93,7 +89,7 @@ class DependentType(type):
         raise NotImplementedError()
 
     def codegen(self):
-        return CodeGen("{this}.check({arg})", {"this": self})
+        return CodeGen("{this}.check({arg})", this=self)
 
     def __type_order__(self, other):
         if isinstance(other, DependentType):
@@ -266,9 +262,9 @@ class Equals(ParametrizedDependentType):
 
     def codegen(self):
         if len(self.parameters) == 1:
-            return CodeGen("({arg} == {p})", {"p": self.parameter})
+            return CodeGen("({arg} == {p})", p=self.parameter)
         else:
-            return CodeGen("({arg} in {ps})", {"ps": self.parameters})
+            return CodeGen("({arg} in {ps})", ps=self.parameters)
 
 
 class ProductType(ParametrizedDependentType):
@@ -364,7 +360,7 @@ class Regexp:
         return bool(self.rx.search(value))
 
     def codegen(self):
-        return CodeGen("bool({rx}.search({arg}))", {"rx": self.rx})
+        return CodeGen("bool({rx}.search({arg}))", rx=self.rx)
 
 
 class Dependent:
