@@ -145,6 +145,11 @@ class ParametrizedDependentType(DependentType):
             self.default_bound(*parameters) if bound is None else bound
         )
         self.__args__ = self.parameters = parameters
+        self.__origin__ = None
+        self.__post_init__()
+
+    def __post_init__(self):
+        pass
 
     @property
     def parameter(self):
@@ -184,10 +189,7 @@ class ParametrizedDependentType(DependentType):
 
 class FuncDependentType(ParametrizedDependentType):
     def default_bound(self, *_):
-        fn = type(self).func
-        return normalize_type(
-            list(inspect.signature(fn).parameters.values())[0].annotation, fn
-        )
+        return self._default_bound
 
     def __lt__(self, other):
         if len(self.parameters) != len(other.parameters):
@@ -209,13 +211,40 @@ class FuncDependentType(ParametrizedDependentType):
 def dependent_check(fn=None, bound_is_name=False):
     if fn is None:
         return partial(dependent_check, bound_is_name=bound_is_name)
-    t = type(
-        fn.__name__,
-        (FuncDependentType,),
-        {"func": fn, "bound_is_name": bound_is_name},
-    )
-    if len(inspect.signature(fn).parameters) == 1:
-        t = t()
+
+    if isinstance(fn, type):
+        params = inspect.signature(fn.check).parameters
+        bound = normalize_type(
+            list(inspect.signature(fn.check).parameters.values())[1].annotation,
+            fn.check,
+        )
+        t = type(
+            fn.__name__,
+            (FuncDependentType,),
+            {
+                "bound_is_name": bound_is_name,
+                "_default_bound": bound,
+                **vars(fn),
+            },
+        )
+
+    else:
+        params = inspect.signature(fn).parameters
+        bound = normalize_type(
+            list(inspect.signature(fn).parameters.values())[0].annotation, fn
+        )
+        t = type(
+            fn.__name__,
+            (FuncDependentType,),
+            {
+                "func": fn,
+                "bound_is_name": bound_is_name,
+                "_default_bound": bound,
+            },
+        )
+        if len(params) == 1:
+            t = t()
+
     return t
 
 
@@ -327,8 +356,15 @@ def EndsWith(value: str, suffix):
 
 
 @dependent_check
-def Regexp(value: str, regexp):
-    return bool(re.search(pattern=regexp, string=value))
+class Regexp:
+    def __post_init__(self):
+        self.rx = re.compile(self.parameter)
+
+    def check(self, value: str):
+        return bool(self.rx.search(value))
+
+    def codegen(self):
+        return CodeGen("bool({rx}.search({arg}))", {"rx": self.rx})
 
 
 class Dependent:

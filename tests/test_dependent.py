@@ -129,6 +129,10 @@ def test_dependent_ambiguity():
         f("hello")
 
 
+def test_regexp_isinstance():
+    assert isinstance("hello", Regexp[r"[ehl]+"])
+
+
 def test_regexp():
     @ovld
     def f(s: Regexp[r"hell+o"]):
