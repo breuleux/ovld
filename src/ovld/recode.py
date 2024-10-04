@@ -61,7 +61,14 @@ def generate_dispatch(ov, arganal):
             rval += ","
         return rval
 
-    spr, spo, pr, po, kr, ko = arganal.compile()
+    arganal.compile()
+
+    spr = arganal.strict_positional_required
+    spo = arganal.strict_positional_optional
+    pr = arganal.positional_required
+    po = arganal.positional_optional
+    kr = arganal.keyword_required
+    ko = arganal.keyword_optional
 
     inits = set()
 

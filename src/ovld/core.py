@@ -165,8 +165,10 @@ class ArgumentAnalyzer:
         self.complex_transforms = set()
         self.total = 0
         self.is_method = None
+        self.done = False
 
     def add(self, fn):
+        self.done = False
         sig = Signature.extract(fn)
         self.complex_transforms.update(
             arg.canonical for arg in sig.arginfo if arg.is_complex
@@ -191,6 +193,8 @@ class ArgumentAnalyzer:
             )
 
     def compile(self):
+        if self.done:
+            return
         for name, pos in self.name_to_positions.items():
             if len(pos) != 1:
                 if all(isinstance(p, int) for p in pos):
@@ -217,23 +221,23 @@ class ArgumentAnalyzer:
 
         assert strict_positional + positional == p_to_n
 
-        strict_positional_required = [
+        self.strict_positional_required = [
             f"ARG{pos + 1}"
             for pos, _ in enumerate(strict_positional)
             if self.counts[pos][0] == self.total
         ]
-        strict_positional_optional = [
+        self.strict_positional_optional = [
             f"ARG{pos + 1}"
             for pos, _ in enumerate(strict_positional)
             if self.counts[pos][0] != self.total
         ]
 
-        positional_required = [
+        self.positional_required = [
             names[0]
             for pos, names in enumerate(positional)
             if self.counts[pos + len(strict_positional)][0] == self.total
         ]
-        positional_optional = [
+        self.positional_optional = [
             names[0]
             for pos, names in enumerate(positional)
             if self.counts[pos + len(strict_positional)][0] != self.total
@@ -244,21 +248,13 @@ class ArgumentAnalyzer:
             for _, (name,) in self.name_to_positions.items()
             if not isinstance(name, int)
         ]
-        keyword_required = [
+        self.keyword_required = [
             name for name in keywords if self.counts[name][0] == self.total
         ]
-        keyword_optional = [
+        self.keyword_optional = [
             name for name in keywords if self.counts[name][0] != self.total
         ]
-
-        return (
-            strict_positional_required,
-            strict_positional_optional,
-            positional_required,
-            positional_optional,
-            keyword_required,
-            keyword_optional,
-        )
+        self.done = True
 
     def lookup_for(self, key):
         return subtler_type if key in self.complex_transforms else type
