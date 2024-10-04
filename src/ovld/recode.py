@@ -48,8 +48,8 @@ def __WRAP_DISPATCH__(OVLD):
 
 
 call_template = """
-method = OVLD.map[({lookup})]
-return method({posargs})
+{mvar} = OVLD.map[({lookup})]
+return {mvar}({posargs})
 """
 
 
@@ -88,6 +88,8 @@ def generate_dispatch(ov, arganal):
 
     for name in spr + spo + pr + po + kr:
         ndb.register(name)
+
+    mv = ndb.gensym(desired_name="method")
 
     for name in spr + spo:
         if name in spr:
@@ -141,6 +143,7 @@ def generate_dispatch(ov, arganal):
     fullcall = call_template.format(
         lookup=join(lookup, trail=True),
         posargs=join(posargs),
+        mvar=mv,
     )
 
     calls = []
@@ -150,6 +153,7 @@ def generate_dispatch(ov, arganal):
             call = call_template.format(
                 lookup=join(lookup[: req + i], trail=True),
                 posargs=join(posargs[: req + i + 1]),
+                mvar=mv,
             )
             call = textwrap.indent(call, "        ")
             calls.append(f"\nif {arg} is MISSING:{call}")
