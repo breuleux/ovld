@@ -5,7 +5,7 @@ import itertools
 import sys
 import textwrap
 import typing
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
 from types import FunctionType, GenericAlias
@@ -18,7 +18,7 @@ from .recode import (
 )
 from .typemap import MultiTypeMap
 from .types import clsstring, normalize_type
-from .utils import UsageError, keyword_decorator, subtler_type
+from .utils import MISSING, UsageError, keyword_decorator, subtler_type
 
 _current_id = itertools.count()
 
@@ -28,6 +28,83 @@ def _setattrs(fn, **kwargs):
     for k, v in kwargs.items():
         setattr(fn, k, v)
     return fn
+
+
+class LazySignature(inspect.Signature):
+    def __init__(self, ovld):
+        super().__init__([])
+        self.ovld = ovld
+
+    def replace(
+        self, *, parameters=inspect._void, return_annotation=inspect._void
+    ):  # pragma: no cover
+        if parameters is inspect._void:
+            parameters = self.parameters.values()
+
+        if return_annotation is inspect._void:
+            return_annotation = self._return_annotation
+
+        return inspect.Signature(
+            parameters, return_annotation=return_annotation
+        )
+
+    @property
+    def parameters(self):
+        anal = self.ovld.analyze_arguments()
+        parameters = []
+        if anal.is_method:
+            parameters.append(
+                inspect.Parameter(
+                    name="self",
+                    kind=inspect._POSITIONAL_ONLY,
+                )
+            )
+        parameters += [
+            inspect.Parameter(
+                name=p,
+                kind=inspect._POSITIONAL_ONLY,
+            )
+            for p in anal.strict_positional_required
+        ]
+        parameters += [
+            inspect.Parameter(
+                name=p,
+                kind=inspect._POSITIONAL_ONLY,
+                default=MISSING,
+            )
+            for p in anal.strict_positional_optional
+        ]
+        parameters += [
+            inspect.Parameter(
+                name=p,
+                kind=inspect._POSITIONAL_OR_KEYWORD,
+            )
+            for p in anal.positional_required
+        ]
+        parameters += [
+            inspect.Parameter(
+                name=p,
+                kind=inspect._POSITIONAL_OR_KEYWORD,
+                default=MISSING,
+            )
+            for p in anal.positional_optional
+        ]
+        parameters += [
+            inspect.Parameter(
+                name=p,
+                kind=inspect._KEYWORD_ONLY,
+            )
+            for p in anal.keyword_required
+        ]
+        parameters += [
+            inspect.Parameter(
+                name=p,
+                kind=inspect._KEYWORD_ONLY,
+                default=MISSING,
+            )
+            for p in anal.keyword_optional
+        ]
+        return OrderedDict({p.name: p for p in parameters})
 
 
 def bootstrap_dispatch(ov, name):
@@ -42,6 +119,7 @@ def bootstrap_dispatch(ov, name):
         (),
         first_entry.__closure__,
     )
+    dispatch.__signature__ = LazySignature(ov)
     dispatch.__ovld__ = ov
     dispatch.register = ov.register
     dispatch.resolve = ov.resolve
@@ -299,6 +377,7 @@ class Ovld:
         self._defns = {}
         self._locked = False
         self.mixins = []
+        self.argument_analysis = ArgumentAnalyzer()
         self.add_mixins(*mixins)
 
     @property
@@ -308,6 +387,13 @@ class Ovld:
             defns.update(mixin.defns)
         defns.update(self._defns)
         return defns
+
+    def analyze_arguments(self):
+        self.argument_analysis = ArgumentAnalyzer()
+        for key, fn in list(self.defns.items()):
+            self.argument_analysis.add(fn)
+        self.argument_analysis.compile()
+        return self.argument_analysis
 
     def mkdoc(self):
         docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
@@ -336,8 +422,7 @@ class Ovld:
 
     @property
     def __signature__(self):
-        self.ensure_compiled()
-        return inspect.signature(self.dispatch)
+        return self.dispatch.__signature__
 
     def lock(self):
         self._locked = True
@@ -409,12 +494,8 @@ class Ovld:
         name = self.__name__
         self.map = MultiTypeMap(name=name, key_error=self._key_error)
 
-        anal = ArgumentAnalyzer()
-        for key, fn in list(self.defns.items()):
-            anal.add(fn)
-        self.argument_analysis = anal
-
-        dispatch = generate_dispatch(self, anal)
+        self.analyze_arguments()
+        dispatch = generate_dispatch(self, self.argument_analysis)
         if not hasattr(self, "dispatch"):
             self.dispatch = bootstrap_dispatch(self, name=self.shortname)
         self.dispatch.__code__ = rename_code(dispatch.__code__, self.shortname)
