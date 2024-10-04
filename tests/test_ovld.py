@@ -1639,6 +1639,9 @@ def test_doc(file_regression):
 
     file_regression.check(doc)
 
+    assert mushroom.__doc__ == mushroom.__ovld__.__doc__
+    assert mushroom.__signature__ == mushroom.__ovld__.__signature__
+
 
 def test_doc2(file_regression):
     @ovld
