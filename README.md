@@ -188,16 +188,17 @@ assert Two().f("s") == "a string"
 
 # Benchmarks
 
-`ovld` is pretty fast: the overhead is comparable to `isinstance` or `match`, and only 2-3x slower when dispatching on `Literal` types. Compared to other multiple dispatch libraries, it is 1.5x to 100x faster.
+`ovld` is pretty fast: the overhead is comparable to `isinstance` or `match`, and only 2-3x slower when dispatching on `Literal` types. Compared to other multiple dispatch libraries, it has 1.5x to 100x less overhead.
 
 Time relative to the fastest implementation (1.00) (lower is better).
 
-| Bench | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch/) | [runtype](https://github.com/erezsh/runtype) | [fastcore](https://github.com/fastai/fastcore) | [singled](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
+| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch/) | [runtype](https://github.com/erezsh/runtype) | [fastcore](https://github.com/fastai/fastcore) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-|[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.14|1.00|2.53|3.64|1.61|1.86|41.31|1.54|
-|[add](https://github.com/breuleux/ovld/tree/master/benchmarks/test_add.py)|1.01|1.00|3.46|4.83|2.21|2.66|56.08|x|
-|[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.00|1.06|9.79|4.11|7.19|1.89|40.37|6.34|
-|[ast](https://github.com/breuleux/ovld/tree/master/benchmarks/test_ast.py)|1.00|1.06|23.07|3.04|1.68|1.87|29.11|1.63|
-|[calc](https://github.com/breuleux/ovld/tree/master/benchmarks/test_calc.py)|1.00|1.96|80.00|43.21|x|x|x|x|
-|[fib](https://github.com/breuleux/ovld/tree/master/benchmarks/test_fib.py)|1.00|3.58|438.97|123.58|x|x|x|x|
-|[tweak](https://github.com/breuleux/ovld/tree/master/benchmarks/test_tweaknum.py)|1.00|2.59|x|x|x|x|x|x|
+|[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.45|1.00|3.32|4.63|2.04|2.41|51.93|1.91|
+|[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.13|1.00|11.05|4.53|8.31|2.19|46.74|7.32|
+|[add](https://github.com/breuleux/ovld/tree/master/benchmarks/test_add.py)|1.08|1.00|3.73|5.21|2.37|2.79|59.31|x|
+|[ast](https://github.com/breuleux/ovld/tree/master/benchmarks/test_ast.py)|1.00|1.08|23.14|3.09|1.68|1.91|28.39|1.66|
+|[calc](https://github.com/breuleux/ovld/tree/master/benchmarks/test_calc.py)|1.00|1.23|54.61|29.32|x|x|x|x|
+|[regexp](https://github.com/breuleux/ovld/tree/master/benchmarks/test_regexp.py)|1.00|1.87|19.18|x|x|x|x|x|
+|[fib](https://github.com/breuleux/ovld/tree/master/benchmarks/test_fib.py)|1.00|3.30|444.31|125.77|x|x|x|x|
+|[tweaknum](https://github.com/breuleux/ovld/tree/master/benchmarks/test_tweaknum.py)|1.00|2.09|x|x|x|x|x|x|
