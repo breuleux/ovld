@@ -148,7 +148,7 @@ def make_test(cls):
 
 
 test_multer_ovld = make_test(make_multer(ovld_dispatch))
-test_multer_ovld_recurse = make_test(OvldRecurseMulter)
+test_multer_recurse = make_test(OvldRecurseMulter)
 test_multer_plum = make_test(make_multer(plum_dispatch))
 test_multer_multimethod = make_test(make_multer(multimethod_dispatch))
 test_multer_singledispatch = make_test(SingleDispatchMulter)
