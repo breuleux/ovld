@@ -17,18 +17,6 @@ call_next = Unusable(
 )
 
 
-dispatch_template = """
-def __DISPATCH__(self, {args}):
-    {body}
-"""
-
-
-call_template = """
-method = self.map[({lookup})]
-return method({posargs})
-"""
-
-
 def instantiate_code(symbol, code, inject={}):
     virtual_file = f"<ovld:{abs(hash(code)):x}>"
     linecache.cache[virtual_file] = (None, None, splitlines(code), virtual_file)
@@ -50,7 +38,22 @@ def instantiate_code(symbol, code, inject={}):
 #     return rval
 
 
-def generate_dispatch(arganal):
+dispatch_template = """
+def __WRAP_DISPATCH__(OVLD):
+    def __DISPATCH__({args}):
+        {body}
+
+    return __DISPATCH__
+"""
+
+
+call_template = """
+method = OVLD.map[({lookup})]
+return method({posargs})
+"""
+
+
+def generate_dispatch(ov, arganal):
     def join(li, sep=", ", trail=False):
         li = [x for x in li if x]
         rval = sep.join(li)
@@ -65,9 +68,9 @@ def generate_dispatch(arganal):
     kwargsstar = ""
     targsstar = ""
 
-    args = []
+    args = ["self" if arganal.is_method else ""]
     body = [""]
-    posargs = ["self.obj" if arganal.is_method else ""]
+    posargs = ["self" if arganal.is_method else ""]
     lookup = []
 
     i = 0
@@ -88,7 +91,7 @@ def generate_dispatch(arganal):
         lookup.append(f"{lookup_for(i)}({name})")
         i += 1
 
-    if len(po) <= 1:
+    if len(po) <= 1 and (spr or spo):
         # If there are more than one non-strictly positional optional arguments,
         # then all positional arguments are strictly positional, because if e.g.
         # x and y are optional we want x==MISSING to imply that y==MISSING, but
@@ -141,18 +144,19 @@ def generate_dispatch(arganal):
                 lookup=join(lookup[: req + i], trail=True),
                 posargs=join(posargs[: req + i + 1]),
             )
-            call = textwrap.indent(call, "    ")
+            call = textwrap.indent(call, "        ")
             calls.append(f"\nif {arg} is MISSING:{call}")
     calls.append(fullcall)
 
-    lines = [*inits, *body, textwrap.indent("".join(calls), "    ")]
+    lines = [*inits, *body, textwrap.indent("".join(calls), "        ")]
     code = dispatch_template.format(
         args=join(args),
-        body=join(lines, sep="\n    ").lstrip(),
+        body=join(lines, sep="\n        ").lstrip(),
     )
-    return instantiate_code(
-        "__DISPATCH__", code, inject={"MISSING": MISSING, **ndb.variables}
+    wr = instantiate_code(
+        "__WRAP_DISPATCH__", code, inject={"MISSING": MISSING, **ndb.variables}
     )
+    return wr(ov)
 
 
 def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
@@ -480,7 +484,10 @@ def adapt_function(fn, ovld, newname):
     """Create a copy of the function with a different name."""
     rec_syms = list(
         _search_names(
-            fn.__code__, (recurse, ovld), fn.__globals__, fn.__closure__
+            fn.__code__,
+            (recurse, ovld, ovld._dispatch2),
+            fn.__globals__,
+            fn.__closure__,
         )
     )
     cn_syms = list(

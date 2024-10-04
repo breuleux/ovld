@@ -8,12 +8,13 @@ import typing
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from functools import cached_property, partial
-from types import GenericAlias
+from types import FunctionType, GenericAlias
 
 from .recode import (
     Conformer,
     adapt_function,
     generate_dispatch,
+    rename_code,
     rename_function,
 )
 from .typemap import MultiTypeMap
@@ -55,10 +56,29 @@ def _compile_first(fn, rename=None):
     return first_entry
 
 
-def arg0_is_self(fn):
-    sgn = inspect.signature(fn)
-    params = list(sgn.parameters.values())
-    return params and params[0].name == "self"
+def bootstrap_dispatch(ov, name):
+    def first_entry(*args, **kwargs):
+        ov.compile()
+        return ov._dispatch2(*args, **kwargs)
+
+    dispatch = FunctionType(
+        rename_code(first_entry.__code__, name),
+        {},
+        name,
+        (),
+        first_entry.__closure__,
+    )
+    dispatch.__ovld__ = ov
+    dispatch.register = ov.register
+    dispatch.resolve = ov.resolve
+    dispatch.copy = ov.copy
+    dispatch.variant = ov.variant
+    dispatch.display_methods = ov.display_methods
+    dispatch.display_resolution = ov.display_resolution
+    dispatch.add_mixins = ov.add_mixins
+    dispatch.unregister = ov.unregister
+    dispatch.next = ov.next
+    return dispatch
 
 
 @dataclass(frozen=True)
@@ -293,7 +313,6 @@ class _Ovld:
         self,
         *,
         mixins=[],
-        bootstrap=None,
         name=None,
         linkback=False,
         allow_replacement=True,
@@ -304,7 +323,6 @@ class _Ovld:
         self.linkback = linkback
         self.children = []
         self.allow_replacement = allow_replacement
-        self.bootstrap = bootstrap
         self.name = name
         self.shortname = name or f"__OVLD{self.id}"
         self.__name__ = name
@@ -312,20 +330,17 @@ class _Ovld:
         self._locked = False
         self.mixins = []
         self.add_mixins(*mixins)
-        self.ocls = _fresh(OvldCall)
 
     @property
     def defns(self):
         defns = {}
         for mixin in self.mixins:
+            mixin = getattr(mixin, "__ovld__", mixin)
             defns.update(mixin.defns)
         defns.update(self._defns)
         return defns
 
-    @property
-    def __doc__(self):
-        self.ensure_compiled()
-
+    def mkdoc(self):
         docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
         if len(docs) == 1:
             maindoc = docs[0]
@@ -346,15 +361,14 @@ class _Ovld:
         return doc
 
     @property
+    def __doc__(self):
+        self.ensure_compiled()
+        return self.mkdoc()
+
+    @property
     def __signature__(self):
         self.ensure_compiled()
-
-        sig = inspect.signature(self._dispatch)
-        if not self.argument_analysis.is_method:
-            sig = inspect.Signature(
-                [v for k, v in sig.parameters.items() if k != "self"]
-            )
-        return sig
+        return inspect.signature(self._dispatch2)
 
     def lock(self):
         self._locked = True
@@ -366,10 +380,9 @@ class _Ovld:
     def add_mixins(self, *mixins):
         self._attempt_modify()
         for mixin in mixins:
+            mixin = getattr(mixin, "__ovld__", mixin)
             if self.linkback:
                 mixin.children.append(self)
-            if mixin._defns and self.bootstrap is None:
-                self.bootstrap = mixin.bootstrap
         self.mixins += mixins
 
     def _key_error(self, key, possibilities=None):
@@ -396,15 +409,15 @@ class _Ovld:
 
     def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
-        if self.bootstrap is None:
-            self.bootstrap = arg0_is_self(fn)
-
         if self.name is None:
             self.name = f"{fn.__module__}.{fn.__qualname__}"
             self.shortname = fn.__name__
             self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
+            self._dispatch2 = bootstrap_dispatch(
+                self, name=f"{self.shortname}.dispatch"
+            )
 
     def _maybe_rename(self, fn):
         if hasattr(fn, "rename"):
@@ -427,6 +440,7 @@ class _Ovld:
         modification.
         """
         for mixin in self.mixins:
+            mixin = getattr(mixin, "__ovld__", mixin)
             if self not in mixin.children:
                 mixin.lock()
 
@@ -445,24 +459,32 @@ class _Ovld:
                 repl = self._maybe_rename(repl)
                 setattr(cls, method, repl)
 
-        target = self.ocls if self.bootstrap else cls
-
         anal = ArgumentAnalyzer()
         for key, fn in list(self.defns.items()):
             anal.add(fn)
         self.argument_analysis = anal
-        dispatch = generate_dispatch(anal)
-        self._dispatch = dispatch
-        target.__call__ = rename_function(dispatch, f"{name}.dispatch")
+
+        dispatch2 = generate_dispatch(self, anal)
+        if not hasattr(self, "_dispatch2"):
+            self._dispatch2 = bootstrap_dispatch(
+                self, name=f"{self.shortname}.dispatch"
+            )
+        self._dispatch2.__code__ = dispatch2.__code__
+        self._dispatch2.__kwdefaults__ = dispatch2.__kwdefaults__
+        self._dispatch2.__annotations__ = dispatch2.__annotations__
+        self._dispatch2.__defaults__ = dispatch2.__defaults__
+        self._dispatch2.__globals__.update(dispatch2.__globals__)
+        self._dispatch2.map = self.map
+        self._dispatch2.__doc__ = self.mkdoc()
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
 
         self._compiled = True
 
-    @_compile_first
     def resolve(self, *args):
         """Find the correct method to call for the given arguments."""
+        self.ensure_compiled()
         return self.map[tuple(map(subtler_type, args))]
 
     def register_signature(self, sig, orig_fn):
@@ -518,6 +540,8 @@ class _Ovld:
             self.compile()
         for child in self.children:
             child._update()
+        if hasattr(self, "_dispatch2"):
+            self._dispatch2.__doc__ = self.mkdoc()
 
     def copy(self, mixins=[], linkback=False):
         """Create a copy of this Ovld.
@@ -525,11 +549,7 @@ class _Ovld:
         New functions can be registered to the copy without affecting the
         original.
         """
-        return _fresh(_Ovld)(
-            bootstrap=self.bootstrap,
-            mixins=[self, *mixins],
-            linkback=linkback,
-        )
+        return _fresh(_Ovld)(mixins=[self, *mixins], linkback=linkback)
 
     def variant(self, fn=None, priority=0, **kwargs):
         """Decorator to create a variant of this Ovld.
@@ -546,24 +566,16 @@ class _Ovld:
 
     @_compile_first
     def __get__(self, obj, cls):
-        if obj is None:
-            return self
-        key = self.shortname
-        rval = obj.__dict__.get(key, None)
-        if rval is None:
-            obj.__dict__[key] = rval = self.ocls(self, obj)
-        return rval
+        return self._dispatch2.__get__(obj, cls)
 
     @_compile_first
     @_setattrs(rename="dispatch")
-    def __call__(self, *args):  # pragma: no cover
+    def __call__(self, *args, **kwargs):  # pragma: no cover
         """Call the overloaded function.
 
         This should be replaced by an auto-generated function.
         """
-        key = tuple(map(subtler_type, args))
-        method = self.map[key]
-        return method(*args)
+        return self._dispatch2(*args, **kwargs)
 
     @_setattrs(rename="next")
     def next(self, *args):
@@ -587,49 +599,18 @@ class _Ovld:
 
 def is_ovld(x):
     """Return whether the argument is an ovld function/method."""
-    return isinstance(x, _Ovld)
+    return isinstance(x, _Ovld) or isinstance(
+        getattr(x, "__ovld__", False), _Ovld
+    )
 
 
-class OvldCall:
-    """Context for an Ovld call."""
-
-    def __init__(self, ovld, bind_to):
-        """Initialize an OvldCall."""
-        self.ovld = ovld
-        self.map = ovld.map
-        self.obj = bind_to
-
-    @property
-    def __name__(self):
-        return self.ovld.__name__
-
-    @property
-    def __doc__(self):
-        return self.ovld.__doc__
-
-    @property
-    def __signature__(self):
-        return self.ovld.__signature__
-
-    def next(self, *args):
-        """Call the next matching method after the caller, in terms of priority or specificity."""
-        fr = sys._getframe(1)
-        key = (fr.f_code, *map(subtler_type, args))
-        method = self.map[key]
-        return method(self.obj, *args)
-
-    def resolve(self, *args):
-        """Find the right method to call for the given arguments."""
-        return self.map[tuple(map(subtler_type, args))].__get__(self.obj)
-
-    def __call__(self, *args):  # pragma: no cover
-        """Call this overloaded function.
-
-        This should be replaced by an auto-generated function.
-        """
-        key = tuple(map(subtler_type, args))
-        method = self.map[key]
-        return method(self.obj, *args)
+def to_ovld(x):
+    """Return whether the argument is an ovld function/method."""
+    x = getattr(x, "__ovld__", x)
+    if inspect.isfunction(x):
+        return ovld(x, fresh=True)
+    else:
+        return x if isinstance(x, _Ovld) else None
 
 
 def Ovld(*args, **kwargs):
@@ -661,17 +642,13 @@ class ovld_cls_dict(dict):
     def __setitem__(self, attr, value):
         prev = None
         if attr in self:
-            prev = self[attr]
-            if inspect.isfunction(prev):
-                prev = ovld(prev, fresh=True)
-            elif not is_ovld(prev):  # pragma: no cover
-                prev = None
+            prev = to_ovld(self[attr])
         elif is_ovld(value) and getattr(value, "_extend_super", False):
             mixins = []
             for base in self._bases:
                 if (candidate := getattr(base, attr, None)) is not None:
-                    if is_ovld(candidate) or inspect.isfunction(candidate):
-                        mixins.append(candidate)
+                    if mixin := to_ovld(candidate):
+                        mixins.append(mixin)
             if mixins:
                 prev, *others = mixins
                 if is_ovld(prev):
@@ -688,6 +665,7 @@ class ovld_cls_dict(dict):
 
         if prev is not None:
             if is_ovld(value) and prev is not value:
+                value = getattr(value, "__ovld__", value)
                 if prev.name is None:
                     prev.rename(value.name)
                 prev.add_mixins(value)
@@ -762,7 +740,7 @@ def _find_overload(fn, **kwargs):
         raise TypeError("@ovld requires Ovld instance")
     elif kwargs:  # pragma: no cover
         raise TypeError("Cannot configure an overload that already exists")
-    return dispatch
+    return getattr(dispatch, "__ovld__", dispatch)
 
 
 @keyword_decorator
@@ -794,13 +772,13 @@ def ovld(fn, priority=0, fresh=False, **kwargs):
         dispatch = _fresh(_Ovld)(**kwargs)
     else:
         dispatch = _find_overload(fn, **kwargs)
-    return dispatch.register(fn, priority=priority)
+    dispatch.register(fn, priority=priority)
+    return dispatch._dispatch2
 
 
 __all__ = [
     "Ovld",
     "OvldBase",
-    "OvldCall",
     "OvldMC",
     "extend_super",
     "is_ovld",
