@@ -15,7 +15,6 @@ from .recode import (
     adapt_function,
     generate_dispatch,
     rename_code,
-    rename_function,
 )
 from .typemap import MultiTypeMap
 from .types import clsstring, normalize_type
@@ -24,36 +23,11 @@ from .utils import UsageError, keyword_decorator, subtler_type
 _current_id = itertools.count()
 
 
-def _fresh(t):
-    """Returns a new subclass of type t.
-
-    Each Ovld corresponds to its own class, which allows for specialization of
-    methods.
-    """
-    methods = {}
-    if not isinstance(getattr(t, "__doc__", None), str):
-        methods["__doc__"] = t.__doc__
-    return type(t.__name__, (t,), methods)
-
-
 @keyword_decorator
 def _setattrs(fn, **kwargs):
     for k, v in kwargs.items():
         setattr(fn, k, v)
     return fn
-
-
-@keyword_decorator
-def _compile_first(fn, rename=None):
-    def first_entry(self, *args, **kwargs):
-        self.compile()
-        method = getattr(self, fn.__name__)
-        assert method is not first_entry
-        return method(*args, **kwargs)
-
-    first_entry._replace_by = fn
-    first_entry._rename = rename
-    return first_entry
 
 
 def bootstrap_dispatch(ov, name):
@@ -290,7 +264,7 @@ class ArgumentAnalyzer:
         return subtler_type if key in self.complex_transforms else type
 
 
-class _Ovld:
+class Ovld:
     """Overloaded function.
 
     A function can be added with the `register` method. One of its parameters
@@ -419,12 +393,6 @@ class _Ovld:
                 self, name=f"{self.shortname}.dispatch"
             )
 
-    def _maybe_rename(self, fn):
-        if hasattr(fn, "rename"):
-            return rename_function(fn, f"{self.__name__}.{fn.rename}")
-        else:
-            return fn
-
     def ensure_compiled(self):
         if not self._compiled:
             self.compile()
@@ -444,20 +412,11 @@ class _Ovld:
             if self not in mixin.children:
                 mixin.lock()
 
-        cls = type(self)
         if self.name is None:
             self.name = self.__name__ = f"ovld{self.id}"
 
         name = self.__name__
         self.map = MultiTypeMap(name=name, key_error=self._key_error)
-
-        # Replace the appropriate functions by their final behavior
-        for method in dir(cls):
-            value = getattr(cls, method)
-            repl = getattr(value, "_replace_by", None)
-            if repl:
-                repl = self._maybe_rename(repl)
-                setattr(cls, method, repl)
 
         anal = ArgumentAnalyzer()
         for key, fn in list(self.defns.items()):
@@ -469,7 +428,9 @@ class _Ovld:
             self._dispatch2 = bootstrap_dispatch(
                 self, name=f"{self.shortname}.dispatch"
             )
-        self._dispatch2.__code__ = dispatch2.__code__
+        self._dispatch2.__code__ = rename_code(
+            dispatch2.__code__, f"{self.shortname}.dispatch"
+        )
         self._dispatch2.__kwdefaults__ = dispatch2.__kwdefaults__
         self._dispatch2.__annotations__ = dispatch2.__annotations__
         self._dispatch2.__defaults__ = dispatch2.__defaults__
@@ -549,7 +510,7 @@ class _Ovld:
         New functions can be registered to the copy without affecting the
         original.
         """
-        return _fresh(_Ovld)(mixins=[self, *mixins], linkback=linkback)
+        return Ovld(mixins=[self, *mixins], linkback=linkback)
 
     def variant(self, fn=None, priority=0, **kwargs):
         """Decorator to create a variant of this Ovld.
@@ -564,17 +525,19 @@ class _Ovld:
             ov.register(fn, priority=priority)
             return ov
 
-    @_compile_first
     def __get__(self, obj, cls):
+        if not self._compiled:
+            self.compile()
         return self._dispatch2.__get__(obj, cls)
 
-    @_compile_first
     @_setattrs(rename="dispatch")
     def __call__(self, *args, **kwargs):  # pragma: no cover
         """Call the overloaded function.
 
         This should be replaced by an auto-generated function.
         """
+        if not self._compiled:
+            self.compile()
         return self._dispatch2(*args, **kwargs)
 
     @_setattrs(rename="next")
@@ -599,8 +562,8 @@ class _Ovld:
 
 def is_ovld(x):
     """Return whether the argument is an ovld function/method."""
-    return isinstance(x, _Ovld) or isinstance(
-        getattr(x, "__ovld__", False), _Ovld
+    return isinstance(x, Ovld) or isinstance(
+        getattr(x, "__ovld__", False), Ovld
     )
 
 
@@ -610,12 +573,7 @@ def to_ovld(x):
     if inspect.isfunction(x):
         return ovld(x, fresh=True)
     else:
-        return x if isinstance(x, _Ovld) else None
-
-
-def Ovld(*args, **kwargs):
-    """Returns an instance of a fresh Ovld class."""
-    return _fresh(_Ovld)(*args, **kwargs)
+        return x if isinstance(x, Ovld) else None
 
 
 def extend_super(fn):
@@ -735,7 +693,7 @@ def _find_overload(fn, **kwargs):
     dispatch = fr.f_locals.get(fn.__name__, None)
 
     if dispatch is None:
-        dispatch = _fresh(_Ovld)(**kwargs)
+        dispatch = Ovld(**kwargs)
     elif not is_ovld(dispatch):  # pragma: no cover
         raise TypeError("@ovld requires Ovld instance")
     elif kwargs:  # pragma: no cover
@@ -769,7 +727,7 @@ def ovld(fn, priority=0, fresh=False, **kwargs):
             ovld so that updates can be propagated. (default: False)
     """
     if fresh:
-        dispatch = _fresh(_Ovld)(**kwargs)
+        dispatch = Ovld(**kwargs)
     else:
         dispatch = _find_overload(fn, **kwargs)
     dispatch.register(fn, priority=priority)
