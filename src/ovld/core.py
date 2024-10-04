@@ -380,9 +380,7 @@ class Ovld:
         self.name = name
         self.shortname = shortname or name
         self.__name__ = shortname
-        self.dispatch = bootstrap_dispatch(
-            self, name=f"{self.shortname}.dispatch"
-        )
+        self.dispatch = bootstrap_dispatch(self, name=self.shortname)
 
     def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
@@ -422,12 +420,8 @@ class Ovld:
 
         dispatch = generate_dispatch(self, anal)
         if not hasattr(self, "dispatch"):
-            self.dispatch = bootstrap_dispatch(
-                self, name=f"{self.shortname}.dispatch"
-            )
-        self.dispatch.__code__ = rename_code(
-            dispatch.__code__, f"{self.shortname}.dispatch"
-        )
+            self.dispatch = bootstrap_dispatch(self, name=self.shortname)
+        self.dispatch.__code__ = rename_code(dispatch.__code__, self.shortname)
         self.dispatch.__kwdefaults__ = dispatch.__kwdefaults__
         self.dispatch.__annotations__ = dispatch.__annotations__
         self.dispatch.__defaults__ = dispatch.__defaults__
