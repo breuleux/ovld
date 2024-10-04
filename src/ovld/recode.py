@@ -226,6 +226,9 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
             conj = "True"
         conjs.append(conj)
 
+    if len(handlers) == 1:
+        exclusive = True
+
     argspec = ", ".join(argname(x) for x in tup)
     argcall = ", ".join(argprovide(x) for x in tup)
 
@@ -354,12 +357,19 @@ def rename_function(fn, newname):
 
 class NameConverter(ast.NodeTransformer):
     def __init__(
-        self, anal, recurse_sym, call_next_sym, ovld_mangled, code_mangled
+        self,
+        anal,
+        recurse_sym,
+        call_next_sym,
+        ovld_mangled,
+        map_mangled,
+        code_mangled,
     ):
         self.analysis = anal
         self.recurse_sym = recurse_sym
         self.call_next_sym = call_next_sym
         self.ovld_mangled = ovld_mangled
+        self.map_mangled = map_mangled
         self.code_mangled = code_mangled
         self.count = count()
 
@@ -424,14 +434,7 @@ class NameConverter(ast.NodeTransformer):
         if cn:
             type_parts.insert(0, ast.Name(id=self.code_mangled, ctx=ast.Load()))
         method = ast.Subscript(
-            value=ast.NamedExpr(
-                target=ast.Name(id=f"{tmp}M", ctx=ast.Store()),
-                value=ast.Attribute(
-                    value=ast.Name(id=self.ovld_mangled, ctx=ast.Load()),
-                    attr="map",
-                    ctx=ast.Load(),
-                ),
-            ),
+            value=ast.Name(id=self.map_mangled, ctx=ast.Load()),
             slice=ast.Tuple(
                 elts=type_parts,
                 ctx=ast.Load(),
@@ -439,19 +442,14 @@ class NameConverter(ast.NodeTransformer):
             ctx=ast.Load(),
         )
         if self.analysis.is_method:
-            method = ast.Call(
-                func=ast.Attribute(
-                    value=method,
-                    attr="__get__",
-                    ctx=ast.Load(),
-                ),
-                args=[ast.Name(id="self", ctx=ast.Load())],
-                keywords=[],
-            )
+            selfarg = [ast.Name(id="self", ctx=ast.Load())]
+        else:
+            selfarg = []
 
         new_node = ast.Call(
             func=method,
-            args=[
+            args=selfarg
+            + [
                 ast.Name(id=f"{tmp}{i}", ctx=ast.Load())
                 for i, arg in enumerate(node.args)
             ],
@@ -529,6 +527,7 @@ def closure_wrap(tree, fname, names):
 
 def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     ovld_mangled = f"___OVLD{ovld.id}"
+    map_mangled = f"___MAP{ovld.id}"
     code_mangled = f"___CODE{next(_current)}"
     try:
         src = inspect.getsource(fn)
@@ -545,6 +544,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
         recurse_sym=recurse_sym,
         call_next_sym=call_next_sym,
         ovld_mangled=ovld_mangled,
+        map_mangled=map_mangled,
         code_mangled=code_mangled,
     ).visit(tree)
     new.body[0].decorator_list = []
@@ -569,6 +569,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     new_fn.__annotations__ = fn.__annotations__
     new_fn = rename_function(new_fn, newname)
     new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
-    new_fn.__globals__[ovld_mangled] = ovld
+    new_fn.__globals__[ovld_mangled] = ovld.dispatch
+    new_fn.__globals__[map_mangled] = ovld.map
     new_fn.__globals__[code_mangled] = new_fn.__code__
     return new_fn

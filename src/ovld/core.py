@@ -352,7 +352,7 @@ class Ovld:
 
     def add_mixins(self, *mixins):
         self._attempt_modify()
-        mixins = [to_ovld(m) for m in mixins]
+        mixins = [o for m in mixins if (o := to_ovld(m)) is not self]
         for mixin in mixins:
             if self.linkback:
                 mixin.children.append(self)
@@ -375,22 +375,21 @@ class Ovld:
                 "Note: you can use @ovld(priority=X) to give higher priority to an overload."
             )
 
-    def rename(self, name):
+    def rename(self, name, shortname=None):
         """Rename this Ovld."""
         self.name = name
-        self.__name__ = name
+        self.shortname = shortname or name
+        self.__name__ = shortname
+        self.dispatch = bootstrap_dispatch(
+            self, name=f"{self.shortname}.dispatch"
+        )
 
     def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
         if self.name is None:
-            self.name = f"{fn.__module__}.{fn.__qualname__}"
-            self.shortname = fn.__name__
-            self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
-            self.dispatch = bootstrap_dispatch(
-                self, name=f"{self.shortname}.dispatch"
-            )
+            self.rename(f"{fn.__module__}.{fn.__qualname__}", fn.__name__)
 
     def ensure_compiled(self):
         if not self._compiled:
@@ -607,15 +606,9 @@ class ovld_cls_dict(dict):
                         mixins.append(mixin)
             if mixins:
                 prev, *others = mixins
-                if is_ovld(prev):
-                    prev = prev.copy()
-                else:
-                    prev = ovld(prev, fresh=True)
+                prev = prev.copy()
                 for other in others:
-                    if is_ovld(other):
-                        prev.add_mixins(other)
-                    else:
-                        prev.register(other)
+                    prev.add_mixins(other)
         else:
             prev = None
 
@@ -630,7 +623,9 @@ class ovld_cls_dict(dict):
                 prev.register(value)
                 value = prev
 
-        super().__setitem__(attr, value)
+        super().__setitem__(
+            attr, value.dispatch if isinstance(value, Ovld) else value
+        )
 
 
 class OvldMC(type):
