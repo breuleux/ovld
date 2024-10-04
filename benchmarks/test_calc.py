@@ -115,7 +115,7 @@ ops = {
 def calc_dict(expr):
     if isinstance(expr, tuple):
         return ops[expr[0]](*expr[1:])
-    elif isinstance(expr, (int, float)):
+    elif isinstance(expr, Number):
         return expr
 
 
