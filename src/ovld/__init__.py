@@ -4,7 +4,6 @@ from . import abc  # noqa: F401
 from .core import (
     Ovld,
     OvldBase,
-    OvldCall,
     OvldMC,
     extend_super,
     is_ovld,
@@ -53,7 +52,6 @@ __all__ = [
     "MultiTypeMap",
     "Ovld",
     "OvldBase",
-    "OvldCall",
     "OvldMC",
     "TypeMap",
     "extend_super",

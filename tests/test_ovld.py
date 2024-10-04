@@ -1,4 +1,3 @@
-import inspect
 import re
 import sys
 import typing
@@ -10,7 +9,6 @@ from ovld import (
     Dataclass,
     Ovld,
     OvldBase,
-    OvldCall,
     OvldMC,
     call_next,
     extend_super,
@@ -147,7 +145,7 @@ def test_redefine_2():
 
 
 def test_redefine_parent():
-    o = Ovld(bootstrap=False)
+    o = Ovld()
     o2 = o.copy()
 
     @o.register
@@ -176,7 +174,7 @@ def test_redefine_parent():
 
 
 def test_redefine_parent_with_linkback():
-    o = Ovld(bootstrap=False)
+    o = Ovld()
     o2 = o.copy(linkback=True)
 
     @o.register
@@ -677,11 +675,6 @@ def test_variant():
     assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
 
 
-class CustomCall(OvldCall):
-    def inc(self, x):
-        return x + 1
-
-
 def test_next():
     f = Ovld()
 
@@ -808,20 +801,6 @@ def test_resolve():
         return x * 2
 
     assert f.resolve(8)("hello") == "hellohello"
-
-
-def test_method_resolve():
-    class C(OvldBase):
-        def __init__(self, n):
-            self.n = n
-
-        @ovld
-        def f(self, x: int):
-            return x * self.n
-
-    c = C(2)
-
-    assert c.f.resolve(8)("hello") == "hellohello"
 
 
 def test_method():
@@ -985,7 +964,7 @@ def test_metaclass_dispatch():
 
         @ovld(priority=1000)
         def perform(self, x):
-            return self.perform.next(x) * 2
+            return call_next(x) * 2
 
         def perform(self, x: int):
             return x + self.n
@@ -1025,7 +1004,7 @@ def test_metaclass_dispatch_2():
         @extend_super
         @ovld(priority=1000)
         def perform(self, x):
-            return self.perform.next(x) * 2
+            return call_next(x) * 2
 
     x2 = Two(1)
     assert x2.perform([1, 2, 3]) == [4, 6, 8, 4, 6, 8]
@@ -1038,7 +1017,7 @@ def test_multiple_dispatch_3():
 
         @ovld(priority=1000)
         def perform(self, x):
-            return self.perform.next(x) * 2
+            return call_next(x) * 2
 
         def perform(self, xs: list):
             return [self.perform(x) for x in xs]
