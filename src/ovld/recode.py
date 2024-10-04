@@ -485,7 +485,7 @@ def adapt_function(fn, ovld, newname):
     rec_syms = list(
         _search_names(
             fn.__code__,
-            (recurse, ovld, ovld._dispatch2),
+            (recurse, ovld, ovld.dispatch),
             fn.__globals__,
             fn.__closure__,
         )

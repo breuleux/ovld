@@ -33,7 +33,7 @@ def _setattrs(fn, **kwargs):
 def bootstrap_dispatch(ov, name):
     def first_entry(*args, **kwargs):
         ov.compile()
-        return ov._dispatch2(*args, **kwargs)
+        return ov.dispatch(*args, **kwargs)
 
     dispatch = FunctionType(
         rename_code(first_entry.__code__, name),
@@ -309,7 +309,6 @@ class Ovld:
     def defns(self):
         defns = {}
         for mixin in self.mixins:
-            mixin = getattr(mixin, "__ovld__", mixin)
             defns.update(mixin.defns)
         defns.update(self._defns)
         return defns
@@ -342,7 +341,7 @@ class Ovld:
     @property
     def __signature__(self):
         self.ensure_compiled()
-        return inspect.signature(self._dispatch2)
+        return inspect.signature(self.dispatch)
 
     def lock(self):
         self._locked = True
@@ -353,8 +352,8 @@ class Ovld:
 
     def add_mixins(self, *mixins):
         self._attempt_modify()
+        mixins = [to_ovld(m) for m in mixins]
         for mixin in mixins:
-            mixin = getattr(mixin, "__ovld__", mixin)
             if self.linkback:
                 mixin.children.append(self)
         self.mixins += mixins
@@ -389,7 +388,7 @@ class Ovld:
             self.__name__ = fn.__name__
             self.__qualname__ = fn.__qualname__
             self.__module__ = fn.__module__
-            self._dispatch2 = bootstrap_dispatch(
+            self.dispatch = bootstrap_dispatch(
                 self, name=f"{self.shortname}.dispatch"
             )
 
@@ -408,7 +407,6 @@ class Ovld:
         modification.
         """
         for mixin in self.mixins:
-            mixin = getattr(mixin, "__ovld__", mixin)
             if self not in mixin.children:
                 mixin.lock()
 
@@ -423,20 +421,20 @@ class Ovld:
             anal.add(fn)
         self.argument_analysis = anal
 
-        dispatch2 = generate_dispatch(self, anal)
-        if not hasattr(self, "_dispatch2"):
-            self._dispatch2 = bootstrap_dispatch(
+        dispatch = generate_dispatch(self, anal)
+        if not hasattr(self, "dispatch"):
+            self.dispatch = bootstrap_dispatch(
                 self, name=f"{self.shortname}.dispatch"
             )
-        self._dispatch2.__code__ = rename_code(
-            dispatch2.__code__, f"{self.shortname}.dispatch"
+        self.dispatch.__code__ = rename_code(
+            dispatch.__code__, f"{self.shortname}.dispatch"
         )
-        self._dispatch2.__kwdefaults__ = dispatch2.__kwdefaults__
-        self._dispatch2.__annotations__ = dispatch2.__annotations__
-        self._dispatch2.__defaults__ = dispatch2.__defaults__
-        self._dispatch2.__globals__.update(dispatch2.__globals__)
-        self._dispatch2.map = self.map
-        self._dispatch2.__doc__ = self.mkdoc()
+        self.dispatch.__kwdefaults__ = dispatch.__kwdefaults__
+        self.dispatch.__annotations__ = dispatch.__annotations__
+        self.dispatch.__defaults__ = dispatch.__defaults__
+        self.dispatch.__globals__.update(dispatch.__globals__)
+        self.dispatch.map = self.map
+        self.dispatch.__doc__ = self.mkdoc()
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
@@ -501,8 +499,8 @@ class Ovld:
             self.compile()
         for child in self.children:
             child._update()
-        if hasattr(self, "_dispatch2"):
-            self._dispatch2.__doc__ = self.mkdoc()
+        if hasattr(self, "dispatch"):
+            self.dispatch.__doc__ = self.mkdoc()
 
     def copy(self, mixins=[], linkback=False):
         """Create a copy of this Ovld.
@@ -528,7 +526,7 @@ class Ovld:
     def __get__(self, obj, cls):
         if not self._compiled:
             self.compile()
-        return self._dispatch2.__get__(obj, cls)
+        return self.dispatch.__get__(obj, cls)
 
     @_setattrs(rename="dispatch")
     def __call__(self, *args, **kwargs):  # pragma: no cover
@@ -538,7 +536,7 @@ class Ovld:
         """
         if not self._compiled:
             self.compile()
-        return self._dispatch2(*args, **kwargs)
+        return self.dispatch(*args, **kwargs)
 
     @_setattrs(rename="next")
     def next(self, *args):
@@ -731,7 +729,7 @@ def ovld(fn, priority=0, fresh=False, **kwargs):
     else:
         dispatch = _find_overload(fn, **kwargs)
     dispatch.register(fn, priority=priority)
-    return dispatch._dispatch2
+    return dispatch.dispatch
 
 
 __all__ = [
