@@ -40,6 +40,8 @@ jobs:
         - python: '3.11'
           coverage: false
         - python: '3.12'
+          coverage: false
+        - python: '3.13'
           coverage: true
     steps:
     - name: Check out the code
@@ -70,6 +72,7 @@ jobs:
         - python: '3.10'
         - python: '3.11'
         - python: '3.12'
+        - python: '3.13'
     steps:
     - name: Check out the code
       uses: actions/checkout@v3
