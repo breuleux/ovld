@@ -7,12 +7,7 @@ from typing import Protocol, get_args, runtime_checkable
 
 from .mro import Order, TypeRelationship, subclasscheck, typeorder
 from .typemap import TypeMap
-from .utils import UsageError, clsstring
-
-try:
-    from types import UnionType
-except ImportError:  # pragma: no cover
-    UnionType = None
+from .utils import UnionType, UnionTypes, UsageError, clsstring
 
 
 def get_args(tp):
@@ -44,6 +39,8 @@ class TypeNormalizer:
             t = object
         elif t is inspect._empty:
             t = object
+        elif t in UnionTypes:
+            return type[t]
         elif isinstance(t, typing._AnnotatedAlias):
             t = t.__origin__
 

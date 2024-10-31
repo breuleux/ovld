@@ -5,6 +5,15 @@ import re
 import typing
 from itertools import count
 
+try:
+    from types import UnionType
+
+    UnionTypes = (type(typing.Union[int, str]), UnionType)
+
+except ImportError:  # pragma: no cover
+    UnionType = None
+    UnionTypes = (type(typing.Union[int, str]),)
+
 
 class Named:
     """A named object.
@@ -89,6 +98,8 @@ def clsstring(cls):
 
 def subtler_type(obj):
     if isinstance(obj, GenericAlias):
+        return type[obj]
+    elif isinstance(obj, UnionTypes):
         return type[obj]
     elif obj is typing.Any:
         return type[object]

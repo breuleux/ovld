@@ -3,6 +3,8 @@ from enum import Enum
 from graphlib import TopologicalSorter
 from typing import get_args, get_origin
 
+from .utils import UnionTypes
+
 
 class Order(Enum):
     LESS = -1
@@ -120,6 +122,9 @@ def subclasscheck(t1, t2):
         and (result := t1.__is_subtype__(t2)) is not NotImplemented
     ):
         return result
+
+    if t2 in UnionTypes:
+        return isinstance(t1, t2)
 
     o1 = get_origin(t1)
     o2 = get_origin(t2)

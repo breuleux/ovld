@@ -18,6 +18,7 @@ from ovld import (
     recurse,
 )
 from ovld.dependent import Dependent, Equals, StartsWith
+from ovld.types import UnionTypes
 from ovld.utils import MISSING, UsageError
 
 from .test_typemap import Animal, Bird, Mammal
@@ -1238,6 +1239,28 @@ def test_type_any():
         return "yes"
 
     assert f(typing.Any) == "yes"
+
+
+UT = type(typing.Union[int, str])
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="union syntax requires python3.10 or higher",
+)
+def test_union_catchall():
+    @ovld
+    def f(t: UnionTypes):
+        return "yes"
+
+    @ovld
+    def f(t: type[object]):
+        return "no"
+
+    assert f(typing.Optional[float]) == "yes"
+    assert f(typing.Union[int, str]) == "yes"
+    assert f(int | str) == "yes"
+    assert f(int) == "no"
 
 
 def test_annotated():
