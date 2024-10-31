@@ -3,7 +3,7 @@ import sys
 import typing
 from dataclasses import dataclass
 from functools import partial
-from typing import Protocol, runtime_checkable
+from typing import Protocol, get_args, runtime_checkable
 
 from .mro import Order, TypeRelationship, subclasscheck, typeorder
 from .typemap import TypeMap
@@ -13,6 +13,13 @@ try:
     from types import UnionType
 except ImportError:  # pragma: no cover
     UnionType = None
+
+
+def get_args(tp):
+    args = getattr(tp, "__args__", None)
+    if not isinstance(args, tuple):
+        args = ()
+    return args
 
 
 class TypeNormalizer:
@@ -82,7 +89,7 @@ class MetaMC(type):
         return super().__new__(T, name, (), {"_handler": handler})
 
     def __init__(cls, name, handler):
-        cls.__args__ = getattr(handler, "__args__", ())
+        cls.__args__ = get_args(handler)
 
     def codegen(cls):
         return cls._handler.codegen()

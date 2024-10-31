@@ -15,6 +15,7 @@ from .types import (
     Intersection,
     Order,
     clsstring,
+    get_args,
     normalize_type,
     subclasscheck,
     typeorder,
@@ -61,7 +62,7 @@ def combine(master_template, args):
 def is_dependent(t):
     if isinstance(t, DependentType):
         return True
-    elif any(is_dependent(subt) for subt in getattr(t, "__args__", ())):
+    elif any(is_dependent(subt) for subt in get_args(t)):
         return True
     return False
 
