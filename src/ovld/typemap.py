@@ -353,7 +353,10 @@ class MultiTypeMap(dict):
                 break
             else:
                 for tup in tups:
-                    self[tup] = func
+                    if specializer := getattr(func, "specializer", False):
+                        self[tup] = specializer(func, tup)
+                    else:
+                        self[tup] = func
             if not codes:
                 break
             parents = codes

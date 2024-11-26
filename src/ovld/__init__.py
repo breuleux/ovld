@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from . import abc  # noqa: F401
+from .codegen import CodeGen, code_generator
 from .core import (
     Ovld,
     OvldBase,
@@ -57,6 +58,8 @@ __all__ = [
     "extend_super",
     "is_ovld",
     "ovld",
+    "CodeGen",
+    "code_generator",
     "Dependent",
     "ParametrizedDependentType",
     "DependentType",

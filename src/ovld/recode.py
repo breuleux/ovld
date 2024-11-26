@@ -1,12 +1,11 @@
 import ast
 import inspect
-import linecache
 import textwrap
-from ast import _splitlines_no_ff as splitlines
 from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
+from .codegen import generate_checking_code, instantiate_code
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
 recurse = Unusable(
@@ -15,27 +14,6 @@ recurse = Unusable(
 call_next = Unusable(
     "call_next() can only be used from inside an @ovld-registered function."
 )
-
-
-def instantiate_code(symbol, code, inject={}):
-    virtual_file = f"<ovld:{abs(hash(code)):x}>"
-    linecache.cache[virtual_file] = (None, None, splitlines(code), virtual_file)
-    code = compile(source=code, filename=virtual_file, mode="exec")
-    glb = {**inject}
-    exec(code, glb, glb)
-    return glb[symbol]
-
-
-# # Previous version: generate a temporary file
-# def instantiate_code(symbol, code, inject={}):
-#     tf = tempfile.NamedTemporaryFile("w")
-#     _tempfiles.append(tf)
-#     tf.write(code)
-#     tf.flush()
-#     glb = runpy.run_path(tf.name)
-#     rval = glb[symbol]
-#     rval.__globals__.update(inject)
-#     return rval
 
 
 dispatch_template = """
@@ -171,7 +149,7 @@ def generate_dispatch(ov, arganal):
 
 
 def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
-    from .dependent import generate_checking_code, is_dependent
+    from .dependent import is_dependent
 
     def to_dict(tup):
         return dict(
@@ -184,12 +162,6 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     def argprovide(x):
         return f"ARG{x}" if isinstance(x, int) else f"{x}={x}"
-
-    def codegen(typ, arg):
-        cg = generate_checking_code(typ)
-        return cg.template.format(
-            arg=arg, **{k: ndb[v] for k, v in cg.substitutions.items()}
-        )
 
     tup = to_dict(tup)
     handlers = [(h, to_dict(types)) for h, types in handlers]
@@ -230,7 +202,10 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         if len(relevant) > 1:
             # The keyexpr method only works if there is only one condition to check.
             keyexpr = keyed = None
-        codes = [codegen(types[k], argname(k)) for k in relevant]
+        codes = [
+            generate_checking_code(types[k]).fill(ndb, arg=argname(k))
+            for k in relevant
+        ]
         conj = " and ".join(codes)
         if not conj:  # pragma: no cover
             # Not sure if this can happen
@@ -318,6 +293,8 @@ class Conformer:
                 ofn.__defaults__,
                 ofn.__closure__,
             )
+            new_fn.specializer = getattr(ofn, "specializer", None)
+            new_fn.__kwdefaults__ = ofn.__kwdefaults__
             new_fn.__annotations__ = ofn.__annotations__
 
         self.ovld.register(new_fn)
@@ -363,6 +340,7 @@ def rename_function(fn, newname):
     )
     new_fn.__kwdefaults__ = fn.__kwdefaults__
     new_fn.__annotations__ = fn.__annotations__
+    new_fn.specializer = getattr(fn, "specializer", None)
     return new_fn
 
 
@@ -578,6 +556,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
     )
     new_fn.__kwdefaults__ = fn.__kwdefaults__
     new_fn.__annotations__ = fn.__annotations__
+    new_fn.specializer = getattr(fn, "specializer", None)
     new_fn = rename_function(new_fn, newname)
     new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
     new_fn.__globals__[ovld_mangled] = ovld.dispatch

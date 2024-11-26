@@ -3,7 +3,6 @@ import re
 from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from functools import partial
-from itertools import count
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -11,6 +10,7 @@ from typing import (
     TypeVar,
 )
 
+from .codegen import CodeGen
 from .types import (
     Intersection,
     Order,
@@ -20,43 +20,6 @@ from .types import (
     subclasscheck,
     typeorder,
 )
-
-_current = count()
-
-
-def generate_checking_code(typ):
-    if hasattr(typ, "codegen"):
-        return typ.codegen()
-    else:
-        return CodeGen("isinstance({arg}, {this})", this=typ)
-
-
-class CodeGen:
-    def __init__(self, template, substitutions={}, **substitutions_kw):
-        self.template = template
-        self.substitutions = {**substitutions, **substitutions_kw}
-
-    def mangle(self):
-        renamings = {
-            k: f"{{{k}__{next(_current)}}}" for k in self.substitutions
-        }
-        renamings["arg"] = "{arg}"
-        new_subs = {
-            newk[1:-1]: self.substitutions[k]
-            for k, newk in renamings.items()
-            if k in self.substitutions
-        }
-        return CodeGen(self.template.format(**renamings), new_subs)
-
-
-def combine(master_template, args):
-    fmts = []
-    subs = {}
-    for cg in args:
-        mangled = cg.mangle()
-        fmts.append(mangled.template)
-        subs.update(mangled.substitutions)
-    return CodeGen(master_template.format(*fmts), subs)
 
 
 def is_dependent(t):
