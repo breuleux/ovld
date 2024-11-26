@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .codegen import generate_checking_code, instantiate_code
+from .codegen import generate_checking_code, instantiate_code, sub
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
 recurse = Unusable(
@@ -192,7 +192,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
                         exclusive = True
                         keyexpr = None
                     else:
-                        keyexpr = focus.keygen().format(arg=argname(k))
+                        keyexpr = sub(focus.keygen(), {"arg": argname(k)})
 
                 else:
                     exclusive = getattr(focus, "exclusive_type", False)

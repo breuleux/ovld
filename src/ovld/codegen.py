@@ -1,5 +1,6 @@
 import inspect
 import linecache
+import re
 from ast import _splitlines_no_ff as splitlines
 from itertools import count
 from textwrap import indent
@@ -34,7 +35,17 @@ def generate_checking_code(typ):
     if hasattr(typ, "codegen"):
         return typ.codegen()
     else:
-        return CodeGen("isinstance({arg}, {this})", this=typ)
+        return CodeGen("isinstance($arg, $this)", this=typ)
+
+
+subr = re.compile(r"\$([a-zA-Z0-9_]+)")
+
+
+def sub(template, subs):
+    def repl_fn(m):
+        return subs[m.groups()[0]]
+
+    return subr.sub(string=template, repl=repl_fn)
 
 
 def combine(master_template, args):
@@ -53,21 +64,18 @@ class CodeGen:
         self.substitutions = {**substitutions, **substitutions_kw}
 
     def fill(self, ndb, **subs):
-        return self.template.format(
-            **subs, **{k: ndb[v] for k, v in self.substitutions.items()}
-        )
+        subs = {**subs, **{k: ndb[v] for k, v in self.substitutions.items()}}
+        return sub(self.template, subs)
 
     def mangle(self):
-        renamings = {
-            k: f"{{{k}__{next(_current)}}}" for k in self.substitutions
-        }
-        renamings["arg"] = "{arg}"
+        renamings = {k: f"${k}__{next(_current)}" for k in self.substitutions}
+        renamings["arg"] = "$arg"
         new_subs = {
-            newk[1:-1]: self.substitutions[k]
+            newk[1:]: self.substitutions[k]
             for k, newk in renamings.items()
             if k in self.substitutions
         }
-        return CodeGen(self.template.format(**renamings), new_subs)
+        return CodeGen(sub(self.template, renamings), new_subs)
 
 
 def regen_signature(fn, ndb):

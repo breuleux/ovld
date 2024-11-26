@@ -53,7 +53,7 @@ class DependentType(type):
         raise NotImplementedError()
 
     def codegen(self):
-        return CodeGen("{this}.check({arg})", this=self)
+        return CodeGen("$this.check($arg)", this=self)
 
     def __type_order__(self, other):
         if isinstance(other, DependentType):
@@ -219,16 +219,16 @@ class Equals(ParametrizedDependentType):
 
     @classmethod
     def keygen(cls):
-        return "{arg}"
+        return "$arg"
 
     def get_keys(self):
         return [self.parameter]
 
     def codegen(self):
         if len(self.parameters) == 1:
-            return CodeGen("({arg} == {p})", p=self.parameter)
+            return CodeGen("($arg == $p)", p=self.parameter)
         else:
-            return CodeGen("({arg} in {ps})", ps=self.parameters)
+            return CodeGen("($arg in $ps)", ps=self.parameters)
 
 
 class ProductType(ParametrizedDependentType):
@@ -245,10 +245,10 @@ class ProductType(ParametrizedDependentType):
         )
 
     def codegen(self):
-        checks = ["len({arg}) == {n}"]
+        checks = ["len($arg) == $n"]
         params = {"n": len(self.parameters)}
         for i, p in enumerate(self.parameters):
-            checks.append(f"isinstance({{arg}}[{i}], {{p{i}}})")
+            checks.append(f"isinstance($arg[{i}], $p{i})")
             params[f"p{i}"] = p
         return CodeGen(" and ".join(checks), params)
 
@@ -324,7 +324,7 @@ class Regexp:
         return bool(self.rx.search(value))
 
     def codegen(self):
-        return CodeGen("bool({rx}.search({arg}))", rx=self.rx)
+        return CodeGen("bool($rx.search($arg))", rx=self.rx)
 
 
 class Dependent:
