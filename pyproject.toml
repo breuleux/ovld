@@ -19,19 +19,21 @@ Repository = "https://github.com/breuleux/ovld"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "codefind~=0.1.6",
     "pytest>=8.3.2",
     "pytest-cov>=5.0.0",
     "pytest-regressions>=2.5.0",
     "pytest-benchmark>=4.0.0",
+    "mkdocs>=1.6.1",
+]
+benchmark = [
+    "fastcore>=1.7.5",
     "multimethod>=1.12",
     "multipledispatch>=1.0.0",
     "plum-dispatch>=2.5.2",
     "runtype>=0.5.0",
-    "fastcore>=1.7.4",
-    "mkdocs>=1.6.1",
 ]
 
 [tool.hatch.build.targets.wheel]
