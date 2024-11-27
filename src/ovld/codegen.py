@@ -64,7 +64,13 @@ class CodeGen:
         self.substitutions = {**substitutions, **substitutions_kw}
 
     def fill(self, ndb, **subs):
-        subs = {**subs, **{k: ndb[v] for k, v in self.substitutions.items()}}
+        subs = {
+            **subs,
+            **{
+                k: ndb.get(v, suggested_name=k)
+                for k, v in self.substitutions.items()
+            },
+        }
         return sub(self.template, subs)
 
     def mangle(self):

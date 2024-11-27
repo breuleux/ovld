@@ -129,18 +129,21 @@ class NameDatabase:
         self.registered.add(name)
         return name
 
-    def __getitem__(self, value):
+    def get(self, value, suggested_name=None):
         if isinstance(value, (int, float, str)):
             return repr(value)
         if id(value) in self.names:
             return self.names[id(value)]
-        name = getattr(value, "__name__", self.default_name)
-        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]+"):
-            name = self.default_name
+        dflt = suggested_name or self.default_name
+        name = getattr(value, "__name__", dflt)
+        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]*"):
+            name = dflt
         name = self.gensym(name)
         self.variables[name] = value
         self.names[id(value)] = name
         return name
+
+    __getitem__ = get
 
 
 __all__ = [
