@@ -1,6 +1,7 @@
 import sys
 from functools import singledispatch
 
+import pytest
 from fastcore.dispatch import typedispatch as fastcore_dispatch
 from multimethod import multimethod as multimethod_dispatch
 from multipledispatch import dispatch as _md_dispatch
@@ -44,6 +45,34 @@ def singledispatch_dispatch(fn):
         return singledispatch(fn)
 
 
+def with_functions(**tests):
+    return pytest.mark.parametrize(
+        "fn",
+        argvalues=list(tests.values()),
+        ids=list(tests.keys()),
+    )
+
+
+def function_builder(defn):
+    def wrapper(dispatch):
+        try:
+            rval = defn(dispatch)
+        except Exception as exc:
+            e = exc
+
+            def reraise(*args, **kwargs):
+                raise e
+
+            rval = reraise
+        try:
+            rval._dispatch = dispatch
+        except AttributeError:
+            pass
+        return rval
+
+    return wrapper
+
+
 __all__ = [
     "multimethod_dispatch",
     "plum_dispatch",
@@ -52,4 +81,6 @@ __all__ = [
     "multipledispatch_dispatch",
     "fastcore_dispatch",
     "singledispatch_dispatch",
+    "function_builder",
+    "with_functions",
 ]

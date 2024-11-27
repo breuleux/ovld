@@ -7,12 +7,14 @@ import pytest
 
 from .common import (
     fastcore_dispatch,
+    function_builder,
     multimethod_dispatch,
     multipledispatch_dispatch,
     ovld_dispatch,
     plum_dispatch,
     runtype_dispatch,
     singledispatch_dispatch,
+    with_functions,
 )
 
 
@@ -33,6 +35,7 @@ def foobar():
     return ast.parse(inspect.getsource(foo)), ast.parse(inspect.getsource(bar))
 
 
+@function_builder
 def make_transform(dispatch):
     @dispatch
     def transform(node: list):
@@ -94,23 +97,24 @@ class NT(ast.NodeTransformer):
 ####################
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="ast")
-    def test(benchmark, foobar):
-        result = benchmark(fn, foobar[0])
-        assert ast.dump(result, indent=2) == ast.dump(
-            foobar[1], indent=2
-        ).replace("bar", "foo")
-
-    return test
-
-
-test_ast_ovld = make_test(make_transform(ovld_dispatch))
-test_ast_plum = make_test(make_transform(plum_dispatch))
-test_ast_multimethod = make_test(make_transform(multimethod_dispatch))
-test_ast_multipledispatch = make_test(make_transform(multipledispatch_dispatch))
-test_ast_runtype = make_test(make_transform(runtype_dispatch))
-test_ast_fastcore = make_test(make_transform(fastcore_dispatch))
-if sys.version_info >= (3, 11):
-    test_ast_singledispatch = make_test(make_transform(singledispatch_dispatch))
-test_ast_custom = make_test(NT().visit)
+@pytest.mark.benchmark(group="ast")
+@with_functions(
+    ovld=make_transform(ovld_dispatch),
+    plum=make_transform(plum_dispatch),
+    multimethod=make_transform(multimethod_dispatch),
+    multipledispatch=make_transform(multipledispatch_dispatch),
+    runtype=make_transform(runtype_dispatch),
+    fastcore=make_transform(fastcore_dispatch),
+    singledispatch=make_transform(singledispatch_dispatch),
+    custom=NT().visit,
+)
+def test_ast(fn, foobar, benchmark):
+    if (
+        sys.version_info < (3, 11)
+        and getattr(fn, "_dispatch", None) is singledispatch_dispatch
+    ):
+        pytest.skip()
+    result = benchmark(fn, foobar[0])
+    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
+        "bar", "foo"
+    )

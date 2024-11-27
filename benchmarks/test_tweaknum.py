@@ -1,12 +1,13 @@
 import pytest
 
-from .common import ovld_dispatch
+from .common import function_builder, ovld_dispatch, with_functions
 
 ###############################
 # multiple dispatch libraries #
 ###############################
 
 
+@function_builder
 def make_tweaknum(dispatch):
     @dispatch
     def tweaknum(n: int, *, add: int):
@@ -62,19 +63,15 @@ def tweaknum_match(n, **kwargs):
 ####################
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="tweaknum")
-    def test(benchmark):
-        def run():
-            return fn(10, add=3), fn(5, mul=7), fn(2, pow=5)
+@pytest.mark.benchmark(group="tweaknum")
+@with_functions(
+    ovld=make_tweaknum(ovld_dispatch),
+    custom_ifs=tweaknum_ifs,
+    custom_match=tweaknum_match,
+)
+def test_tweaknum(fn, benchmark):
+    def run():
+        return fn(10, add=3), fn(5, mul=7), fn(2, pow=5)
 
-        result = benchmark(run)
-        assert result == (13, 35, 32)
-
-    return test
-
-
-test_tweaknum_ovld = make_test(make_tweaknum(ovld_dispatch))
-
-test_tweaknum_custom_ifs = make_test(tweaknum_ifs)
-test_tweaknum_custom_match = make_test(tweaknum_match)
+    result = benchmark(run)
+    assert result == (13, 35, 32)

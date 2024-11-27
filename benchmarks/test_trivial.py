@@ -4,12 +4,14 @@ import pytest
 
 from .common import (
     fastcore_dispatch,
+    function_builder,
     multimethod_dispatch,
     multipledispatch_dispatch,
     ovld_dispatch,
     plum_dispatch,
     runtype_dispatch,
     singledispatch_dispatch,
+    with_functions,
 )
 
 
@@ -38,6 +40,7 @@ class Bird(Animal):
 ###############################
 
 
+@function_builder
 def make_trivial(dispatch):
     @dispatch
     def trivial(x: Number):
@@ -97,35 +100,29 @@ def trivial_isinstance(x):
 ####################
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="trivial")
-    def test(benchmark):
-        def run():
-            return [
-                fn(1),
-                fn(3.5),
-                fn("hello"),
-                fn({}),
-                fn([1, 2]),
-                fn(Cat()),
-                fn(Dog()),
-                fn(Bird()),
-            ]
-
-        result = benchmark(run)
-        assert result == list("AABCDEFG")
-
-    return test
-
-
-test_trivial_ovld = make_test(make_trivial(ovld_dispatch))
-test_trivial_plum = make_test(make_trivial(plum_dispatch))
-test_trivial_multimethod = make_test(make_trivial(multimethod_dispatch))
-test_trivial_multipledispatch = make_test(
-    make_trivial(multipledispatch_dispatch)
+@pytest.mark.benchmark(group="trivial")
+@with_functions(
+    ovld=make_trivial(ovld_dispatch),
+    plum=make_trivial(plum_dispatch),
+    multimethod=make_trivial(multimethod_dispatch),
+    multipledispatch=make_trivial(multipledispatch_dispatch),
+    runtype=make_trivial(runtype_dispatch),
+    fastcore=make_trivial(fastcore_dispatch),
+    singledispatch=make_trivial(singledispatch_dispatch),
+    custom_isinstance=trivial_isinstance,
 )
-test_trivial_runtype = make_test(make_trivial(runtype_dispatch))
-test_trivial_fastcore = make_test(make_trivial(fastcore_dispatch))
-test_trivial_singledispatch = make_test(make_trivial(singledispatch_dispatch))
+def test_trivial(fn, benchmark):
+    def run():
+        return [
+            fn(1),
+            fn(3.5),
+            fn("hello"),
+            fn({}),
+            fn([1, 2]),
+            fn(Cat()),
+            fn(Dog()),
+            fn(Bird()),
+        ]
 
-test_trivial_custom_isinstance = make_test(trivial_isinstance)
+    result = benchmark(run)
+    assert result == list("AABCDEFG")

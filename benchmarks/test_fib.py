@@ -3,9 +3,11 @@ from typing import Literal
 import pytest
 
 from .common import (
+    function_builder,
     multimethod_dispatch,
     ovld_dispatch,
     plum_dispatch,
+    with_functions,
 )
 
 ###############################
@@ -13,6 +15,7 @@ from .common import (
 ###############################
 
 
+@function_builder
 def make_fib(dispatch):
     @dispatch
     def fib(n: Literal[0]):
@@ -46,17 +49,13 @@ def fib_normal(n):
 ####################
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="fib")
-    def test(benchmark):
-        result = benchmark(fn, 8)
-        assert result == 21
-
-    return test
-
-
-test_fib_ovld = make_test(make_fib(ovld_dispatch))
-test_fib_plum = make_test(make_fib(plum_dispatch))
-test_fib_multimethod = make_test(make_fib(multimethod_dispatch))
-
-test_fib_custom = make_test(fib_normal)
+@pytest.mark.benchmark(group="fib")
+@with_functions(
+    ovld=make_fib(ovld_dispatch),
+    plum=make_fib(plum_dispatch),
+    multimethod=make_fib(multimethod_dispatch),
+    custom=fib_normal,
+)
+def test_fib(fn, benchmark):
+    result = benchmark(fn, 8)
+    assert result == 21
