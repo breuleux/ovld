@@ -84,12 +84,13 @@ class CodeGen:
         return CodeGen(sub(self.template, renamings), new_subs)
 
 
-def regen_signature(fn, ndb):
+def regen_signature(fn, ndb):  # pragma: no cover
     sig = inspect.signature(fn)
     args = []
     ko_flag = False
     po_flag = False
     for argname, arg in sig.parameters.items():
+        ndb.register(argname)
         argstring = argname
         if arg.default is not inspect._empty:
             argstring += f" = {ndb[arg.default]}"
@@ -109,7 +110,6 @@ def regen_signature(fn, ndb):
         elif arg.kind is inspect._POSITIONAL_ONLY:
             po_flag = True
         args.append(argstring)
-        ndb.register(argname)
 
     if po_flag:
         args.append("/")
@@ -138,3 +138,9 @@ def codegen_specializer(typemap, fn, tup):
 def code_generator(fn):
     fn.specializer = codegen_specializer
     return fn
+
+
+__all__ = [
+    "CodeGen",
+    "code_generator",
+]
