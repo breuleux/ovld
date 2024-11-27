@@ -123,6 +123,7 @@ def bootstrap_dispatch(ov, name):
     dispatch.__ovld__ = ov
     dispatch.register = ov.register
     dispatch.resolve = ov.resolve
+    dispatch.resolve_for_types = ov.resolve_for_types
     dispatch.copy = ov.copy
     dispatch.variant = ov.variant
     dispatch.display_methods = ov.display_methods
@@ -492,7 +493,7 @@ class Ovld:
             self.name = self.__name__ = f"ovld{self.id}"
 
         name = self.__name__
-        self.map = MultiTypeMap(name=name, key_error=self._key_error)
+        self.map = MultiTypeMap(name=name, key_error=self._key_error, ovld=self)
 
         self.analyze_arguments()
         dispatch = generate_dispatch(self, self.argument_analysis)
@@ -515,6 +516,11 @@ class Ovld:
         """Find the correct method to call for the given arguments."""
         self.ensure_compiled()
         return self.map[tuple(map(subtler_type, args))]
+
+    def resolve_for_types(self, *args):
+        """Find the correct method to call for the given arguments."""
+        self.ensure_compiled()
+        return self.map[args]
 
     def register_signature(self, sig, orig_fn):
         """Register a function for the given signature."""

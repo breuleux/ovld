@@ -5,7 +5,7 @@ from ast import _splitlines_no_ff as splitlines
 from itertools import count
 from textwrap import indent
 
-from .utils import NameDatabase
+from .utils import MISSING, NameDatabase
 
 _current = count()
 
@@ -117,10 +117,11 @@ def {fn}({args}):
 """
 
 
-def codegen_specializer(fn, tup):
+def codegen_specializer(typemap, fn, tup):
+    is_method = typemap.ovld.argument_analysis.is_method
     ndb = NameDatabase(default_name="INJECT")
     args = regen_signature(fn, ndb)
-    body = fn(*tup)
+    body = fn(MISSING, *tup) if is_method else fn(*tup)
     if isinstance(body, CodeGen):
         body = body.fill(ndb)
     body = indent(body, "    ")

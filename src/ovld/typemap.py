@@ -95,7 +95,7 @@ class MultiTypeMap(dict):
     specific than [object, int] (which means there is an ambiguity).
     """
 
-    def __init__(self, name="_ovld", key_error=KeyError):
+    def __init__(self, name="_ovld", key_error=KeyError, ovld=None):
         self.maps = {}
         self.priorities = {}
         self.tiebreaks = {}
@@ -107,6 +107,7 @@ class MultiTypeMap(dict):
         self.dispatch_id = count()
         self.all = {}
         self.errors = {}
+        self.ovld = ovld
 
     def mro(self, obj_t_tup):
         specificities = {}
@@ -354,7 +355,7 @@ class MultiTypeMap(dict):
             else:
                 for tup in tups:
                     if specializer := getattr(func, "specializer", False):
-                        self[tup] = specializer(func, tup)
+                        self[tup] = specializer(self, func, tup)
                     else:
                         self[tup] = func
             if not codes:
