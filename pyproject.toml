@@ -25,7 +25,6 @@ dev = [
     "pytest>=8.3.2",
     "pytest-cov>=5.0.0",
     "pytest-regressions>=2.5.0",
-    "pytest-benchmark>=4.0.0",
     "mkdocs>=1.6.1",
 ]
 benchmark = [
@@ -33,6 +32,7 @@ benchmark = [
     "multimethod>=1.12",
     "multipledispatch>=1.0.0",
     "plum-dispatch>=2.5.2",
+    "pytest-benchmark>=4.0.0",
     "runtype>=0.5.0",
 ]
 
