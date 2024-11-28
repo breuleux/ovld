@@ -1,0 +1,14 @@
+def __GENERATED__(self, thing):
+    return thing + int(5)
+
+==========
+def __GENERATED__(self, thing):
+    return thing + str(5)
+
+==========
+def __GENERATED__(self, thing):
+    return thing + int(77)
+
+==========
+def __GENERATED__(self, thing):
+    return thing + str(77)

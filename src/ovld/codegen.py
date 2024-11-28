@@ -195,7 +195,7 @@ def codegen_specializer(typemap, fn, tup):
     is_method = typemap.ovld.argument_analysis.is_method
     ndb = NameDatabase(default_name="INJECT")
     args = regen_signature(fn, ndb)
-    body = fn(MISSING, *tup) if is_method else fn(*tup)
+    body = fn(typemap.ovld.specialization_self, *tup) if is_method else fn(*tup)
     if isinstance(body, CodeGen):
         body = body.fill(ndb)
     elif isinstance(body, str):
