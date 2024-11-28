@@ -198,6 +198,12 @@ def codegen_specializer(typemap, fn, tup):
     body = fn(MISSING, *tup) if is_method else fn(*tup)
     if isinstance(body, CodeGen):
         body = body.fill(ndb)
+    elif isinstance(body, str):
+        pass
+    elif isinstance(body, FunctionType):
+        return body
+    elif body is None:
+        return None
     body = textwrap.indent(body, "    ")
     code = fgen_template.format(fn="__GENERATED__", args=args, body=body)
     func = instantiate_code("__GENERATED__", code, inject=ndb.variables)
