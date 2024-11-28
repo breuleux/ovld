@@ -39,6 +39,7 @@ from .utils import (
     BOOTSTRAP,
     MISSING,
     Named,
+    NameDatabase,
     keyword_decorator,
 )
 from .version import version as __version__
@@ -68,6 +69,7 @@ __all__ = [
     "MISSING",
     "Dataclass",
     "Named",
+    "NameDatabase",
     "Deferred",
     "Exactly",
     "Intersection",

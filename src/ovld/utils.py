@@ -96,6 +96,18 @@ def clsstring(cls):
             return r
 
 
+def typemap_entry_string(cls):
+    if isinstance(cls, tuple):
+        key, typ = cls
+        return f"{key}: {clsstring(typ)}"
+    else:
+        return clsstring(cls)
+
+
+def sigstring(types):
+    return ", ".join(map(typemap_entry_string, types))
+
+
 def subtler_type(obj):
     if isinstance(obj, GenericAlias):
         return type[obj]
@@ -110,7 +122,7 @@ def subtler_type(obj):
 
 
 class NameDatabase:
-    def __init__(self, default_name):
+    def __init__(self, default_name="TMP"):
         self.default_name = default_name
         self.count = count()
         self.variables = {}

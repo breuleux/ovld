@@ -17,8 +17,14 @@ from .recode import (
     rename_code,
 )
 from .typemap import MultiTypeMap
-from .types import clsstring, normalize_type
-from .utils import MISSING, UsageError, keyword_decorator, subtler_type
+from .types import normalize_type
+from .utils import (
+    MISSING,
+    UsageError,
+    keyword_decorator,
+    sigstring,
+    subtler_type,
+)
 
 _current_id = itertools.count()
 
@@ -222,18 +228,6 @@ class Signature:
             priority=None,
             arginfo=arginfo,
         )
-
-
-def typemap_entry_string(cls):
-    if isinstance(cls, tuple):
-        key, typ = cls
-        return f"{key}: {clsstring(typ)}"
-    else:
-        return clsstring(cls)
-
-
-def sigstring(types):
-    return ", ".join(map(typemap_entry_string, types))
 
 
 class ArgumentAnalyzer:

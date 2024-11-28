@@ -1,13 +1,70 @@
 import inspect
 import linecache
 import re
+import textwrap
 from ast import _splitlines_no_ff as splitlines
 from itertools import count
-from textwrap import indent
+from types import FunctionType
 
-from .utils import MISSING, NameDatabase
+from .utils import MISSING, NameDatabase, sigstring
 
 _current = count()
+
+
+def rename_code(co, newname):  # pragma: no cover
+    if hasattr(co, "replace"):
+        if hasattr(co, "co_qualname"):
+            return co.replace(co_name=newname, co_qualname=newname)
+        else:
+            return co.replace(co_name=newname)
+    else:
+        return type(co)(
+            co.co_argcount,
+            co.co_kwonlyargcount,
+            co.co_nlocals,
+            co.co_stacksize,
+            co.co_flags,
+            co.co_code,
+            co.co_consts,
+            co.co_names,
+            co.co_varnames,
+            co.co_filename,
+            newname,
+            co.co_firstlineno,
+            co.co_lnotab,
+            co.co_freevars,
+            co.co_cellvars,
+        )
+
+
+def transfer_function(
+    func,
+    argdefs=MISSING,
+    closure=MISSING,
+    code=MISSING,
+    globals=MISSING,
+    name=MISSING,
+):
+    new_fn = FunctionType(
+        argdefs=func.__defaults__ if argdefs is MISSING else argdefs,
+        closure=func.__closure__ if closure is MISSING else closure,
+        code=func.__code__ if code is MISSING else code,
+        globals=func.__globals__ if globals is MISSING else globals,
+        name=func.__name__ if name is MISSING else name,
+    )
+    new_fn.__kwdefaults__ = func.__kwdefaults__
+    new_fn.__annotations__ = func.__annotations__
+    new_fn.__dict__.update(func.__dict__)
+    return new_fn
+
+
+def rename_function(fn, newname):
+    """Create a copy of the function with a different name."""
+    return transfer_function(
+        func=fn,
+        code=rename_code(fn.__code__, newname),
+        name=newname,
+    )
 
 
 def instantiate_code(symbol, code, inject={}):
@@ -58,9 +115,20 @@ def combine(master_template, args):
     return CodeGen(master_template.format(*fmts), subs)
 
 
+def format_code(code, indent=0, nl=False):
+    if isinstance(code, str):
+        return f"{code}\n" if nl and not code.endswith("\n") else code
+    elif isinstance(code, (list, tuple)):
+        lines = [format_code(line, indent + 4, True) for line in code]
+        block = "".join(lines)
+        return textwrap.indent(block, " " * indent)
+    else:  # pragma: no cover
+        raise TypeError(f"Cannot format code from type {type(code)}")
+
+
 class CodeGen:
     def __init__(self, template, substitutions={}, **substitutions_kw):
-        self.template = template
+        self.template = format_code(template)
         self.substitutions = {**substitutions, **substitutions_kw}
 
     def fill(self, ndb, **subs):
@@ -130,9 +198,12 @@ def codegen_specializer(typemap, fn, tup):
     body = fn(MISSING, *tup) if is_method else fn(*tup)
     if isinstance(body, CodeGen):
         body = body.fill(ndb)
-    body = indent(body, "    ")
+    body = textwrap.indent(body, "    ")
     code = fgen_template.format(fn="__GENERATED__", args=args, body=body)
-    return instantiate_code("__GENERATED__", code, inject=ndb.variables)
+    func = instantiate_code("__GENERATED__", code, inject=ndb.variables)
+    adjusted_name = f"{fn.__name__.split('[')[0]}[{sigstring(tup)}]"
+    func = rename_function(func, adjusted_name)
+    return func
 
 
 def code_generator(fn):
