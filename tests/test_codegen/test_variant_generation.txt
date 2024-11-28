@@ -1,0 +1,14 @@
+def __GENERATED__(obj):
+    return Person(
+        name=obj.name,
+        hometown=obj.hometown,
+        age=obj.age,
+    )
+
+==========
+def __GENERATED__(obj):
+    return Person(
+        name=obj.name,
+        hometown=obj.hometown,
+        age=g(obj.age),
+    )

@@ -51,11 +51,8 @@ def test_dataclass_gen(file_regression):
     @ovld
     @code_generator
     def f(x: Dataclass):
-        lines = ["return $cons("]
-        for fld in fields(x):
-            lines.append(f"    {fld.name}=$recurse(x.{fld.name}),")
-        lines.append(")")
-        return CodeGen("\n".join(lines), cons=x, recurse=recurse)
+        body = [f"{fld.name}=$recurse(x.{fld.name})," for fld in fields(x)]
+        return CodeGen(["return $cons(", body, ")"], cons=x, recurse=recurse)
 
     @ovld
     def f(x: int):

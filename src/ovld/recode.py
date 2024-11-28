@@ -5,7 +5,14 @@ from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
-from .codegen import generate_checking_code, instantiate_code, sub
+from .codegen import (
+    generate_checking_code,
+    instantiate_code,
+    rename_code,
+    rename_function,
+    sub,
+    transfer_function,
+)
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
 recurse = Unusable(
@@ -298,62 +305,6 @@ class Conformer:
         code_registry.update_cache_entry(self, self.code, new_code)
 
         self.code = new_code
-
-
-def rename_code(co, newname):  # pragma: no cover
-    if hasattr(co, "replace"):
-        if hasattr(co, "co_qualname"):
-            return co.replace(co_name=newname, co_qualname=newname)
-        else:
-            return co.replace(co_name=newname)
-    else:
-        return type(co)(
-            co.co_argcount,
-            co.co_kwonlyargcount,
-            co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags,
-            co.co_code,
-            co.co_consts,
-            co.co_names,
-            co.co_varnames,
-            co.co_filename,
-            newname,
-            co.co_firstlineno,
-            co.co_lnotab,
-            co.co_freevars,
-            co.co_cellvars,
-        )
-
-
-def transfer_function(
-    func,
-    argdefs=MISSING,
-    closure=MISSING,
-    code=MISSING,
-    globals=MISSING,
-    name=MISSING,
-):
-    new_fn = FunctionType(
-        argdefs=func.__defaults__ if argdefs is MISSING else argdefs,
-        closure=func.__closure__ if closure is MISSING else closure,
-        code=func.__code__ if code is MISSING else code,
-        globals=func.__globals__ if globals is MISSING else globals,
-        name=func.__name__ if name is MISSING else name,
-    )
-    new_fn.__kwdefaults__ = func.__kwdefaults__
-    new_fn.__annotations__ = func.__annotations__
-    new_fn.__dict__.update(func.__dict__)
-    return new_fn
-
-
-def rename_function(fn, newname):
-    """Create a copy of the function with a different name."""
-    return transfer_function(
-        func=fn,
-        code=rename_code(fn.__code__, newname),
-        name=newname,
-    )
 
 
 class NameConverter(ast.NodeTransformer):
