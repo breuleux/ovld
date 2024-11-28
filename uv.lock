@@ -359,13 +359,13 @@ benchmark = [
     { name = "multimethod" },
     { name = "multipledispatch" },
     { name = "plum-dispatch" },
-    { name = "pytest-benchmark" },
     { name = "runtype" },
 ]
 dev = [
     { name = "codefind" },
     { name = "mkdocs" },
     { name = "pytest" },
+    { name = "pytest-benchmark" },
     { name = "pytest-cov" },
     { name = "pytest-regressions" },
 ]
@@ -378,13 +378,13 @@ benchmark = [
     { name = "multimethod", specifier = ">=1.12" },
     { name = "multipledispatch", specifier = ">=1.0.0" },
     { name = "plum-dispatch", specifier = ">=2.5.2" },
-    { name = "pytest-benchmark", specifier = ">=4.0.0" },
     { name = "runtype", specifier = ">=0.5.0" },
 ]
 dev = [
     { name = "codefind", specifier = "~=0.1.6" },
     { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "pytest", specifier = ">=8.3.2" },
+    { name = "pytest-benchmark", specifier = ">=4.0.0" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
     { name = "pytest-regressions", specifier = ">=2.5.0" },
 ]
