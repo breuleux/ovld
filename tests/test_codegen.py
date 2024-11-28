@@ -86,3 +86,34 @@ def test_method(file_regression):
     assert plus.f("wow") == "wow5"
 
     file_regression.check(getcodes(Plusser.f, int, str))
+
+
+def test_variant_generation(file_regression):
+    def normal(fn):
+        fn.normal = True
+        return fn
+
+    @ovld
+    @code_generator
+    def f(obj: Dataclass):
+        lines = ["return $cons("]
+        for fld in fields(obj):
+            existing = recurse.resolve_for_types(fld.type)
+            if getattr(existing, "normal", False):
+                expr = f"obj.{fld.name}"
+            else:
+                expr = f"$recurse(obj.{fld.name})"
+            lines.append(f"    {fld.name}={expr},")
+        lines.append(")")
+        return CodeGen("\n".join(lines), cons=obj, recurse=recurse)
+
+    @ovld
+    @normal
+    def f(obj: object):
+        return obj
+
+    @f.variant
+    def g(obj: int):
+        return obj + 1
+
+    file_regression.check(getcodes(f, Person) + SEP + getcodes(g, Person))

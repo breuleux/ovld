@@ -286,16 +286,10 @@ class Conformer:
             if new_code is None:
                 return
             ofn = self.orig_fn
-            new_fn = FunctionType(
-                new_code,
-                ofn.__globals__,
-                ofn.__name__,
-                ofn.__defaults__,
-                ofn.__closure__,
+            new_fn = transfer_function(
+                func=ofn,
+                code=new_code,
             )
-            new_fn.specializer = getattr(ofn, "specializer", None)
-            new_fn.__kwdefaults__ = ofn.__kwdefaults__
-            new_fn.__annotations__ = ofn.__annotations__
 
         self.ovld.register(new_fn)
 
@@ -332,16 +326,34 @@ def rename_code(co, newname):  # pragma: no cover
         )
 
 
+def transfer_function(
+    func,
+    argdefs=MISSING,
+    closure=MISSING,
+    code=MISSING,
+    globals=MISSING,
+    name=MISSING,
+):
+    new_fn = FunctionType(
+        argdefs=func.__defaults__ if argdefs is MISSING else argdefs,
+        closure=func.__closure__ if closure is MISSING else closure,
+        code=func.__code__ if code is MISSING else code,
+        globals=func.__globals__ if globals is MISSING else globals,
+        name=func.__name__ if name is MISSING else name,
+    )
+    new_fn.__kwdefaults__ = func.__kwdefaults__
+    new_fn.__annotations__ = func.__annotations__
+    new_fn.__dict__.update(func.__dict__)
+    return new_fn
+
+
 def rename_function(fn, newname):
     """Create a copy of the function with a different name."""
-    newcode = rename_code(fn.__code__, newname)
-    new_fn = FunctionType(
-        newcode, fn.__globals__, newname, fn.__defaults__, fn.__closure__
+    return transfer_function(
+        func=fn,
+        code=rename_code(fn.__code__, newname),
+        name=newname,
     )
-    new_fn.__kwdefaults__ = fn.__kwdefaults__
-    new_fn.__annotations__ = fn.__annotations__
-    new_fn.specializer = getattr(fn, "specializer", None)
-    return new_fn
 
 
 class NameConverter(ast.NodeTransformer):
@@ -551,13 +563,12 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
             for name in new_code.co_freevars
         ]
     )
-    new_fn = FunctionType(
-        new_code, fn.__globals__, newname, fn.__defaults__, new_closure
+    new_fn = transfer_function(
+        func=fn,
+        code=rename_code(new_code, newname),
+        name=newname,
+        closure=new_closure,
     )
-    new_fn.__kwdefaults__ = fn.__kwdefaults__
-    new_fn.__annotations__ = fn.__annotations__
-    new_fn.specializer = getattr(fn, "specializer", None)
-    new_fn = rename_function(new_fn, newname)
     new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
     new_fn.__globals__[ovld_mangled] = ovld.dispatch
     new_fn.__globals__[map_mangled] = ovld.map
