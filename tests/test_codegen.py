@@ -4,6 +4,7 @@ from dataclasses import dataclass, fields
 from ovld import recurse
 from ovld.codegen import CodeGen, code_generator
 from ovld.core import ovld
+from ovld.dependent import Regexp
 from ovld.types import Dataclass
 
 
@@ -114,3 +115,48 @@ def test_variant_generation(file_regression):
         return obj + 1
 
     file_regression.check(getcodes(f, Person) + SEP + getcodes(g, Person))
+
+
+def test_nogen():
+    @ovld
+    @code_generator
+    def f(x: Dataclass):
+        if any(fld.type is not int for fld in fields(x)):
+            return None
+        body = [f"{fld.name}=$recurse(x.{fld.name})," for fld in fields(x)]
+        return CodeGen(["return $cons(", body, ")"], cons=x, recurse=recurse)
+
+    @ovld
+    def f(x: int):
+        return x + 1
+
+    @ovld
+    def f(x: object):
+        return False
+
+    assert f(Point(1, 2)) == Point(2, 3)
+    assert f(Person("Robert", "Montreal", 21)) is False
+
+
+def test_dependent_generation():
+    @ovld
+    @code_generator
+    def f(obj: Regexp[r"^A"]):
+        return "return 'rx'"
+
+    @ovld
+    def f(obj: str):
+        return "s"
+
+    assert f("Allo") == "rx"
+    assert f("Banana") == "s"
+
+
+def test_generate_function_directly():
+    @ovld
+    @code_generator
+    def f(x: object):
+        xt = x
+        return lambda x: (xt, x)
+
+    assert f("coconut") == (str, "coconut")
