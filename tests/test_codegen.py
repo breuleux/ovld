@@ -3,9 +3,10 @@ from dataclasses import dataclass, fields
 
 from ovld import recurse
 from ovld.codegen import CodeGen, code_generator
-from ovld.core import ovld
+from ovld.core import OvldBase, OvldPerInstanceBase, ovld
 from ovld.dependent import Regexp
 from ovld.types import Dataclass
+from ovld.utils import MISSING
 
 
 @dataclass
@@ -77,6 +78,7 @@ def test_method(file_regression):
         @ovld
         @code_generator
         def f(self, thing: object):
+            assert self is MISSING
             return CodeGen("return thing + $cls(self.number)", cls=thing)
 
     plus = Plusser(5)
@@ -84,6 +86,58 @@ def test_method(file_regression):
     assert plus.f("wow") == "wow5"
 
     file_regression.check(getcodes(Plusser.f, int, str))
+
+
+def test_method_metaclass(file_regression):
+    class Plusser(OvldBase):
+        def __init__(self, number):
+            self.number = number
+
+        @ovld
+        @code_generator
+        def f(self, thing: object):
+            assert self is Plusser
+            return CodeGen("return thing + $cls(self.number)", cls=thing)
+
+    plus = Plusser(5)
+    assert plus.f(3) == 8
+    assert plus.f("wow") == "wow5"
+
+    file_regression.check(getcodes(Plusser.f, int, str))
+
+
+def test_method_per_instance(file_regression):
+    class Plusser(OvldPerInstanceBase):
+        def __init__(self, number):
+            self.number = number
+
+        @ovld
+        @code_generator
+        def f(self, thing: object):
+            assert isinstance(self, Plusser)
+            return CodeGen(
+                "return thing + $cls($num)", cls=thing, num=self.number
+            )
+
+    plus5 = Plusser(5)
+    plus77 = Plusser(77)
+
+    assert type(plus5) is not type(plus77)
+
+    assert plus5.f(3) == 8
+    assert plus5.f("wow") == "wow5"
+
+    assert plus77.f(3) == 80
+    assert plus77.f("wow") == "wow77"
+
+    assert plus5.f(3) == 8
+    assert plus5.f("wow") == "wow5"
+
+    file_regression.check(
+        getcodes(type(plus5).f, int, str)
+        + SEP
+        + getcodes(type(plus77).f, int, str)
+    )
 
 
 def test_variant_generation(file_regression):

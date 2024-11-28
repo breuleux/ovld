@@ -362,6 +362,7 @@ class Ovld:
     ):
         """Initialize an Ovld."""
         self.id = next(_current_id)
+        self.specialization_self = MISSING
         self._compiled = False
         self.linkback = linkback
         self.children = []
@@ -713,7 +714,7 @@ class OvldMC(type):
         return type(cls)(name, bases, cls.__prepare__(name, bases))
 
     @classmethod
-    def __prepare__(cls, name, bases):
+    def __prepare__(metacls, name, bases):
         d = ovld_cls_dict(bases)
 
         names = set()
@@ -736,9 +737,41 @@ class OvldMC(type):
 
         return d
 
+    def __init__(cls, name, bases, d):
+        for val in d.values():
+            if o := to_ovld(val):
+                o.specialization_self = cls
+        super().__init__(name, bases, d)
+
 
 class OvldBase(metaclass=OvldMC):
     """Base class that allows overloading of methods."""
+
+
+class OvldPerInstanceMC(OvldMC):
+    """Metaclass that allows overloading.
+
+    A class which uses this metaclass can define multiple functions with
+    the same name and different type signatures.
+    """
+
+    def __call__(cls, *args, **kwargs):
+        if getattr(cls, "_ovld_instantiated", False):
+            return super().__call__(*args, **kwargs)
+        else:
+            new_t = OvldMC(cls.__name__, (cls,), {"_ovld_instantiated": True})
+            rval = new_t(*args, **kwargs)
+            for k in dir(new_t):
+                val = getattr(new_t, k, None)
+                if o := to_ovld(val):
+                    o = o.copy()
+                    o.specialization_self = rval
+                    setattr(new_t, k, o)
+            return rval
+
+
+class OvldPerInstanceBase(metaclass=OvldPerInstanceMC):
+    pass
 
 
 def _find_overload(fn, **kwargs):
@@ -802,6 +835,8 @@ __all__ = [
     "Ovld",
     "OvldBase",
     "OvldMC",
+    "OvldPerInstanceBase",
+    "OvldPerInstanceMC",
     "extend_super",
     "is_ovld",
     "ovld",
