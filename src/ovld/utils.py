@@ -148,7 +148,7 @@ class NameDatabase:
             return self.names[id(value)]
         dflt = suggested_name or self.default_name
         name = getattr(value, "__name__", dflt)
-        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]*"):
+        if not re.match(string=name, pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$"):
             name = dflt
         name = self.gensym(name)
         self.variables[name] = value

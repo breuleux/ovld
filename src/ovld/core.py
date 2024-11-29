@@ -493,8 +493,9 @@ class OvldPerInstanceMC(OvldMC):
                 val = getattr(new_t, k, None)
                 if o := to_ovld(val):
                     o = o.copy()
+                    o.compile()
                     o.specialization_self = rval
-                    setattr(new_t, k, o)
+                    setattr(new_t, k, o.dispatch)
             return rval
 
 

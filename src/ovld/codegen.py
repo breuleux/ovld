@@ -3,6 +3,7 @@ import linecache
 import re
 import textwrap
 from ast import _splitlines_no_ff as splitlines
+from dataclasses import dataclass
 from itertools import count
 from types import FunctionType
 
@@ -126,18 +127,23 @@ def format_code(code, indent=0, nl=False):
         raise TypeError(f"Cannot format code from type {type(code)}")
 
 
+@dataclass
+class InsertCode:
+    code: str
+
+
 class CodeGen:
     def __init__(self, template, substitutions={}, **substitutions_kw):
         self.template = format_code(template)
         self.substitutions = {**substitutions, **substitutions_kw}
 
     def fill(self, ndb, **subs):
+        subs = {**subs, **self.substitutions}
         subs = {
-            **subs,
-            **{
-                k: ndb.get(v, suggested_name=k)
-                for k, v in self.substitutions.items()
-            },
+            k: v.code
+            if isinstance(v, InsertCode)
+            else ndb.get(v, suggested_name=k)
+            for k, v in subs.items()
         }
         return sub(self.template, subs)
 
