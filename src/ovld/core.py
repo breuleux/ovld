@@ -484,11 +484,22 @@ class OvldPerInstanceMC(OvldMC):
     """
 
     def __call__(cls, *args, **kwargs):
-        if getattr(cls, "_ovld_instantiated", False):
+        if getattr(cls, "_ovlds_specialized", False):
             return super().__call__(*args, **kwargs)
         else:
-            new_t = OvldMC(cls.__name__, (cls,), {"_ovld_instantiated": True})
+            if hasattr(cls, "ovld_instance_key"):
+                key = cls.ovld_instance_key(*args, **kwargs)
+                insts = getattr(cls, "_ovld_instances", {})
+                cls._ovld_instances = insts
+                if key in insts:
+                    return insts[key]
+            else:
+                key = MISSING
+
+            new_t = OvldMC(cls.__name__, (cls,), {"_ovlds_specialized": True})
             rval = new_t(*args, **kwargs)
+            if key is not MISSING:
+                insts[key] = rval
             for k in dir(new_t):
                 val = getattr(new_t, k, None)
                 if orig := to_ovld(val, force=False):
