@@ -140,6 +140,39 @@ def test_method_per_instance(file_regression):
     )
 
 
+def test_method_per_instance_keyed():
+    class Plusser(OvldPerInstanceBase):
+        def __init__(self, number):
+            self.number = number
+
+        @classmethod
+        def ovld_instance_key(cls, number):
+            return number
+
+        @ovld
+        @code_generator
+        def f(self, thing: object):
+            assert isinstance(self, Plusser)
+            return CodeGen(
+                "return thing + $cls($num)", cls=thing, num=self.number
+            )
+
+    plus5 = Plusser(5)
+    plus77 = Plusser(77)
+
+    plus5_bis = Plusser(5)
+    assert plus5 is plus5_bis
+    assert plus5 is not plus77
+
+    assert type(plus5) is not type(plus77)
+
+    assert plus5.f(3) == 8
+    assert plus5.f("wow") == "wow5"
+
+    assert plus77.f(3) == 80
+    assert plus77.f("wow") == "wow77"
+
+
 def test_variant_generation(file_regression):
     def normal(fn):
         fn.normal = True
