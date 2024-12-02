@@ -364,11 +364,11 @@ def is_ovld(x):
     )
 
 
-def to_ovld(x):
-    """Return whether the argument is an ovld function/method."""
+def to_ovld(x, force=True):
+    """Return the argument as an Ovld."""
     x = getattr(x, "__ovld__", x)
     if inspect.isfunction(x):
-        return ovld(x, fresh=True)
+        return ovld(x, fresh=True) if force else None
     else:
         return x if isinstance(x, Ovld) else None
 
@@ -467,7 +467,7 @@ class OvldMC(type):
 
     def __init__(cls, name, bases, d):
         for val in d.values():
-            if o := to_ovld(val):
+            if o := to_ovld(val, force=False):
                 o.specialization_self = cls
         super().__init__(name, bases, d)
 
@@ -491,8 +491,9 @@ class OvldPerInstanceMC(OvldMC):
             rval = new_t(*args, **kwargs)
             for k in dir(new_t):
                 val = getattr(new_t, k, None)
-                if o := to_ovld(val):
-                    o = o.copy()
+                if orig := to_ovld(val, force=False):
+                    o = orig.copy()
+                    o.rename(orig.name, orig.shortname)
                     o.compile()
                     o.specialization_self = rval
                     setattr(new_t, k, o.dispatch)
