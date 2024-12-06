@@ -83,6 +83,6 @@ jobs:
     - name: Pin Python version
       run: uv python pin ${{ matrix.settings.python }}
     - name: Sync dependencies
-      run: uv sync
+      run: uv sync --group benchmark
     - name: Run benchmarks
       run: uv run pytest benchmarks/

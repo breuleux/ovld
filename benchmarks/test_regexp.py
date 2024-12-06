@@ -4,13 +4,19 @@ import pytest
 
 from ovld.dependent import Regexp
 
-from .common import ovld_dispatch, plum_dispatch
+from .common import (
+    function_builder,
+    ovld_dispatch,
+    plum_dispatch,
+    with_functions,
+)
 
 ###############################
 # multiple dispatch libraries #
 ###############################
 
 
+@function_builder
 def make_regexp(dispatch):
     @dispatch
     def regexp(x: Regexp[r"^a"]):
@@ -72,25 +78,21 @@ def regexp_compiled_nonexclusive(x):
 ####################
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="regexp")
-    def test(benchmark):
-        def run():
-            return [
-                fn("allo"),
-                fn("canada"),
-                fn("the end"),
-            ]
+@pytest.mark.benchmark(group="regexp")
+@with_functions(
+    ovld=make_regexp(ovld_dispatch),
+    plum=make_regexp(plum_dispatch),
+    custom_search=regexp_search,
+    custom_compiled=regexp_compiled,
+    custom_compiled_nx=regexp_compiled_nonexclusive,
+)
+def test_regexp(fn, benchmark):
+    def run():
+        return [
+            fn("allo"),
+            fn("canada"),
+            fn("the end"),
+        ]
 
-        result = benchmark(run)
-        assert result == ["one", "two", "three"]
-
-    return test
-
-
-test_regexp_ovld = make_test(make_regexp(ovld_dispatch))
-test_regexp_plum = make_test(make_regexp(plum_dispatch))
-
-test_regexp_custom_search = make_test(regexp_search)
-test_regexp_custom_compiled = make_test(regexp_compiled)
-# test_regexp_custom_compiled_nx = make_test(regexp_compiled_nonexclusive)
+    result = benchmark(run)
+    assert result == ["one", "two", "three"]

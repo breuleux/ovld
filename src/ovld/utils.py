@@ -96,6 +96,18 @@ def clsstring(cls):
             return r
 
 
+def typemap_entry_string(cls):
+    if isinstance(cls, tuple):
+        key, typ = cls
+        return f"{key}: {clsstring(typ)}"
+    else:
+        return clsstring(cls)
+
+
+def sigstring(types):
+    return ", ".join(map(typemap_entry_string, types))
+
+
 def subtler_type(obj):
     if isinstance(obj, GenericAlias):
         return type[obj]
@@ -110,7 +122,7 @@ def subtler_type(obj):
 
 
 class NameDatabase:
-    def __init__(self, default_name):
+    def __init__(self, default_name="TMP"):
         self.default_name = default_name
         self.count = count()
         self.variables = {}
@@ -129,18 +141,21 @@ class NameDatabase:
         self.registered.add(name)
         return name
 
-    def __getitem__(self, value):
+    def get(self, value, suggested_name=None):
         if isinstance(value, (int, float, str)):
             return repr(value)
         if id(value) in self.names:
             return self.names[id(value)]
-        name = getattr(value, "__name__", self.default_name)
-        if not re.match(string=name, pattern=r"[a-zA-Z_][a-zA-Z0-9_]+"):
-            name = self.default_name
+        dflt = suggested_name or self.default_name
+        name = getattr(value, "__name__", dflt)
+        if not re.match(string=name, pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$"):
+            name = dflt
         name = self.gensym(name)
         self.variables[name] = value
         self.names[id(value)] = name
         return name
+
+    __getitem__ = get
 
 
 __all__ = [

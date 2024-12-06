@@ -1,0 +1,13 @@
+def __GENERATED__(x):
+    return Point(
+        x=f(x.x),
+        y=f(x.y),
+    )
+
+==========
+def __GENERATED__(x):
+    return Person(
+        name=f(x.name),
+        hometown=f(x.hometown),
+        age=f(x.age),
+    )

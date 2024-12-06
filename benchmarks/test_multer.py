@@ -8,10 +8,12 @@ from ovld.core import OvldBase
 
 from .common import (
     fastcore_dispatch,
+    function_builder,
     multimethod_dispatch,
     ovld_dispatch,
     plum_dispatch,
     runtype_dispatch,
+    with_functions,
 )
 
 
@@ -20,6 +22,7 @@ class BaseMulter:
         self.factor = factor
 
 
+@function_builder
 def make_multer(dispatch):
     class Multer(BaseMulter):
         @dispatch
@@ -138,22 +141,18 @@ A = {"xs": list(range(0, 50)), "ys": ("o", (6, 7))}
 C = {"xs": list(range(0, 150, 3)), "ys": ("ooo", (18, 21))}
 
 
-def make_test(cls):
-    @pytest.mark.benchmark(group="multer")
-    def test(benchmark):
-        result = benchmark(cls(3), A)
-        assert result == C
-
-    return test
-
-
-test_multer_ovld = make_test(make_multer(ovld_dispatch))
-test_multer_recurse = make_test(OvldRecurseMulter)
-test_multer_plum = make_test(make_multer(plum_dispatch))
-test_multer_multimethod = make_test(make_multer(multimethod_dispatch))
-test_multer_singledispatch = make_test(SingleDispatchMulter)
-test_multer_multipledispatch = make_test(MultipleDispatchMulter)
-test_multer_runtype = make_test(make_multer(runtype_dispatch))
-test_multer_fastcore = make_test(make_multer(fastcore_dispatch))
-
-test_multer_custom_isinstance = make_test(IsinstanceMulter)
+@pytest.mark.benchmark(group="multer")
+@with_functions(
+    ovld=make_multer(ovld_dispatch),
+    recurse=OvldRecurseMulter,
+    plum=make_multer(plum_dispatch),
+    multimethod=make_multer(multimethod_dispatch),
+    singledispatch=SingleDispatchMulter,
+    multipledispatch=MultipleDispatchMulter,
+    runtype=make_multer(runtype_dispatch),
+    fastcore=make_multer(fastcore_dispatch),
+    isinstance=IsinstanceMulter,
+)
+def test_multer(fn, benchmark):
+    result = benchmark(fn(3), A)
+    assert result == C

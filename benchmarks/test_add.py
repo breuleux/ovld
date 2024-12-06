@@ -2,11 +2,13 @@ import pytest
 
 from .common import (
     fastcore_dispatch,
+    function_builder,
     multimethod_dispatch,
     multipledispatch_dispatch,
     ovld_dispatch,
     plum_dispatch,
     runtype_dispatch,
+    with_functions,
 )
 
 ###############################
@@ -14,6 +16,7 @@ from .common import (
 ###############################
 
 
+@function_builder
 def make_add(dispatch):
     @dispatch
     def add(x: list, y: list):
@@ -76,21 +79,17 @@ B = {"xs": list(range(10, 60)), "ys": ("x", (7, 6))}
 C = {"xs": list(range(10, 110, 2)), "ys": ("ox", (13, 13))}
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="add")
-    def test(benchmark):
-        result = benchmark(fn, A, B)
-        assert result == C
-
-    return test
-
-
-test_add_ovld = make_test(make_add(ovld_dispatch))
-test_add_plum = make_test(make_add(plum_dispatch))
-test_add_multimethod = make_test(make_add(multimethod_dispatch))
-test_add_multipledispatch = make_test(make_add(multipledispatch_dispatch))
-test_add_runtype = make_test(make_add(runtype_dispatch))
-test_add_fastcore = make_test(make_add(fastcore_dispatch))
-
-test_add_custom_isinstance = make_test(add_isinstance)
-test_add_custom_match = make_test(add_match)
+@pytest.mark.benchmark(group="add")
+@with_functions(
+    ovld=make_add(ovld_dispatch),
+    plum=make_add(plum_dispatch),
+    multimethod=make_add(multimethod_dispatch),
+    multipledispatch=make_add(multipledispatch_dispatch),
+    runtype=make_add(runtype_dispatch),
+    fastcore=make_add(fastcore_dispatch),
+    isinstance=add_isinstance,
+    match=add_match,
+)
+def test_add(fn, benchmark):
+    result = benchmark(fn, A, B)
+    assert result == C

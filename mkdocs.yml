@@ -9,4 +9,5 @@ nav:
   - types.md
   - dependent.md
   - features.md
+  - codegen.md
   - compare.md
