@@ -27,13 +27,6 @@ from .utils import (
 _current_id = itertools.count()
 
 
-@keyword_decorator
-def _setattrs(fn, **kwargs):
-    for k, v in kwargs.items():
-        setattr(fn, k, v)
-    return fn
-
-
 def bootstrap_dispatch(ov, name):
     def first_entry(*args, **kwargs):
         ov.compile()
@@ -327,7 +320,6 @@ class Ovld:
             self.compile()
         return self.dispatch.__get__(obj, cls)
 
-    @_setattrs(rename="dispatch")
     def __call__(self, *args, **kwargs):  # pragma: no cover
         """Call the overloaded function.
 
@@ -337,7 +329,6 @@ class Ovld:
             self.compile()
         return self.dispatch(*args, **kwargs)
 
-    @_setattrs(rename="next")
     def next(self, *args):
         """Call the next matching method after the caller, in terms of priority or specificity."""
         fr = sys._getframe(1)
