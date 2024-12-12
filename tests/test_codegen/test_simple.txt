@@ -1,0 +1,14 @@
+def __GENERATED__(x):
+    return type
+
+==========
+def __GENERATED__(x):
+    return int
+
+==========
+def __GENERATED__(x):
+    return str
+
+==========
+def __GENERATED__(x):
+    return Point

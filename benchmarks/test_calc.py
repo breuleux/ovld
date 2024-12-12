@@ -4,9 +4,11 @@ from typing import Literal
 import pytest
 
 from .common import (
+    function_builder,
     multimethod_dispatch,
     ovld_dispatch,
     plum_dispatch,
+    with_functions,
 )
 
 ###############################
@@ -14,6 +16,7 @@ from .common import (
 ###############################
 
 
+@function_builder
 def make_calc(dispatch):
     @dispatch
     def calc(num: Number):
@@ -127,18 +130,14 @@ expr = ("add", ("mul", ("sqrt", 4), 7), ("div", ("add", 6, 4), ("sub", 5, 3)))
 expected_result = 19
 
 
-def make_test(fn):
-    @pytest.mark.benchmark(group="calc")
-    def test(benchmark):
-        result = benchmark(fn, expr)
-        assert result == expected_result
-
-    return test
-
-
-test_calc_ovld = make_test(make_calc(ovld_dispatch))
-test_calc_plum = make_test(make_calc(plum_dispatch))
-test_calc_multimethod = make_test(make_calc(multimethod_dispatch))
-
-test_calc_custom_dict = make_test(calc_dict)
-test_calc_custom_match = make_test(calc_match)
+@pytest.mark.benchmark(group="calc")
+@with_functions(
+    ovld=make_calc(ovld_dispatch),
+    plum=make_calc(plum_dispatch),
+    multimethod=make_calc(multimethod_dispatch),
+    custom_dict=calc_dict,
+    custom_match=calc_match,
+)
+def test_calc(fn, benchmark):
+    result = benchmark(fn, expr)
+    assert result == expected_result

@@ -321,7 +321,7 @@ class Union:
         self.__args__ = self.types = types
 
     def codegen(self):
-        from .dependent import combine, generate_checking_code
+        from .codegen import combine, generate_checking_code
 
         template = " or ".join("{}" for t in self.types)
         return combine(
@@ -372,7 +372,7 @@ class Intersection:
         self.__args__ = self.types = types
 
     def codegen(self):
-        from .dependent import combine, generate_checking_code
+        from .codegen import combine, generate_checking_code
 
         template = " and ".join("{}" for t in self.types)
         return combine(

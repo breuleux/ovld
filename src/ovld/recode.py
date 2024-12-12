@@ -1,12 +1,19 @@
 import ast
 import inspect
-import linecache
 import textwrap
-from ast import _splitlines_no_ff as splitlines
 from functools import reduce
 from itertools import count
 from types import CodeType, FunctionType
 
+from .codegen import (
+    InsertCode,
+    generate_checking_code,
+    instantiate_code,
+    rename_code,
+    rename_function,
+    sub,
+    transfer_function,
+)
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
 recurse = Unusable(
@@ -15,27 +22,6 @@ recurse = Unusable(
 call_next = Unusable(
     "call_next() can only be used from inside an @ovld-registered function."
 )
-
-
-def instantiate_code(symbol, code, inject={}):
-    virtual_file = f"<ovld:{abs(hash(code)):x}>"
-    linecache.cache[virtual_file] = (None, None, splitlines(code), virtual_file)
-    code = compile(source=code, filename=virtual_file, mode="exec")
-    glb = {**inject}
-    exec(code, glb, glb)
-    return glb[symbol]
-
-
-# # Previous version: generate a temporary file
-# def instantiate_code(symbol, code, inject={}):
-#     tf = tempfile.NamedTemporaryFile("w")
-#     _tempfiles.append(tf)
-#     tf.write(code)
-#     tf.flush()
-#     glb = runpy.run_path(tf.name)
-#     rval = glb[symbol]
-#     rval.__globals__.update(inject)
-#     return rval
 
 
 dispatch_template = """
@@ -171,7 +157,7 @@ def generate_dispatch(ov, arganal):
 
 
 def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
-    from .dependent import generate_checking_code, is_dependent
+    from .dependent import is_dependent
 
     def to_dict(tup):
         return dict(
@@ -184,12 +170,6 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     def argprovide(x):
         return f"ARG{x}" if isinstance(x, int) else f"{x}={x}"
-
-    def codegen(typ, arg):
-        cg = generate_checking_code(typ)
-        return cg.template.format(
-            arg=arg, **{k: ndb[v] for k, v in cg.substitutions.items()}
-        )
 
     tup = to_dict(tup)
     handlers = [(h, to_dict(types)) for h, types in handlers]
@@ -220,7 +200,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
                         exclusive = True
                         keyexpr = None
                     else:
-                        keyexpr = focus.keygen().format(arg=argname(k))
+                        keyexpr = sub(focus.keygen(), {"arg": argname(k)})
 
                 else:
                     exclusive = getattr(focus, "exclusive_type", False)
@@ -230,7 +210,12 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
         if len(relevant) > 1:
             # The keyexpr method only works if there is only one condition to check.
             keyexpr = keyed = None
-        codes = [codegen(types[k], argname(k)) for k in relevant]
+        codes = [
+            generate_checking_code(types[k]).fill(
+                ndb, arg=InsertCode(argname(k))
+            )
+            for k in relevant
+        ]
         conj = " and ".join(codes)
         if not conj:  # pragma: no cover
             # Not sure if this can happen
@@ -311,14 +296,10 @@ class Conformer:
             if new_code is None:
                 return
             ofn = self.orig_fn
-            new_fn = FunctionType(
-                new_code,
-                ofn.__globals__,
-                ofn.__name__,
-                ofn.__defaults__,
-                ofn.__closure__,
+            new_fn = transfer_function(
+                func=ofn,
+                code=new_code,
             )
-            new_fn.__annotations__ = ofn.__annotations__
 
         self.ovld.register(new_fn)
 
@@ -327,43 +308,6 @@ class Conformer:
         code_registry.update_cache_entry(self, self.code, new_code)
 
         self.code = new_code
-
-
-def rename_code(co, newname):  # pragma: no cover
-    if hasattr(co, "replace"):
-        if hasattr(co, "co_qualname"):
-            return co.replace(co_name=newname, co_qualname=newname)
-        else:
-            return co.replace(co_name=newname)
-    else:
-        return type(co)(
-            co.co_argcount,
-            co.co_kwonlyargcount,
-            co.co_nlocals,
-            co.co_stacksize,
-            co.co_flags,
-            co.co_code,
-            co.co_consts,
-            co.co_names,
-            co.co_varnames,
-            co.co_filename,
-            newname,
-            co.co_firstlineno,
-            co.co_lnotab,
-            co.co_freevars,
-            co.co_cellvars,
-        )
-
-
-def rename_function(fn, newname):
-    """Create a copy of the function with a different name."""
-    newcode = rename_code(fn.__code__, newname)
-    new_fn = FunctionType(
-        newcode, fn.__globals__, newname, fn.__defaults__, fn.__closure__
-    )
-    new_fn.__kwdefaults__ = fn.__kwdefaults__
-    new_fn.__annotations__ = fn.__annotations__
-    return new_fn
 
 
 class NameConverter(ast.NodeTransformer):
@@ -573,12 +517,12 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
             for name in new_code.co_freevars
         ]
     )
-    new_fn = FunctionType(
-        new_code, fn.__globals__, newname, fn.__defaults__, new_closure
+    new_fn = transfer_function(
+        func=fn,
+        code=rename_code(new_code, newname),
+        name=newname,
+        closure=new_closure,
     )
-    new_fn.__kwdefaults__ = fn.__kwdefaults__
-    new_fn.__annotations__ = fn.__annotations__
-    new_fn = rename_function(new_fn, newname)
     new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
     new_fn.__globals__[ovld_mangled] = ovld.dispatch
     new_fn.__globals__[map_mangled] = ovld.map

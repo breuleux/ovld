@@ -1,10 +1,13 @@
 from typing import TYPE_CHECKING
 
 from . import abc  # noqa: F401
+from .codegen import CodeGen, InsertCode, code_generator
 from .core import (
     Ovld,
     OvldBase,
     OvldMC,
+    OvldPerInstanceBase,
+    OvldPerInstanceMC,
     extend_super,
     is_ovld,
     ovld,
@@ -38,6 +41,7 @@ from .utils import (
     BOOTSTRAP,
     MISSING,
     Named,
+    NameDatabase,
     keyword_decorator,
 )
 from .version import version as __version__
@@ -53,10 +57,15 @@ __all__ = [
     "Ovld",
     "OvldBase",
     "OvldMC",
+    "OvldPerInstanceMC",
+    "OvldPerInstanceBase",
     "TypeMap",
     "extend_super",
     "is_ovld",
     "ovld",
+    "CodeGen",
+    "InsertCode",
+    "code_generator",
     "Dependent",
     "ParametrizedDependentType",
     "DependentType",
@@ -65,6 +74,7 @@ __all__ = [
     "MISSING",
     "Dataclass",
     "Named",
+    "NameDatabase",
     "Deferred",
     "Exactly",
     "Intersection",

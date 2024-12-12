@@ -1,0 +1,6 @@
+def __GENERATED__(self, thing):
+    return thing + int(self.number)
+
+==========
+def __GENERATED__(self, thing):
+    return thing + str(self.number)

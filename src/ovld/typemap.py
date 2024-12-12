@@ -58,6 +58,7 @@ class TypeMap(dict):
 @dataclass
 class Candidate:
     handler: object
+    base_handler: object
     priority: float
     specificity: tuple
     tiebreak: int
@@ -95,7 +96,7 @@ class MultiTypeMap(dict):
     specific than [object, int] (which means there is an ambiguity).
     """
 
-    def __init__(self, name="_ovld", key_error=KeyError):
+    def __init__(self, name="_ovld", key_error=KeyError, ovld=None):
         self.maps = {}
         self.priorities = {}
         self.tiebreaks = {}
@@ -107,6 +108,7 @@ class MultiTypeMap(dict):
         self.dispatch_id = count()
         self.all = {}
         self.errors = {}
+        self.ovld = ovld
 
     def mro(self, obj_t_tup):
         specificities = {}
@@ -152,14 +154,22 @@ class MultiTypeMap(dict):
             for c in candidates:
                 specificities.setdefault(c, []).append(results[c])
 
+        def get_handler(func):
+            if specializer := getattr(func, "specializer", False):
+                return specializer(self, func, obj_t_tup)
+            else:
+                return func
+
         candidates = [
             Candidate(
-                handler=c,
+                handler=h,
+                base_handler=c,
                 priority=self.priorities.get(c, 0),
                 specificity=tuple(specificities[c]),
                 tiebreak=self.tiebreaks.get(c, 0),
             )
             for c in candidates
+            if (h := get_handler(c))
         ]
 
         # The sort ensures that if candidate A dominates candidate B, A will
@@ -264,7 +274,7 @@ class MultiTypeMap(dict):
             grp.sort(key=lambda x: x.handler.__name__)
             match = [
                 dependent_match(
-                    self.type_tuples[c.handler], [*args, *kwargs.items()]
+                    self.type_tuples[c.base_handler], [*args, *kwargs.items()]
                 )
                 for c in grp
             ]
@@ -300,12 +310,11 @@ class MultiTypeMap(dict):
                 finished = True
         print("Resolution:", message)
 
-    def wrap_dependent(self, tup, handlers, group, next_call):
-        handlers = list(handlers)
-        htup = [(h, self.type_tuples[h]) for h in handlers]
+    def wrap_dependent(self, tup, group, next_call):
+        htup = [(c.handler, self.type_tuples[c.base_handler]) for c in group]
         slf = (
             "self, "
-            if inspect.getfullargspec(handlers[0]).args[0] == "self"
+            if inspect.getfullargspec(group[0].handler).args[0] == "self"
             else ""
         )
         return generate_dependent_dispatch(
@@ -326,10 +335,10 @@ class MultiTypeMap(dict):
         funcs = []
         for group in reversed(results):
             handlers = [c.handler for c in group]
-            dependent = any(self.dependent[c.handler] for c in group)
+            dependent = any(self.dependent[c.base_handler] for c in group)
             if dependent:
                 nxt = self.wrap_dependent(
-                    obj_t_tup, handlers, group, funcs[-1] if funcs else None
+                    obj_t_tup, group, funcs[-1] if funcs else None
                 )
             elif len(group) != 1:
                 nxt = None

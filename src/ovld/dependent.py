@@ -3,7 +3,6 @@ import re
 from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from functools import partial
-from itertools import count
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -11,6 +10,7 @@ from typing import (
     TypeVar,
 )
 
+from .codegen import CodeGen
 from .types import (
     Intersection,
     Order,
@@ -20,43 +20,6 @@ from .types import (
     subclasscheck,
     typeorder,
 )
-
-_current = count()
-
-
-def generate_checking_code(typ):
-    if hasattr(typ, "codegen"):
-        return typ.codegen()
-    else:
-        return CodeGen("isinstance({arg}, {this})", this=typ)
-
-
-class CodeGen:
-    def __init__(self, template, substitutions={}, **substitutions_kw):
-        self.template = template
-        self.substitutions = {**substitutions, **substitutions_kw}
-
-    def mangle(self):
-        renamings = {
-            k: f"{{{k}__{next(_current)}}}" for k in self.substitutions
-        }
-        renamings["arg"] = "{arg}"
-        new_subs = {
-            newk[1:-1]: self.substitutions[k]
-            for k, newk in renamings.items()
-            if k in self.substitutions
-        }
-        return CodeGen(self.template.format(**renamings), new_subs)
-
-
-def combine(master_template, args):
-    fmts = []
-    subs = {}
-    for cg in args:
-        mangled = cg.mangle()
-        fmts.append(mangled.template)
-        subs.update(mangled.substitutions)
-    return CodeGen(master_template.format(*fmts), subs)
 
 
 def is_dependent(t):
@@ -90,7 +53,7 @@ class DependentType(type):
         raise NotImplementedError()
 
     def codegen(self):
-        return CodeGen("{this}.check({arg})", this=self)
+        return CodeGen("$this.check($arg)", this=self)
 
     def __type_order__(self, other):
         if isinstance(other, DependentType):
@@ -256,16 +219,16 @@ class Equals(ParametrizedDependentType):
 
     @classmethod
     def keygen(cls):
-        return "{arg}"
+        return "$arg"
 
     def get_keys(self):
         return [self.parameter]
 
     def codegen(self):
         if len(self.parameters) == 1:
-            return CodeGen("({arg} == {p})", p=self.parameter)
+            return CodeGen("($arg == $p)", p=self.parameter)
         else:
-            return CodeGen("({arg} in {ps})", ps=self.parameters)
+            return CodeGen("($arg in $ps)", ps=self.parameters)
 
 
 class ProductType(ParametrizedDependentType):
@@ -282,10 +245,10 @@ class ProductType(ParametrizedDependentType):
         )
 
     def codegen(self):
-        checks = ["len({arg}) == {n}"]
+        checks = ["len($arg) == $n"]
         params = {"n": len(self.parameters)}
         for i, p in enumerate(self.parameters):
-            checks.append(f"isinstance({{arg}}[{i}], {{p{i}}})")
+            checks.append(f"isinstance($arg[{i}], $p{i})")
             params[f"p{i}"] = p
         return CodeGen(" and ".join(checks), params)
 
@@ -361,7 +324,7 @@ class Regexp:
         return bool(self.rx.search(value))
 
     def codegen(self):
-        return CodeGen("bool({rx}.search({arg}))", rx=self.rx)
+        return CodeGen("bool($rx.search($arg))", rx=self.rx)
 
 
 class Dependent:
