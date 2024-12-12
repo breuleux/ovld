@@ -113,23 +113,26 @@ class Ovld:
         return self.argument_analysis
 
     def mkdoc(self):
-        docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
-        if len(docs) == 1:
-            maindoc = docs[0]
-        else:
-            maindoc = f"Ovld with {len(self.defns)} methods."
-
-        doc = f"{maindoc}\n\n"
-        for fn in self.defns.values():
-            fndef = inspect.signature(fn)
-            fdoc = fn.__doc__
-            if not fdoc or fdoc == maindoc:
-                doc += f"{self.__name__}{fndef}\n\n"
+        try:
+            docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
+            if len(docs) == 1:
+                maindoc = docs[0]
             else:
-                if not fdoc.strip(" ").endswith("\n"):
-                    fdoc += "\n"
-                fdoc = textwrap.indent(fdoc, " " * 4)
-                doc += f"{self.__name__}{fndef}\n{fdoc}\n"
+                maindoc = f"Ovld with {len(self.defns)} methods."
+
+            doc = f"{maindoc}\n\n"
+            for fn in self.defns.values():
+                fndef = inspect.signature(fn)
+                fdoc = fn.__doc__
+                if not fdoc or fdoc == maindoc:
+                    doc += f"{self.__name__}{fndef}\n\n"
+                else:
+                    if not fdoc.strip(" ").endswith("\n"):
+                        fdoc += "\n"
+                    fdoc = textwrap.indent(fdoc, " " * 4)
+                    doc += f"{self.__name__}{fndef}\n{fdoc}\n"
+        except Exception as exc:  # pragma: no cover
+            doc = f"An exception occurred when calculating the docstring: {exc}"
         return doc
 
     @property
