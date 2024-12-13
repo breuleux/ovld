@@ -110,7 +110,7 @@ class MultiTypeMap(dict):
         self.errors = {}
         self.ovld = ovld
 
-    def mro(self, obj_t_tup):
+    def mro(self, obj_t_tup, specialize=True):
         specificities = {}
         candidates = None
         nargs = len([t for t in obj_t_tup if not isinstance(t, tuple)])
@@ -155,7 +155,7 @@ class MultiTypeMap(dict):
                 specificities.setdefault(c, []).append(results[c])
 
         def get_handler(func):
-            if specializer := getattr(func, "specializer", False):
+            if specialize and (specializer := getattr(func, "specializer", False)):
                 return specializer(self, func, obj_t_tup)
             else:
                 return func
