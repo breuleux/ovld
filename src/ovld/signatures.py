@@ -29,9 +29,7 @@ class LazySignature(inspect.Signature):
         if return_annotation is inspect._void:
             return_annotation = self._return_annotation
 
-        return inspect.Signature(
-            parameters, return_annotation=return_annotation
-        )
+        return inspect.Signature(parameters, return_annotation=return_annotation)
 
     @property
     def parameters(self):
@@ -119,9 +117,7 @@ class Signature:
     priority: float
     tiebreak: int = 0
     is_method: bool = False
-    arginfo: list[Arginfo] = field(
-        default_factory=list, hash=False, compare=False
-    )
+    arginfo: list[Arginfo] = field(default_factory=list, hash=False, compare=False)
 
     @classmethod
     def extract(cls, fn):
@@ -195,9 +191,7 @@ class ArgumentAnalyzer:
     def add(self, fn):
         self.done = False
         sig = Signature.extract(fn)
-        self.complex_transforms.update(
-            arg.canonical for arg in sig.arginfo if arg.is_complex
-        )
+        self.complex_transforms.update(arg.canonical for arg in sig.arginfo if arg.is_complex)
         for arg in sig.arginfo:
             if arg.position is not None:
                 self.position_to_names[arg.position].add(arg.name)
@@ -231,9 +225,7 @@ class ArgumentAnalyzer:
                         f"Argument '{name}' is declared in a positional and keyword setting by different methods. It should be either."
                     )
 
-        p_to_n = [
-            list(names) for _, names in sorted(self.position_to_names.items())
-        ]
+        p_to_n = [list(names) for _, names in sorted(self.position_to_names.items())]
 
         positional = list(
             itertools.takewhile(
@@ -269,9 +261,7 @@ class ArgumentAnalyzer:
         ]
 
         keywords = [
-            name
-            for _, (name,) in self.name_to_positions.items()
-            if not isinstance(name, int)
+            name for _, (name,) in self.name_to_positions.items() if not isinstance(name, int)
         ]
         self.keyword_required = [
             name for name in keywords if self.counts[name][0] == self.total

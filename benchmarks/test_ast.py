@@ -115,6 +115,4 @@ def test_ast(fn, foobar, benchmark):
     ):
         pytest.skip()
     result = benchmark(fn, foobar[0])
-    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace(
-        "bar", "foo"
-    )
+    assert ast.dump(result, indent=2) == ast.dump(foobar[1], indent=2).replace("bar", "foo")

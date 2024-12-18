@@ -308,11 +308,7 @@ def Exactly(cls, base_cls):
 @parametrized_class_check
 def StrictSubclass(cls, base_cls):
     """Match subclasses but not the base class."""
-    return (
-        isinstance(cls, type)
-        and issubclass(cls, base_cls)
-        and cls is not base_cls
-    )
+    return isinstance(cls, type) and issubclass(cls, base_cls) and cls is not base_cls
 
 
 @parametrized_class_check
@@ -326,19 +322,14 @@ class Union:
         template = " or ".join(f"${i}" for i in range(len(self.types)))
         return Code(
             template,
-            {
-                str(i): generate_checking_code(t)
-                for i, t in enumerate(self.types)
-            },
+            {str(i): generate_checking_code(t) for i, t in enumerate(self.types)},
         )
 
     def __type_order__(self, other):
         if other is Union:
             return Order.LESS
         classes = self.types
-        compare = [
-            x for t in classes if (x := typeorder(t, other)) is not Order.NONE
-        ]
+        compare = [x for t in classes if (x := typeorder(t, other)) is not Order.NONE]
         if not compare:
             return Order.NONE
         elif any(x is Order.MORE or x is Order.SAME for x in compare):
@@ -381,19 +372,14 @@ class Intersection:
         template = " and ".join(f"${i}" for i in range(len(self.types)))
         return Code(
             template,
-            {
-                str(i): generate_checking_code(t)
-                for i, t in enumerate(self.types)
-            },
+            {str(i): generate_checking_code(t) for i, t in enumerate(self.types)},
         )
 
     def __type_order__(self, other):
         if other is Intersection:
             return Order.LESS
         classes = self.types
-        compare = [
-            x for t in classes if (x := typeorder(t, other)) is not Order.NONE
-        ]
+        compare = [x for t in classes if (x := typeorder(t, other)) is not Order.NONE]
         if not compare:
             return Order.NONE
         elif any(x is Order.LESS or x is Order.SAME for x in compare):

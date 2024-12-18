@@ -162,9 +162,7 @@ class Ovld:
     def _key_error(self, key, possibilities=None):
         typenames = sigstring(key)
         if not possibilities:
-            return TypeError(
-                f"No method in {self} for argument types [{typenames}]"
-            )
+            return TypeError(f"No method in {self} for argument types [{typenames}]")
         else:
             hlp = ""
             for c in possibilities:
@@ -243,9 +241,7 @@ class Ovld:
 
     def register_signature(self, sig, orig_fn):
         """Register a function for the given signature."""
-        fn = adapt_function(
-            orig_fn, self, f"{self.__name__}[{sigstring(sig.types)}]"
-        )
+        fn = adapt_function(orig_fn, self, f"{self.__name__}[{sigstring(sig.types)}]")
         # We just need to keep the Conformer pointer alive for jurigged
         # to find it, if jurigged is used with ovld
         fn._conformer = Conformer(self, orig_fn, fn)
@@ -267,9 +263,7 @@ class Ovld:
 
         sig = replace(Signature.extract(fn), priority=priority)
         if not self.allow_replacement and sig in self._defns:
-            raise TypeError(
-                f"There is already a method for {sigstring(sig.types)}"
-            )
+            raise TypeError(f"There is already a method for {sigstring(sig.types)}")
 
         def _set(sig, fn):
             if sig in self._defns:
@@ -353,9 +347,7 @@ class Ovld:
 
 def is_ovld(x):
     """Return whether the argument is an ovld function/method."""
-    return isinstance(x, Ovld) or isinstance(
-        getattr(x, "__ovld__", False), Ovld
-    )
+    return isinstance(x, Ovld) or isinstance(getattr(x, "__ovld__", False), Ovld)
 
 
 def to_ovld(x, force=True):
@@ -417,9 +409,7 @@ class ovld_cls_dict(dict):
                 prev.register(value)
                 value = prev
 
-        super().__setitem__(
-            attr, value.dispatch if isinstance(value, Ovld) else value
-        )
+        super().__setitem__(attr, value.dispatch if isinstance(value, Ovld) else value)
 
 
 class OvldMC(type):
@@ -446,9 +436,7 @@ class OvldMC(type):
         for name in names:
             values = [getattr(base, name, None) for base in bases]
             ovlds = [v for v in values if is_ovld(v)]
-            mixins = [
-                v for v in ovlds[1:] if getattr(v, "_extend_super", False)
-            ]
+            mixins = [v for v in ovlds[1:] if getattr(v, "_extend_super", False)]
             if mixins:
                 o = ovlds[0].copy(mixins=mixins)
                 others = [v for v in values if v is not None and not is_ovld(v)]

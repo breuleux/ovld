@@ -145,9 +145,7 @@ def subclasscheck(t1, t2):
                 args2 = get_args(t2)
                 if len(args1) != len(args2):
                     return False
-                return all(
-                    subclasscheck(a1, a2) for a1, a2 in zip(args1, args2)
-                )
+                return all(subclasscheck(a1, a2) for a1, a2 in zip(args1, args2))
         else:
             return False
     else:

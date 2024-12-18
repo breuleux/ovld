@@ -81,11 +81,7 @@ class World:
 
 @ovld
 def deserialize(t: type[Dataclass], data: dict):
-    kwargs = {
-        f.name: recurse(f.type, data[f.name])
-        for f in fields(t)
-        if f.name in data
-    }
+    kwargs = {f.name: recurse(f.type, data[f.name]) for f in fields(t) if f.name in data}
     return t(**kwargs)
 
 
