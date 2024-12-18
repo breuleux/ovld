@@ -213,7 +213,7 @@ class Equals(ParametrizedDependentType):
 
     @classmethod
     def keygen(cls):
-        return "$arg"
+        return Code("$arg")
 
     def get_keys(self):
         return [self.parameter]

@@ -88,13 +88,23 @@ def instantiate_code(symbol, code, inject={}):
 #     return rval
 
 
-subr = re.compile(r"\$([a-zA-Z0-9_]+)")
+subr = re.compile(r"\$(|=|:)(|\[[^\[\]]+\])([a-zA-Z0-9_]+)")
+symr = re.compile(r"[a-zA-Z0-9_]")
 
 
 def sub(template, subs):
+    idx = next(_current)
+
     def repl_fn(m):
-        x = m.groups()[0]
-        return subs.get(x, f"${x}")
+        prefix, sep, name = m.groups()
+        value = subs(name, bool(sep))
+        if sep:
+            value = sep[1:-1].join(value)
+        if prefix == "=" and not symr.fullmatch(value):
+            return f"{name}__{idx}"
+        if prefix == ":" and not symr.fullmatch(value):
+            return f"({name}__{idx} := {value})"
+        return value
 
     return subr.sub(string=template, repl=repl_fn)
 
@@ -121,15 +131,22 @@ class Code:
     def defaults(self, subs):
         return Code(self.template, subs, **self.substitutions)
 
-    def fill(self, ndb):
-        subs = {}
-        for k, v in self.substitutions.items():
-            if f"${k}" in self.template:
-                if isinstance(v, Code):
-                    subs[k] = v.defaults(self.substitutions).fill(ndb)
-                else:
-                    subs[k] = ndb.get(v, suggested_name=k)
-        return sub(self.template, subs)
+    def fill(self, ndb=None):
+        if ndb is None:
+            ndb = NameDatabase()
+
+        def make(name, v, sep):
+            if isinstance(v, Code):
+                return v.defaults(self.substitutions).fill(ndb)
+            elif sep:
+                return [make(name, x, sep) for x in v]
+            else:
+                return ndb.get(v, suggested_name=name)
+
+        def getsub(name, sep=False):
+            return make(name, self.substitutions[name], sep)
+
+        return sub(self.template, getsub)
 
 
 def regen_signature(fn, ndb):  # pragma: no cover

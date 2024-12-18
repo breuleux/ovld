@@ -10,7 +10,6 @@ from .codegen import (
     instantiate_code,
     rename_code,
     rename_function,
-    sub,
     transfer_function,
 )
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
@@ -197,7 +196,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
                         exclusive = True
                         keyexpr = None
                     else:
-                        keyexpr = sub(focus.keygen(), {"arg": argname(k)})
+                        keyexpr = focus.keygen().sub(arg=Code(argname(k))).fill(ndb)
 
                 else:
                     exclusive = getattr(focus, "exclusive_type", False)

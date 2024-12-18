@@ -319,11 +319,7 @@ class Union:
         self.__args__ = self.types = types
 
     def codegen(self):
-        template = " or ".join(f"${i}" for i in range(len(self.types)))
-        return Code(
-            template,
-            {str(i): generate_checking_code(t) for i, t in enumerate(self.types)},
-        )
+        return Code("($[ or ]checks)", checks=[generate_checking_code(t) for t in self.types])
 
     def __type_order__(self, other):
         if other is Union:
@@ -367,11 +363,7 @@ class Intersection:
         self.__args__ = self.types = types
 
     def codegen(self):
-        template = " and ".join(f"${i}" for i in range(len(self.types)))
-        return Code(
-            template,
-            {str(i): generate_checking_code(t) for i, t in enumerate(self.types)},
-        )
+        return Code("($[ and ]checks)", checks=[generate_checking_code(t) for t in self.types])
 
     def __type_order__(self, other):
         if other is Intersection:
