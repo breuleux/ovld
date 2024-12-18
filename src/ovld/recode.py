@@ -7,7 +7,6 @@ from types import CodeType, FunctionType
 
 from .codegen import (
     Code,
-    generate_checking_code,
     instantiate_code,
     rename_code,
     rename_function,
@@ -33,6 +32,13 @@ call_template = """
 {mvar} = OVLD.map[({lookup})]
 return {mvar}({posargs})
 """
+
+
+def generate_checking_code(typ):
+    if hasattr(typ, "codegen"):
+        return typ.codegen()
+    else:
+        return Code("isinstance($arg, $this)", this=typ)
 
 
 def generate_dispatch(ov, arganal):
