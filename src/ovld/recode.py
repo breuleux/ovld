@@ -6,7 +6,7 @@ from itertools import count
 from types import CodeType, FunctionType
 
 from .codegen import (
-    InsertCode,
+    Code,
     generate_checking_code,
     instantiate_code,
     rename_code,
@@ -211,9 +211,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
             # The keyexpr method only works if there is only one condition to check.
             keyexpr = keyed = None
         codes = [
-            generate_checking_code(types[k]).fill(
-                ndb, arg=InsertCode(argname(k))
-            )
+            generate_checking_code(types[k]).sub(arg=Code(argname(k))).fill(ndb)
             for k in relevant
         ]
         conj = " and ".join(codes)

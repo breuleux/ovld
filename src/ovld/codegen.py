@@ -3,7 +3,6 @@ import linecache
 import re
 import textwrap
 from ast import _splitlines_no_ff as splitlines
-from dataclasses import dataclass
 from itertools import count
 from types import FunctionType
 
@@ -93,7 +92,7 @@ def generate_checking_code(typ):
     if hasattr(typ, "codegen"):
         return typ.codegen()
     else:
-        return CodeGen("isinstance($arg, $this)", this=typ)
+        return Code("isinstance($arg, $this)", this=typ)
 
 
 subr = re.compile(r"\$([a-zA-Z0-9_]+)")
@@ -101,19 +100,10 @@ subr = re.compile(r"\$([a-zA-Z0-9_]+)")
 
 def sub(template, subs):
     def repl_fn(m):
-        return subs[m.groups()[0]]
+        x = m.groups()[0]
+        return subs.get(x, f"${x}")
 
     return subr.sub(string=template, repl=repl_fn)
-
-
-def combine(master_template, args):
-    fmts = []
-    subs = {}
-    for cg in args:
-        mangled = cg.mangle()
-        fmts.append(mangled.template)
-        subs.update(mangled.substitutions)
-    return CodeGen(master_template.format(*fmts), subs)
 
 
 def format_code(code, indent=0, nl=False):
@@ -127,35 +117,26 @@ def format_code(code, indent=0, nl=False):
         raise TypeError(f"Cannot format code from type {type(code)}")
 
 
-@dataclass
-class InsertCode:
-    code: str
-
-
-class CodeGen:
+class Code:
     def __init__(self, template, substitutions={}, **substitutions_kw):
         self.template = format_code(template)
         self.substitutions = {**substitutions, **substitutions_kw}
 
-    def fill(self, ndb, **subs):
-        subs = {**subs, **self.substitutions}
-        subs = {
-            k: v.code
-            if isinstance(v, InsertCode)
-            else ndb.get(v, suggested_name=k)
-            for k, v in subs.items()
-        }
-        return sub(self.template, subs)
+    def sub(self, **subs):
+        return Code(self.template, self.substitutions, **subs)
 
-    def mangle(self):
-        renamings = {k: f"${k}__{next(_current)}" for k in self.substitutions}
-        renamings["arg"] = "$arg"
-        new_subs = {
-            newk[1:]: self.substitutions[k]
-            for k, newk in renamings.items()
-            if k in self.substitutions
-        }
-        return CodeGen(sub(self.template, renamings), new_subs)
+    def defaults(self, subs):
+        return Code(self.template, subs, **self.substitutions)
+
+    def fill(self, ndb):
+        subs = {}
+        for k, v in self.substitutions.items():
+            if f"${k}" in self.template:
+                if isinstance(v, Code):
+                    subs[k] = v.defaults(self.substitutions).fill(ndb)
+                else:
+                    subs[k] = ndb.get(v, suggested_name=k)
+        return sub(self.template, subs)
 
 
 def regen_signature(fn, ndb):  # pragma: no cover
@@ -202,7 +183,7 @@ def codegen_specializer(typemap, fn, tup):
     ndb = NameDatabase(default_name="INJECT")
     args = regen_signature(fn, ndb)
     body = fn(typemap.ovld.specialization_self, *tup) if is_method else fn(*tup)
-    if isinstance(body, CodeGen):
+    if isinstance(body, Code):
         body = body.fill(ndb)
     elif isinstance(body, str):
         pass
@@ -224,6 +205,6 @@ def code_generator(fn):
 
 
 __all__ = [
-    "CodeGen",
+    "Code",
     "code_generator",
 ]

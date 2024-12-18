@@ -2,7 +2,7 @@ import inspect
 from dataclasses import dataclass, fields
 
 from ovld import recurse
-from ovld.codegen import CodeGen, code_generator
+from ovld.codegen import Code, code_generator
 from ovld.core import OvldBase, OvldPerInstanceBase, ovld
 from ovld.dependent import Regexp
 from ovld.types import Dataclass
@@ -37,7 +37,7 @@ def test_simple(file_regression):
     @ovld
     @code_generator
     def f(x: object):
-        return CodeGen("return $cls", cls=x)
+        return Code("return $cls", cls=x)
 
     assert f(int) is type
     assert f(123) is int
@@ -54,7 +54,7 @@ def test_dataclass_gen(file_regression):
     @code_generator
     def f(x: Dataclass):
         body = [f"{fld.name}=$recurse(x.{fld.name})," for fld in fields(x)]
-        return CodeGen(["return $cons(", body, ")"], cons=x, recurse=recurse)
+        return Code(["return $cons(", body, ")"], cons=x, recurse=recurse)
 
     @ovld
     def f(x: int):
@@ -79,7 +79,7 @@ def test_method(file_regression):
         @code_generator
         def f(self, thing: object):
             assert self is MISSING
-            return CodeGen("return thing + $cls(self.number)", cls=thing)
+            return Code("return thing + $cls(self.number)", cls=thing)
 
     plus = Plusser(5)
     assert plus.f(3) == 8
@@ -97,7 +97,7 @@ def test_method_metaclass(file_regression):
         @code_generator
         def f(self, thing: object):
             assert self is Plusser
-            return CodeGen("return thing + $cls(self.number)", cls=thing)
+            return Code("return thing + $cls(self.number)", cls=thing)
 
     plus = Plusser(5)
     assert plus.f(3) == 8
@@ -115,9 +115,7 @@ def test_method_per_instance(file_regression):
         @code_generator
         def f(self, thing: object):
             assert isinstance(self, Plusser)
-            return CodeGen(
-                "return thing + $cls($num)", cls=thing, num=self.number
-            )
+            return Code("return thing + $cls($num)", cls=thing, num=self.number)
 
     plus5 = Plusser(5)
     plus77 = Plusser(77)
@@ -153,9 +151,7 @@ def test_method_per_instance_keyed():
         @code_generator
         def f(self, thing: object):
             assert isinstance(self, Plusser)
-            return CodeGen(
-                "return thing + $cls($num)", cls=thing, num=self.number
-            )
+            return Code("return thing + $cls($num)", cls=thing, num=self.number)
 
     plus5 = Plusser(5)
     plus77 = Plusser(77)
@@ -190,7 +186,7 @@ def test_variant_generation(file_regression):
                 expr = f"$recurse(obj.{fld.name})"
             lines.append(f"    {fld.name}={expr},")
         lines.append(")")
-        return CodeGen("\n".join(lines), cons=obj, recurse=recurse)
+        return Code("\n".join(lines), cons=obj, recurse=recurse)
 
     @ovld
     @normal
@@ -211,7 +207,7 @@ def test_nogen():
         if any(fld.type is not int for fld in fields(x)):
             return None
         body = [f"{fld.name}=$recurse(x.{fld.name})," for fld in fields(x)]
-        return CodeGen(["return $cons(", body, ")"], cons=x, recurse=recurse)
+        return Code(["return $cons(", body, ")"], cons=x, recurse=recurse)
 
     @ovld
     def f(x: int):

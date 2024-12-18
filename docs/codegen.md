@@ -9,7 +9,7 @@
 * **Instance checks:** Custom protocols can return code that performs the check. This code is injected directly in dispatch functions to avoid a function call when e.g. a simple equality check would suffice.
 * **Specializing functions:** The `@code_generator` decorator on a function means that this function will receive types as arguments and must return *code* that will be called on the real values. The generated code will be cached for the particular type signature.
 
-The `ovld.CodeGen` class should be used to return generated code. Functions and data can be embedded using `CodeGen` and the `$x` syntax. For example, return `CodeGen("$f($x, 3)", f=my_function, x=open(...))` to generate code that will call `my_function` with some file. Note that `ovld` will not necessarily use these specific symbols in the code: to make the generated code easier to read and debug, it will try to use the real names of the functions or classes you embed.
+The `ovld.Code` class should be used to return generated code. Functions and data can be embedded using `Code` and the `$x` syntax. For example, return `Code("$f($x, 3)", f=my_function, x=open(...))` to generate code that will call `my_function` with some file. Note that `ovld` will not necessarily use these specific symbols in the code: to make the generated code easier to read and debug, it will try to use the real names of the functions or classes you embed.
 
 
 ## Instance checks
@@ -26,12 +26,12 @@ class Regexp:
         return bool(self.rx.search(value))
 
     def codegen(self):
-        return CodeGen("bool($rx.search($arg))", rx=self.rx)
+        return Code("bool($rx.search($arg))", rx=self.rx)
 ```
 
 The type's `codegen` method will be called by `ovld` to create code for the relevant dispatch function: instead of running, say, `isinstance(arg, Regexp)` it will run `bool(rx.search(arg))` directly, saving some overhead.
 
-The pre-compiled regexp `rx` can be embedded in the generated code by passing it to `CodeGen`. The special variable `$arg` is filled in by `ovld` and corresponds to the argument we want to check.
+The pre-compiled regexp `rx` can be embedded in the generated code by passing it to `Code`. The special variable `$arg` is filled in by `ovld` and corresponds to the argument we want to check.
 
 
 ## Specialized functions
@@ -53,13 +53,13 @@ def serialize(x: Dataclass):
 **With codegen:**
 
 ```python
-from ovld import CodeGen, code_generator
+from ovld import Code, code_generator
 
 @ovld
 @code_generator
 def serialize(x: Dataclass):
     body = [f"{fld.name}=$recurse(x.{fld.name})," for fld in fields(x)]
-    return CodeGen(["return $dataclass(", body, ")"], dataclass=x, recurse=recurse)
+    return Code(["return $dataclass(", body, ")"], dataclass=x, recurse=recurse)
 ```
 
 When the above is called on e.g. a `Person` object, the following code would be generated and called whenever a `Person` is passed to `serialize`:
@@ -83,9 +83,9 @@ If the code generation function returns `None`, nothing is generated and the nex
 If you want to look at the code `ovld` will generate, try something like this:
 
 ```python
-from ovld import CodeGen, NameDatabase
+from ovld import Code, NameDatabase
 
-code = CodeGen(
+code = Code(
     ["if x == $value:", ["print($txt)", "return True"]],
     value=0,
     txt="It is zero!",

@@ -20,9 +20,7 @@ def _locate(fn):
 
 def _getanns(fn):
     anns = fn.__annotations__.values()
-    anns = [
-        tuple(ann.__args__) if hasattr(ann, "__args__") else ann for ann in anns
-    ]
+    anns = [tuple(ann.__args__) if hasattr(ann, "__args__") else ann for ann in anns]
     return anns
 
 
