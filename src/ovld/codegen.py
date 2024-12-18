@@ -88,13 +88,6 @@ def instantiate_code(symbol, code, inject={}):
 #     return rval
 
 
-def generate_checking_code(typ):
-    if hasattr(typ, "codegen"):
-        return typ.codegen()
-    else:
-        return Code("isinstance($arg, $this)", this=typ)
-
-
 subr = re.compile(r"\$([a-zA-Z0-9_]+)")
 
 

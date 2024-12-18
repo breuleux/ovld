@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Protocol, get_args, runtime_checkable
 
+from .codegen import Code
 from .mro import Order, TypeRelationship, subclasscheck, typeorder
+from .recode import generate_checking_code
 from .typemap import TypeMap
 from .utils import UnionType, UnionTypes, UsageError, clsstring
 
@@ -317,8 +319,6 @@ class Union:
         self.__args__ = self.types = types
 
     def codegen(self):
-        from .codegen import Code, generate_checking_code
-
         template = " or ".join(f"${i}" for i in range(len(self.types)))
         return Code(
             template,
@@ -367,8 +367,6 @@ class Intersection:
         self.__args__ = self.types = types
 
     def codegen(self):
-        from .codegen import Code, generate_checking_code
-
         template = " and ".join(f"${i}" for i in range(len(self.types)))
         return Code(
             template,
