@@ -1,7 +1,8 @@
 import inspect
 from dataclasses import dataclass, fields
+from itertools import count
 
-from ovld import recurse
+from ovld import codegen, recurse
 from ovld.codegen import Code, code_generator
 from ovld.core import OvldBase, OvldPerInstanceBase, ovld
 from ovld.dependent import Regexp
@@ -25,6 +26,19 @@ class Person:
 SEP = """
 ==========
 """
+
+
+def test_code_gensym():
+    codegen._current = count()
+    co = Code("$=x if $:x else $y", x=Code("f(1, 2, 3)"), y=123)
+    assert co.fill() == "x__0 if (x__0 := f(1, 2, 3)) else 123"
+
+
+def test_code_gensym_simple():
+    codegen._current = count()
+    obj = object()
+    co = Code("$=x if $:x else $y", x=obj, y=123)
+    assert co.fill() == "x if x else 123"
 
 
 def getcodes(fn, *sigs):
