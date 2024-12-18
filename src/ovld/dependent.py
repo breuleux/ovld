@@ -10,7 +10,7 @@ from typing import (
     TypeVar,
 )
 
-from .codegen import CodeGen
+from .codegen import Code
 from .types import (
     Intersection,
     Order,
@@ -53,7 +53,7 @@ class DependentType(type):
         raise NotImplementedError()
 
     def codegen(self):
-        return CodeGen("$this.check($arg)", this=self)
+        return Code("$this.check($arg)", this=self)
 
     def __type_order__(self, other):
         if isinstance(other, DependentType):
@@ -226,9 +226,9 @@ class Equals(ParametrizedDependentType):
 
     def codegen(self):
         if len(self.parameters) == 1:
-            return CodeGen("($arg == $p)", p=self.parameter)
+            return Code("($arg == $p)", p=self.parameter)
         else:
-            return CodeGen("($arg in $ps)", ps=self.parameters)
+            return Code("($arg in $ps)", ps=self.parameters)
 
 
 class ProductType(ParametrizedDependentType):
@@ -250,7 +250,7 @@ class ProductType(ParametrizedDependentType):
         for i, p in enumerate(self.parameters):
             checks.append(f"isinstance($arg[{i}], $p{i})")
             params[f"p{i}"] = p
-        return CodeGen(" and ".join(checks), params)
+        return Code(" and ".join(checks), params)
 
     def __type_order__(self, other):
         if isinstance(other, ProductType):
@@ -324,7 +324,7 @@ class Regexp:
         return bool(self.rx.search(value))
 
     def codegen(self):
-        return CodeGen("bool($rx.search($arg))", rx=self.rx)
+        return Code("bool($rx.search($arg))", rx=self.rx)
 
 
 class Dependent:
