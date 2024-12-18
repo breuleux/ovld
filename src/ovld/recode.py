@@ -16,12 +16,8 @@ from .codegen import (
 )
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
-recurse = Unusable(
-    "recurse() can only be used from inside an @ovld-registered function."
-)
-call_next = Unusable(
-    "call_next() can only be used from inside an @ovld-registered function."
-)
+recurse = Unusable("recurse() can only be used from inside an @ovld-registered function.")
+call_next = Unusable("call_next() can only be used from inside an @ovld-registered function.")
 
 
 dispatch_template = """
@@ -161,8 +157,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     def to_dict(tup):
         return dict(
-            entry if isinstance(entry, tuple) else (i, entry)
-            for i, entry in enumerate(tup)
+            entry if isinstance(entry, tuple) else (i, entry) for i, entry in enumerate(tup)
         )
 
     def argname(x):
@@ -189,14 +184,10 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
             if not possibilities:
                 if getattr(focus, "keyable_type", False):
                     all_keys = [
-                        {key: h for key in types[k].get_keys()}
-                        for h, types in handlers
+                        {key: h for key in types[k].get_keys()} for h, types in handlers
                     ]
                     keyed = reduce(lambda a, b: {**a, **b}, all_keys)
-                    if (
-                        len(keyed) == sum(map(len, all_keys))
-                        and len(featured) < 4
-                    ):
+                    if len(keyed) == sum(map(len, all_keys)) and len(featured) < 4:
                         exclusive = True
                         keyexpr = None
                     else:
@@ -262,9 +253,7 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
 
     inject["FALLTHROUGH"] = (next_call and next_call[0]) or raise_error
 
-    fn = instantiate_code(
-        symbol="__DEPENDENT_DISPATCH__", code=code, inject=inject
-    )
+    fn = instantiate_code(symbol="__DEPENDENT_DISPATCH__", code=code, inject=inject)
     return rename_function(fn, name)
 
 
@@ -352,9 +341,7 @@ class NameConverter(ast.NodeTransformer):
 
         def _make_lookup_call(key, arg):
             name = (
-                "__SUBTLER_TYPE"
-                if self.analysis.lookup_for(key) is subtler_type
-                else "type"
+                "__SUBTLER_TYPE" if self.analysis.lookup_for(key) is subtler_type else "type"
             )
             value = ast.NamedExpr(
                 target=ast.Name(id=f"{tmp}{key}", ctx=ast.Store()),
@@ -368,9 +355,7 @@ class NameConverter(ast.NodeTransformer):
             )
 
         # type index for positional arguments
-        type_parts = [
-            _make_lookup_call(i, arg) for i, arg in enumerate(node.args)
-        ]
+        type_parts = [_make_lookup_call(i, arg) for i, arg in enumerate(node.args)]
 
         # type index for keyword arguments
         type_parts += [
@@ -402,10 +387,7 @@ class NameConverter(ast.NodeTransformer):
         new_node = ast.Call(
             func=method,
             args=selfarg
-            + [
-                ast.Name(id=f"{tmp}{i}", ctx=ast.Load())
-                for i, arg in enumerate(node.args)
-            ],
+            + [ast.Name(id=f"{tmp}{i}", ctx=ast.Load()) for i, arg in enumerate(node.args)],
             keywords=[
                 ast.keyword(
                     arg=kw.arg,
@@ -441,13 +423,9 @@ def adapt_function(fn, ovld, newname):
             fn.__closure__,
         )
     )
-    cn_syms = list(
-        _search_names(fn.__code__, (call_next,), fn.__globals__, fn.__closure__)
-    )
+    cn_syms = list(_search_names(fn.__code__, (call_next,), fn.__globals__, fn.__closure__))
     if rec_syms or cn_syms:
-        return recode(
-            fn, ovld, rec_syms and rec_syms[0], cn_syms and cn_syms[0], newname
-        )
+        return recode(fn, ovld, rec_syms and rec_syms[0], cn_syms and cn_syms[0], newname)
     else:
         return rename_function(fn, newname)
 
@@ -510,10 +488,7 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
         res = [x for x in res.co_consts if isinstance(x, CodeType)][0]
     (*_, new_code) = [ct for ct in res.co_consts if isinstance(ct, CodeType)]
     new_closure = tuple(
-        [
-            fn.__closure__[fn.__code__.co_freevars.index(name)]
-            for name in new_code.co_freevars
-        ]
+        [fn.__closure__[fn.__code__.co_freevars.index(name)] for name in new_code.co_freevars]
     )
     new_fn = transfer_function(
         func=fn,

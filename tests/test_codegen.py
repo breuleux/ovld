@@ -132,9 +132,7 @@ def test_method_per_instance(file_regression):
     assert plus5.f("wow") == "wow5"
 
     file_regression.check(
-        getcodes(type(plus5).f, int, str)
-        + SEP
-        + getcodes(type(plus77).f, int, str)
+        getcodes(type(plus5).f, int, str) + SEP + getcodes(type(plus77).f, int, str)
     )
 
 

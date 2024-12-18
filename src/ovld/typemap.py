@@ -70,9 +70,7 @@ class Candidate:
         if self.priority > other.priority:
             return True
         elif self.specificity != other.specificity:
-            return all(
-                s1 >= s2 for s1, s2 in zip(self.specificity, other.specificity)
-            )
+            return all(s1 >= s2 for s1, s2 in zip(self.specificity, other.specificity))
         else:
             return self.tiebreak > other.tiebreak
 
@@ -128,9 +126,7 @@ class MultiTypeMap(dict):
             results = {
                 handler: spc
                 for (handler, sig), spc in results.items()
-                if sig.req_pos
-                <= nargs
-                <= (math.inf if sig.vararg else sig.max_pos)
+                if sig.req_pos <= nargs <= (math.inf if sig.vararg else sig.max_pos)
                 and not (sig.req_names - names)
             }
 
@@ -180,9 +176,7 @@ class MultiTypeMap(dict):
 
         candidates.sort(key=Candidate.sort_key, reverse=True)
 
-        self.all[obj_t_tup] = {
-            getattr(c.handler, "__code__", None) for c in candidates
-        }
+        self.all[obj_t_tup] = {getattr(c.handler, "__code__", None) for c in candidates}
 
         processed = set()
 
@@ -273,9 +267,7 @@ class MultiTypeMap(dict):
         for grp in self.mro(tuple(argt)):
             grp.sort(key=lambda x: x.handler.__name__)
             match = [
-                dependent_match(
-                    self.type_tuples[c.base_handler], [*args, *kwargs.items()]
-                )
+                dependent_match(self.type_tuples[c.base_handler], [*args, *kwargs.items()])
                 for c in grp
             ]
             ambiguous = len([m for m in match if m]) > 1
@@ -302,21 +294,17 @@ class MultiTypeMap(dict):
                 width = 2 * len(args) + 6
                 print(f"{color}{bullet} {lvl:{width}} {handler.__name__}")
                 co = handler.__code__
-                print(
-                    f"   {'':{width-1}}@ {co.co_filename}:{co.co_firstlineno}\033[0m"
-                )
+                print(f"   {'':{width-1}}@ {co.co_filename}:{co.co_firstlineno}\033[0m")
             if ambiguous:
-                message += " There is ambiguity between multiple matching methods, marked '=='."
+                message += (
+                    " There is ambiguity between multiple matching methods, marked '=='."
+                )
                 finished = True
         print("Resolution:", message)
 
     def wrap_dependent(self, tup, group, next_call):
         htup = [(c.handler, self.type_tuples[c.base_handler]) for c in group]
-        slf = (
-            "self, "
-            if inspect.getfullargspec(group[0].handler).args[0] == "self"
-            else ""
-        )
+        slf = "self, " if inspect.getfullargspec(group[0].handler).args[0] == "self" else ""
         return generate_dependent_dispatch(
             tup,
             htup,
@@ -337,9 +325,7 @@ class MultiTypeMap(dict):
             handlers = [c.handler for c in group]
             dependent = any(self.dependent[c.base_handler] for c in group)
             if dependent:
-                nxt = self.wrap_dependent(
-                    obj_t_tup, group, funcs[-1] if funcs else None
-                )
+                nxt = self.wrap_dependent(obj_t_tup, group, funcs[-1] if funcs else None)
             elif len(group) != 1:
                 nxt = None
             else:
@@ -351,11 +337,7 @@ class MultiTypeMap(dict):
 
         parents = []
         for group, (func, codes) in zip(results, funcs):
-            tups = (
-                [obj_t_tup]
-                if not parents
-                else [(parent, *obj_t_tup) for parent in parents]
-            )
+            tups = [obj_t_tup] if not parents else [(parent, *obj_t_tup) for parent in parents]
             if func is None:
                 for tup in tups:
                     self.errors[tup] = self.key_error(obj_t_tup, group)

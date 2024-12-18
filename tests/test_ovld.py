@@ -620,9 +620,7 @@ def test_recurse_renamed():
 def test_call_next_must_be_called():
     f = Ovld()
 
-    with pytest.raises(
-        UsageError, match="call_next should be called right away"
-    ):
+    with pytest.raises(UsageError, match="call_next should be called right away"):
 
         @f.register
         def f(xs: list):
@@ -1449,9 +1447,7 @@ def test_display(capsys, file_regression):
     out = out.replace(__file__, "THIS_FILE")
 
     def renumber(m):
-        return "THIS_FILE:" + str(
-            int(m[1]) - test_display.__code__.co_firstlineno
-        )
+        return "THIS_FILE:" + str(int(m[1]) - test_display.__code__.co_firstlineno)
 
     out = re.sub(string=out, pattern=r"THIS_FILE:([0-9]+)", repl=renumber)
     file_regression.check(out)
@@ -1485,9 +1481,7 @@ def test_display_more(capsys, file_regression):
     out = out.replace(__file__, "THIS_FILE")
 
     def renumber(m):
-        return "THIS_FILE:" + str(
-            int(m[1]) - test_display_more.__code__.co_firstlineno
-        )
+        return "THIS_FILE:" + str(int(m[1]) - test_display_more.__code__.co_firstlineno)
 
     out = re.sub(string=out, pattern=r"THIS_FILE:([0-9]+)", repl=renumber)
     file_regression.check(out)
@@ -1703,9 +1697,7 @@ def test_method_doc(file_regression):
 
     mushroom = Mushroom()
     doc = mushroom.rise.__doc__
-    doc = (
-        f"{mushroom.rise.__name__}{inspect.signature(mushroom.rise)}\n\n" + doc
-    )
+    doc = f"{mushroom.rise.__name__}{inspect.signature(mushroom.rise)}\n\n" + doc
 
     file_regression.check(doc)
 

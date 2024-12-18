@@ -40,7 +40,7 @@ benchmark = [
 packages = ["src/ovld"]
 
 [tool.ruff]
-line-length = 80
+line-length = 95
 
 [tool.ruff.lint]
 extend-select = ["I"]

@@ -146,21 +146,13 @@ def test_typeorder_type_union():
 
 def test_subclasscheck_dependent():
     assert subclasscheck(B, Dependent[A, identity])
-    assert not subclasscheck(
-        Dependent[int, identity], Dependent[float, identity]
-    )
+    assert not subclasscheck(Dependent[int, identity], Dependent[float, identity])
 
 
 def test_typeorder_dependent():
     assert typeorder(Dependent[int, identity], float) is Order.NONE
-    assert (
-        typeorder(Dependent[int, identity], Dependent[A, identity])
-        is Order.NONE
-    )
-    assert (
-        typeorder(Dependent[int, identity], Dependent[float, identity])
-        is Order.NONE
-    )
+    assert typeorder(Dependent[int, identity], Dependent[A, identity]) is Order.NONE
+    assert typeorder(Dependent[int, identity], Dependent[float, identity]) is Order.NONE
 
 
 def test_subclasscheck_proxy():

@@ -69,9 +69,7 @@ class DependentType(type):
                     return Order.NONE
             else:  # pragma: no cover
                 return order
-        elif subclasscheck(other, self.bound) or subclasscheck(
-            self.bound, other
-        ):
+        elif subclasscheck(other, self.bound) or subclasscheck(self.bound, other):
             return Order.LESS
         else:
             return Order.NONE
@@ -101,9 +99,7 @@ class DependentType(type):
 
 class ParametrizedDependentType(DependentType):
     def __init__(self, *parameters, bound=None):
-        super().__init__(
-            self.default_bound(*parameters) if bound is None else bound
-        )
+        super().__init__(self.default_bound(*parameters) if bound is None else bound)
         self.__args__ = self.parameters = parameters
         self.__origin__ = None
         self.__post_init__()
@@ -155,12 +151,10 @@ class FuncDependentType(ParametrizedDependentType):
         if len(self.parameters) != len(other.parameters):
             return False
         p1g = sum(
-            p1 is Any and p2 is not Any
-            for p1, p2 in zip(self.parameters, other.parameters)
+            p1 is Any and p2 is not Any for p1, p2 in zip(self.parameters, other.parameters)
         )
         p2g = sum(
-            p2 is Any and p1 is not Any
-            for p1, p2 in zip(self.parameters, other.parameters)
+            p2 is Any and p1 is not Any for p1, p2 in zip(self.parameters, other.parameters)
         )
         return p2g and not p1g
 
@@ -256,8 +250,7 @@ class ProductType(ParametrizedDependentType):
         if isinstance(other, ProductType):
             if len(other.parameters) == len(self.parameters):
                 return Order.merge(
-                    typeorder(a, b)
-                    for a, b in zip(self.parameters, other.parameters)
+                    typeorder(a, b) for a, b in zip(self.parameters, other.parameters)
                 )
             else:
                 return Order.NONE
