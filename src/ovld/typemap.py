@@ -243,7 +243,7 @@ class MultiTypeMap(dict):
             width = 6
             print(f"{prio:{width}} \033[1m{h.__name__}\033[0m")
             co = h.__code__
-            print(f"{'':{width-2}} @ {co.co_filename}:{co.co_firstlineno}")
+            print(f"{'':{width - 2}} @ {co.co_filename}:{co.co_firstlineno}")
 
     def display_resolution(self, *args, **kwargs):
         from .dependent import is_dependent
@@ -294,7 +294,7 @@ class MultiTypeMap(dict):
                 width = 2 * len(args) + 6
                 print(f"{color}{bullet} {lvl:{width}} {handler.__name__}")
                 co = handler.__code__
-                print(f"   {'':{width-1}}@ {co.co_filename}:{co.co_firstlineno}\033[0m")
+                print(f"   {'':{width - 1}}@ {co.co_filename}:{co.co_firstlineno}\033[0m")
             if ambiguous:
                 message += (
                     " There is ambiguity between multiple matching methods, marked '=='."
