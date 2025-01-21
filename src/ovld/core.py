@@ -42,8 +42,8 @@ def bootstrap_dispatch(ov, name):
     dispatch.__signature__ = LazySignature(ov)
     dispatch.__ovld__ = ov
     dispatch.register = ov.register
+    dispatch.resolve_for_values = ov.resolve_for_values
     dispatch.resolve = ov.resolve
-    dispatch.resolve_for_types = ov.resolve_for_types
     dispatch.copy = ov.copy
     dispatch.variant = ov.variant
     dispatch.display_methods = ov.display_methods
@@ -229,13 +229,13 @@ class Ovld:
 
         self._compiled = True
 
-    def resolve(self, *args):
+    def resolve_for_values(self, *args):
         """Find the correct method to call for the given arguments."""
         self.ensure_compiled()
         return self.map[tuple(map(subtler_type, args))]
 
-    def resolve_for_types(self, *args):
-        """Find the correct method to call for the given arguments."""
+    def resolve(self, *args):
+        """Find the correct method to call for the given argument types."""
         self.ensure_compiled()
         return self.map[args]
 
