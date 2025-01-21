@@ -266,5 +266,6 @@ def code_generator(fn):
 
 __all__ = [
     "Code",
+    "Lambda",
     "code_generator",
 ]
