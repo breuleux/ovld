@@ -186,6 +186,12 @@ assert Two().f(1) == "an integer"
 assert Two().f("s") == "a string"
 ```
 
+
+# Code generation
+
+(Experimental) For advanced use cases, you can generate custom code for type checkers or overloads. [See here](https://ovld.readthedocs.io/en/latest/codegen/).
+
+
 # Benchmarks
 
 `ovld` is pretty fast: the overhead is comparable to `isinstance` or `match`, and only 2-3x slower when dispatching on `Literal` types. Compared to other multiple dispatch libraries, it has 1.5x to 100x less overhead.

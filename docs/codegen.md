@@ -90,8 +90,9 @@ code = Code(
     value=0,
     txt="It is zero!",
 )
-ndb = NameDatabase()
-print(code.fill(ndb))
+ndb = NameDatabase()   # Optional, but fill() will add variable mappings in there
+print(code.fill(ndb))  # Code produced
+print(ndb.variables)   # Dictionary of globals to pass to eval/exec
 ```
 
 A list is interpreted as a list of lines, and nested lists will be indented, so you don't have to care about doing that yourself.
