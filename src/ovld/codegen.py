@@ -98,6 +98,8 @@ def sub(template, subs):
     def repl_fn(m):
         prefix, sep, name = m.groups()
         value = subs(name, bool(sep))
+        if value is None:
+            return m.group()
         if sep:
             value = sep[1:-1].join(value)
         if prefix == "=" and not symr.fullmatch(value):
@@ -120,6 +122,10 @@ def format_code(code, indent=0, nl=False):
         raise TypeError(f"Cannot format code from type {type(code)}")
 
 
+def _gensym():
+    return f"__G{next(_current)}"
+
+
 class Code:
     def __init__(self, template, substitutions={}, **substitutions_kw):
         self.template = format_code(template)
@@ -130,6 +136,29 @@ class Code:
 
     def defaults(self, subs):
         return Code(self.template, subs, **self.substitutions)
+
+    def rename(self, subs):
+        def getsub(name, sep=False):
+            return f"${renaming[name]}" if name in renaming else None
+
+        subs = {k: v for k, v in subs.items() if k not in self.substitutions}
+
+        renaming = {k: _gensym() for k in subs}
+        new_subs = {renaming[k]: v for k, v in subs.items()}
+
+        def _rename_step(v):
+            if isinstance(v, Code):
+                return v.rename(subs)
+            elif isinstance(v, (list, tuple)):
+                if any(isinstance(x, Code) for x in v):
+                    return [_rename_step(x) for x in v]
+            else:
+                return v
+
+        new_subs.update({k: _rename_step(v) for k, v in self.substitutions.items()})
+
+        new_template = sub(self.template, getsub)
+        return Code(new_template, new_subs)
 
     def fill(self, ndb=None):
         if ndb is None:
@@ -147,6 +176,22 @@ class Code:
             return make(name, self.substitutions[name], sep)
 
         return sub(self.template, getsub)
+
+
+class Lambda:
+    def __init__(self, args, code, **subs):
+        self.args = args
+        if subs:
+            self.code = code.sub(**subs) if isinstance(code, Code) else Code(code, subs)
+        else:
+            self.code = code if isinstance(code, Code) else Code(code)
+
+    def rename(self, *args):
+        return self.code.rename(dict(zip(self.args, args)))
+
+    def __call__(self, *args):
+        args = [Code(name) if isinstance(name, str) else name for name in args]
+        return self.rename(*args)
 
 
 def regen_signature(fn, ndb):  # pragma: no cover
@@ -193,6 +238,10 @@ def codegen_specializer(typemap, fn, tup):
     ndb = NameDatabase(default_name="INJECT")
     args = regen_signature(fn, ndb)
     body = fn(typemap.ovld.specialization_self, *tup) if is_method else fn(*tup)
+    lbda = None
+    if isinstance(body, Lambda):
+        lbda = body
+        body = Code("return $body", body=body(*inspect.signature(fn).parameters))
     if isinstance(body, Code):
         body = body.fill(ndb)
     elif isinstance(body, str):
@@ -206,6 +255,7 @@ def codegen_specializer(typemap, fn, tup):
     func = instantiate_code("__GENERATED__", code, inject=ndb.variables)
     adjusted_name = f"{fn.__name__.split('[')[0]}[{sigstring(tup)}]"
     func = rename_function(func, adjusted_name)
+    func.__lambda__ = lbda
     return func
 
 
