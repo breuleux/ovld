@@ -58,7 +58,7 @@ def test_rename_closure():
 
 def getcodes(fn, *sigs):
     sigs = [(sig if isinstance(sig, tuple) else (sig,)) for sig in sigs]
-    codes = [inspect.getsource(fn.resolve_for_types(*sig)) for sig in sigs]
+    codes = [inspect.getsource(fn.resolve(*sig)) for sig in sigs]
     return SEP.join(codes)
 
 
@@ -206,7 +206,7 @@ def test_variant_generation(file_regression):
     def f(obj: Dataclass):
         lines = ["return $cons("]
         for fld in fields(obj):
-            existing = recurse.resolve_for_types(fld.type)
+            existing = recurse.resolve(fld.type)
             if getattr(existing, "normal", False):
                 expr = f"obj.{fld.name}"
             else:
@@ -290,10 +290,10 @@ class TwoPoints:
     b: Point
 
 
-def test_recursive_embedding():
-    def resolve_subcode(t):
+def test_inlining_generator():
+    def resolve_subcode(t, f):
         try:
-            fn = f.resolve_for_types(type[t], All)
+            fn = f.resolve(type[t], All)
             lbda = getattr(fn, "__lambda__", None)
             if lbda:
                 return lbda
@@ -310,7 +310,7 @@ def test_recursive_embedding():
     @code_generator
     def f(typ: type[UnionType], x: object):
         (typ,) = typ.__args__
-        subcodes = [(t, resolve_subcode(t)) for t in typ.__args__]
+        subcodes = [(t, resolve_subcode(t, recurse)) for t in typ.__args__]
         assert len(subcodes) == 2
         return Lambda(
             ["typ", "x"],
@@ -326,16 +326,17 @@ def test_recursive_embedding():
     @code_generator
     def f(typ: type[Dataclass], x: Dataclass):
         if x is not All:
-            return f.resolve_for_types(typ, All)
+            return recurse.resolve(typ, All)
         (typ,) = typ.__args__
         parts = []
         for field in fields(typ):
             lbda = resolve_subcode(
-                eval(field.type) if isinstance(field.type, str) else field.type
+                eval(field.type) if isinstance(field.type, str) else field.type,
+                recurse,
             )
             subcode = lbda(Code("UNUSED"), Code(f"$x.{field.name}"))
             parts.append(subcode)
-        code = Code("$cons($[, ]parts)", cons=typ, parts=parts, recurse=f)
+        code = Code("$cons($[, ]parts)", cons=typ, parts=parts, recurse=recurse)
         return Lambda(["typ", "x"], code)
 
     assert f(int, 3) == 4

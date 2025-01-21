@@ -793,14 +793,14 @@ def test_priority():
     assert f([1, "x"]) == ["TOP", [["TOP", 2], ["TOP", "BOTTOM"]]]
 
 
-def test_resolve():
+def test_resolve_for_values():
     f = Ovld()
 
     @f.register
     def f(x: int):
         return x * 2
 
-    assert f.resolve(8)("hello") == "hellohello"
+    assert f.resolve_for_values(8)("hello") == "hellohello"
 
 
 def test_method():
