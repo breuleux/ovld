@@ -1,13 +1,14 @@
 import inspect
 from dataclasses import dataclass, fields
 from itertools import count
+from types import UnionType
 
 from ovld import codegen, recurse
-from ovld.codegen import Code, code_generator
+from ovld.codegen import Code, Lambda, code_generator
 from ovld.core import OvldBase, OvldPerInstanceBase, ovld
 from ovld.dependent import Regexp
-from ovld.types import Dataclass
-from ovld.utils import MISSING
+from ovld.types import All, Dataclass
+from ovld.utils import MISSING, CodegenInProgress
 
 
 @dataclass
@@ -39,6 +40,20 @@ def test_code_gensym_simple():
     obj = object()
     co = Code("$=x if $:x else $y", x=obj, y=123)
     assert co.fill() == "x if x else 123"
+
+
+def test_rename():
+    lbda = Lambda(["x"], "$x + 1")
+    expr = lbda(Code("($x * 2)"))
+
+    assert expr.sub(x=123).fill() == "(123 * 2) + 1"
+
+
+def test_rename_closure():
+    lbda = Lambda(["x"], "$x + $y + $z", y=Code("$x", x=5), z=Code("$x"))
+    expr = lbda(20)
+
+    assert expr.fill() == "20 + 5 + 20"
 
 
 def getcodes(fn, *sigs):
@@ -255,3 +270,77 @@ def test_generate_function_directly():
         return lambda x: (xt, x)
 
     assert f("coconut") == (str, "coconut")
+
+
+@dataclass
+class Tree:
+    left: "Tree | int"
+    right: "Tree | int"
+
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+
+@dataclass
+class TwoPoints:
+    a: Point
+    b: Point
+
+
+def test_recursive_embedding():
+    def resolve_subcode(t):
+        try:
+            fn = f.resolve_for_types(type[t], All)
+            lbda = getattr(fn, "__lambda__", None)
+            if lbda:
+                return lbda
+        except CodegenInProgress:
+            pass
+        return Lambda(["typ", "x"], Code("$recurse($typ, $x)", recurse=f))
+
+    @ovld
+    @code_generator
+    def f(typ: type[int], x: int):
+        return Lambda(["typ", "x"], "$x + 1")
+
+    @ovld
+    @code_generator
+    def f(typ: type[UnionType], x: object):
+        (typ,) = typ.__args__
+        subcodes = [(t, resolve_subcode(t)) for t in typ.__args__]
+        assert len(subcodes) == 2
+        return Lambda(
+            ["typ", "x"],
+            Code(
+                "$s1 if isinstance($x, $t1) else $s2",
+                s1=subcodes[0][1].code,
+                s2=subcodes[1][1].code,
+                t1=subcodes[0][0],
+            ),
+        )
+
+    @ovld
+    @code_generator
+    def f(typ: type[Dataclass], x: Dataclass):
+        if x is not All:
+            return f.resolve_for_types(typ, All)
+        (typ,) = typ.__args__
+        parts = []
+        for field in fields(typ):
+            lbda = resolve_subcode(
+                eval(field.type) if isinstance(field.type, str) else field.type
+            )
+            subcode = lbda(Code("UNUSED"), Code(f"$x.{field.name}"))
+            parts.append(subcode)
+        code = Code("$cons($[, ]parts)", cons=typ, parts=parts, recurse=f)
+        return Lambda(["typ", "x"], code)
+
+    assert f(int, 3) == 4
+    assert f(Point, Point(7, 8)) == Point(8, 9)
+    assert f(Tree, Tree(1, 2)) == Tree(2, 3)
+    assert f(TwoPoints, TwoPoints(Point(1, 2), Point(7, 8))) == TwoPoints(
+        Point(2, 3), Point(8, 9)
+    )

@@ -6,7 +6,7 @@ from types import CodeType
 
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
-from .utils import MISSING, subtler_type
+from .utils import MISSING, CodegenInProgress, subtler_type
 
 
 class TypeMap(dict):
@@ -107,6 +107,7 @@ class MultiTypeMap(dict):
         self.all = {}
         self.errors = {}
         self.ovld = ovld
+        self.in_progress = set()
 
     def mro(self, obj_t_tup, specialize=True):
         specificities = {}
@@ -152,6 +153,10 @@ class MultiTypeMap(dict):
 
         def get_handler(func):
             if specialize and (specializer := getattr(func, "specializer", False)):
+                key = (func, obj_t_tup)
+                if key in self.in_progress:
+                    raise CodegenInProgress()
+                self.in_progress.add(key)
                 return specializer(self, func, obj_t_tup)
             else:
                 return func

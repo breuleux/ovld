@@ -57,6 +57,10 @@ def keyword_decorator(deco):
     return new_deco
 
 
+class CodegenInProgress(Exception):
+    pass
+
+
 class UsageError(Exception):
     pass
 
