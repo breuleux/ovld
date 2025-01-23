@@ -14,8 +14,17 @@ from .codegen import (
 )
 from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
 
-recurse = Unusable("recurse() can only be used from inside an @ovld-registered function.")
-call_next = Unusable("call_next() can only be used from inside an @ovld-registered function.")
+
+def _make_unusable(name):
+    return Unusable(
+        name, f"{name}() can only be used from inside an @ovld-registered function."
+    )
+
+
+recurse = _make_unusable("recurse")
+call_next = _make_unusable("call_next")
+resolve = _make_unusable("resolve")
+current_code = _make_unusable("current_code")
 
 
 dispatch_template = """
@@ -303,45 +312,39 @@ class Conformer:
 
 
 class NameConverter(ast.NodeTransformer):
-    def __init__(
-        self,
-        anal,
-        recurse_sym,
-        call_next_sym,
-        ovld_mangled,
-        map_mangled,
-        code_mangled,
-    ):
+    def __init__(self, anal, special_syms, mapping):
         self.analysis = anal
-        self.recurse_sym = recurse_sym
-        self.call_next_sym = call_next_sym
-        self.ovld_mangled = ovld_mangled
-        self.map_mangled = map_mangled
-        self.code_mangled = code_mangled
+        self.syms = special_syms
+        self.mapping = mapping
+        self.ovld_mangled = mapping[recurse]
+        self.map_mangled = mapping[resolve]
+        self.code_mangled = mapping[current_code]
         self.count = count()
 
+    def is_special(self, name, *kinds):
+        return any(name in self.syms[kind] for kind in kinds)
+
     def visit_Name(self, node):
-        if node.id == self.recurse_sym:
+        if node.id in self.mapping:
             return ast.copy_location(
                 old_node=node,
-                new_node=ast.Name(self.ovld_mangled, ctx=node.ctx),
+                new_node=ast.Name(self.mapping[node.id], ctx=node.ctx),
             )
-        elif node.id == self.call_next_sym:
+        elif self.is_special(node.id, call_next):
             raise UsageError("call_next should be called right away")
         else:
             return node
 
     def visit_Call(self, node):
-        if not isinstance(node.func, ast.Name) or node.func.id not in (
-            self.recurse_sym,
-            self.call_next_sym,
+        if not isinstance(node.func, ast.Name) or not self.is_special(
+            node.func.id, recurse, call_next
         ):
             return self.generic_visit(node)
 
         if any(isinstance(arg, ast.Starred) for arg in node.args):
             return self.generic_visit(node)
 
-        cn = node.func.id == self.call_next_sym
+        cn = self.is_special(node.func.id, call_next)
         tmp = f"__TMP{next(self.count)}_"
 
         def _make_lookup_call(key, arg):
@@ -404,33 +407,38 @@ class NameConverter(ast.NodeTransformer):
         return ast.copy_location(old_node=node, new_node=new_node)
 
 
-def _search_names(co, values, glb, closure=None):
-    if isinstance(co, CodeType):
-        if closure is not None:
-            for varname, cell in zip(co.co_freevars, closure):
-                if any(cell.cell_contents is v for v in values):
-                    yield varname
-        for name in co.co_names:
-            if any(glb.get(name, None) is v for v in values):
-                yield name
-        else:
-            for ct in co.co_consts:
-                yield from _search_names(ct, values, glb)
+def _search_names(co, specials, glb, closure=None):
+    def _search(co, values, glb, closure=None):
+        if isinstance(co, CodeType):
+            if closure is not None:
+                for varname, cell in zip(co.co_freevars, closure):
+                    if any(cell.cell_contents is v for v in values):
+                        yield varname
+            for name in co.co_names:
+                if any(glb.get(name, None) is v for v in values):
+                    yield name
+            else:
+                for ct in co.co_consts:
+                    yield from _search(ct, values, glb)
+
+    return {k: list(_search(co, v, glb, closure)) for k, v in specials.items()}
 
 
 def adapt_function(fn, ovld, newname):
     """Create a copy of the function with a different name."""
-    rec_syms = list(
-        _search_names(
-            fn.__code__,
-            (recurse, ovld, ovld.dispatch),
-            fn.__globals__,
-            fn.__closure__,
-        )
+    syms = _search_names(
+        fn.__code__,
+        {
+            recurse: (recurse, ovld, ovld.dispatch),
+            call_next: (call_next,),
+            resolve: (resolve,),
+            current_code: (current_code,),
+        },
+        fn.__globals__,
+        fn.__closure__,
     )
-    cn_syms = list(_search_names(fn.__code__, (call_next,), fn.__globals__, fn.__closure__))
-    if rec_syms or cn_syms:
-        return recode(fn, ovld, rec_syms and rec_syms[0], cn_syms and cn_syms[0], newname)
+    if any(syms.values()):
+        return recode(fn, ovld, syms, newname)
     else:
         return rename_function(fn, newname)
 
@@ -461,7 +469,7 @@ def closure_wrap(tree, fname, names):
     return ast.Module(body=[wrap], type_ignores=[])
 
 
-def recode(fn, ovld, recurse_sym, call_next_sym, newname):
+def recode(fn, ovld, syms, newname):
     ovld_mangled = f"___OVLD{ovld.id}"
     map_mangled = f"___MAP{ovld.id}"
     code_mangled = f"___CODE{next(_current)}"
@@ -475,14 +483,22 @@ def recode(fn, ovld, recurse_sym, call_next_sym, newname):
             " avoid calling recurse()/call_next()"
         )
     tree = ast.parse(textwrap.dedent(src))
+
+    mapping = {
+        recurse: ovld_mangled,
+        resolve: map_mangled,
+        current_code: code_mangled,
+    }
+    for special, symbols in syms.items():
+        for sym in symbols:
+            if special in mapping:
+                mapping[sym] = mapping[special]
     new = NameConverter(
         anal=ovld.argument_analysis,
-        recurse_sym=recurse_sym,
-        call_next_sym=call_next_sym,
-        ovld_mangled=ovld_mangled,
-        map_mangled=map_mangled,
-        code_mangled=code_mangled,
+        special_syms=syms,
+        mapping=mapping,
     ).visit(tree)
+
     new.body[0].decorator_list = []
     if fn.__closure__:
         new = closure_wrap(new.body[0], "irrelevant", fn.__code__.co_freevars)

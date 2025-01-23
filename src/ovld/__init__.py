@@ -23,7 +23,12 @@ from .mro import (
     subclasscheck,
     typeorder,
 )
-from .recode import call_next, recurse
+from .recode import (
+    call_next,
+    current_code,
+    recurse,
+    resolve,
+)
 from .typemap import (
     MultiTypeMap,
     TypeMap,
@@ -39,8 +44,8 @@ from .types import (
 )
 from .utils import (
     BOOTSTRAP,
-    CodegenInProgress,
     MISSING,
+    CodegenInProgress,
     Named,
     NameDatabase,
     keyword_decorator,
@@ -89,5 +94,7 @@ __all__ = [
     "keyword_decorator",
     "call_next",
     "recurse",
+    "resolve",
+    "current_code",
     "__version__",
 ]
