@@ -65,10 +65,12 @@ class UsageError(Exception):
     pass
 
 
-class Unusable:
-    def __init__(self, name, message):
-        self.name = name
-        self.__message = message
+class SpecialForm:
+    def __init__(self, name, message=None):
+        self.__name = name
+        self.__message = (
+            message or f"{name}() can only be used from inside an @ovld-registered function."
+        )
 
     def __call__(self, *args, **kwargs):
         raise UsageError(self.__message)
@@ -76,8 +78,8 @@ class Unusable:
     def __getattr__(self, attr):
         raise UsageError(self.__message)
 
-    def __str__(self):  # pragma: no cover
-        return f"<Unusable {self.name}>"
+    def __str__(self):
+        return f"<SpecialForm {self.__name}>"
 
     __repr__ = __str__
 

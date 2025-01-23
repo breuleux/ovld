@@ -12,19 +12,12 @@ from .codegen import (
     rename_function,
     transfer_function,
 )
-from .utils import MISSING, NameDatabase, Unusable, UsageError, subtler_type
+from .utils import MISSING, NameDatabase, SpecialForm, UsageError, subtler_type
 
-
-def _make_unusable(name):
-    return Unusable(
-        name, f"{name}() can only be used from inside an @ovld-registered function."
-    )
-
-
-recurse = _make_unusable("recurse")
-call_next = _make_unusable("call_next")
-resolve = _make_unusable("resolve")
-current_code = _make_unusable("current_code")
+recurse = SpecialForm("recurse")
+call_next = SpecialForm("call_next")
+resolve = SpecialForm("resolve")
+current_code = SpecialForm("current_code")
 
 
 dispatch_template = """
