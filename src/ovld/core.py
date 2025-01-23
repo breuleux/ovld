@@ -552,15 +552,3 @@ def ovld(fn, priority=0, fresh=False, **kwargs):
         dispatch = _find_overload(fn, **kwargs)
     dispatch.register(fn, priority=priority)
     return dispatch.dispatch
-
-
-__all__ = [
-    "Ovld",
-    "OvldBase",
-    "OvldMC",
-    "OvldPerInstanceBase",
-    "OvldPerInstanceMC",
-    "extend_super",
-    "is_ovld",
-    "ovld",
-]
