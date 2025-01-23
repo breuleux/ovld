@@ -39,6 +39,7 @@ from .types import (
 )
 from .utils import (
     BOOTSTRAP,
+    CodegenInProgress,
     MISSING,
     Named,
     NameDatabase,
@@ -71,6 +72,7 @@ __all__ = [
     "DependentType",
     "dependent_check",
     "BOOTSTRAP",
+    "CodegenInProgress",
     "MISSING",
     "Dataclass",
     "Named",

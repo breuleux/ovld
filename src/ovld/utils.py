@@ -160,11 +160,3 @@ class NameDatabase:
         return name
 
     __getitem__ = get
-
-
-__all__ = [
-    "BOOTSTRAP",
-    "MISSING",
-    "Named",
-    "keyword_decorator",
-]

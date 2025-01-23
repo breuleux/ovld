@@ -262,10 +262,3 @@ def codegen_specializer(typemap, fn, tup):
 def code_generator(fn):
     fn.specializer = codegen_specializer
     return fn
-
-
-__all__ = [
-    "Code",
-    "Lambda",
-    "code_generator",
-]
