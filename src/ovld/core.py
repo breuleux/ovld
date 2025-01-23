@@ -234,10 +234,13 @@ class Ovld:
         self.ensure_compiled()
         return self.map[tuple(map(subtler_type, args))]
 
-    def resolve(self, *args):
+    def resolve(self, *args, after=None):
         """Find the correct method to call for the given argument types."""
         self.ensure_compiled()
-        return self.map[args]
+        if after:
+            return self.map[(getattr(after, "__code__", after), *args)]
+        else:
+            return self.map[args]
 
     def register_signature(self, sig, orig_fn):
         """Register a function for the given signature."""

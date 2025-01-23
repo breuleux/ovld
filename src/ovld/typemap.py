@@ -382,3 +382,9 @@ class MultiTypeMap(dict):
             raise self.errors[obj_t_tup]
         else:
             return self[obj_t_tup]
+
+    def __call__(self, *obj_t_tup, after=None):
+        if after:
+            return self[(after, *obj_t_tup)]
+        else:
+            return self[obj_t_tup]

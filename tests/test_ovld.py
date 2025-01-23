@@ -12,10 +12,12 @@ from ovld import (
     OvldBase,
     OvldMC,
     call_next,
+    current_code,
     extend_super,
     is_ovld,
     ovld,
     recurse,
+    resolve,
 )
 from ovld.dependent import Dependent, Equals, StartsWith
 from ovld.types import UnionTypes
@@ -801,6 +803,47 @@ def test_resolve_for_values():
         return x * 2
 
     assert f.resolve_for_values(8)("hello") == "hellohello"
+
+
+def test_resolve():
+    @ovld(priority=1)
+    def f(x: int):
+        return x * 2
+
+    @ovld(priority=0)
+    def f(x: int):
+        return x * 3
+
+    f1 = f.resolve(int)
+    f2a = f.resolve(int, after=f1)
+    f2b = f.resolve(int, after=f1.__code__)
+    assert f1("hello") == "hellohello"
+    assert f2a("hello") == "hellohellohello"
+    assert f2b("hello") == "hellohellohello"
+
+
+def test_resolve_keyword():
+    @ovld(priority=1)
+    def f(x: int):
+        return resolve(str)(x)
+
+    @ovld(priority=0)
+    def f(x: str):
+        return x * 3
+
+    assert f(3) == 9
+
+
+def test_current_code_keyword():
+    @ovld(priority=1)
+    def f(x: int):
+        return resolve(int, after=current_code)(x)
+
+    @ovld(priority=0)
+    def f(x: int):
+        return x * 3
+
+    assert f(3) == 9
 
 
 def test_method():

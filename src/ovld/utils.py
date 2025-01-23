@@ -66,7 +66,8 @@ class UsageError(Exception):
 
 
 class Unusable:
-    def __init__(self, message):
+    def __init__(self, name, message):
+        self.name = name
         self.__message = message
 
     def __call__(self, *args, **kwargs):
@@ -74,6 +75,11 @@ class Unusable:
 
     def __getattr__(self, attr):
         raise UsageError(self.__message)
+
+    def __str__(self):  # pragma: no cover
+        return f"<Unusable {self.name}>"
+
+    __repr__ = __str__
 
 
 class GenericAliasMC(type):
