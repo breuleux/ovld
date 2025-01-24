@@ -173,7 +173,10 @@ class Code:
                 return ndb.get(v, suggested_name=name)
 
         def getsub(name, sep=False):
-            return make(name, self.substitutions[name], sep)
+            if name in self.substitutions:
+                return make(name, self.substitutions[name], sep)
+            else:  # pragma: no cover
+                return None
 
         return sub(self.template, getsub)
 
