@@ -218,11 +218,15 @@ def _getcls(ref):
 
 
 class AllMC(type):
+    __bound__ = False
+
     def __type_order__(self, other):
         return Order.MORE
 
     def __is_subtype__(self, other):
-        return True
+        if not self.__bound__:
+            return True
+        return subclasscheck(self.__bound__, other) or subclasscheck(other, self.__bound__)
 
     def __is_supertype__(self, other):
         return False
@@ -232,6 +236,10 @@ class AllMC(type):
 
     def __isinstance__(self, other):  # pragma: no cover
         return False
+
+    def __getitem__(self, item):
+        name = getattr(item, "__name__", str(item))
+        return type(f"All[{name}]", (self,), {"__bound__": item})
 
 
 class All(metaclass=AllMC):

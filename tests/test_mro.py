@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from ovld.dependent import Dependent
+from ovld.dependent import Dependent, Regexp
 from ovld.mro import Order, subclasscheck, typeorder
 from ovld.types import (
     All,
@@ -171,3 +171,25 @@ def test_subclasscheck_proxy():
     assert typeorder(int, Prox[int]) is Order.SAME
     assert typeorder(Prox[int], Prox) is Order.LESS
     assert typeorder(Prox, Prox[int]) is Order.MORE
+
+
+def test_all():
+    rx = Regexp["[a-z]+"]
+
+    aa = All[A]
+    assert subclasscheck(aa, object)
+    assert not subclasscheck(aa, int)
+    assert subclasscheck(aa, A)
+    assert subclasscheck(aa, B)
+    assert not subclasscheck(aa, rx)
+
+    ai = All[int]
+    assert subclasscheck(ai, object)
+    assert subclasscheck(ai, int)
+    assert not subclasscheck(ai, A)
+    assert not subclasscheck(ai, rx)
+
+    ass = All[str]
+    assert subclasscheck(ass, object)
+    assert subclasscheck(ass, str)
+    assert subclasscheck(ass, rx)  # Because rx's bound is str
