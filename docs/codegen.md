@@ -78,7 +78,7 @@ All other members of the `ovld` work as normal, so you can focus your codegen on
 If the code generation function returns `None`, nothing is generated and the next matching dispatch function will be used. You may also return a function directly.
 
 
-## Tips
+## Viewing the code
 
 If you want to look at the code `ovld` will generate, try something like this:
 

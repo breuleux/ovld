@@ -182,7 +182,10 @@ class Code:
 
 
 class Lambda:
-    def __init__(self, args, code, **subs):
+    def __init__(self, args, code=None, **subs):
+        if code is None:
+            code = args
+            args = ...
         self.args = args
         if subs:
             self.code = code.sub(**subs) if isinstance(code, Code) else Code(code, subs)
@@ -243,8 +246,11 @@ def codegen_specializer(typemap, fn, tup):
     body = fn(typemap.ovld.specialization_self, *tup) if is_method else fn(*tup)
     lbda = None
     if isinstance(body, Lambda):
+        argnames = inspect.signature(fn).parameters
+        if body.args is ...:
+            body.args = argnames
         lbda = body
-        body = Code("return $body", body=body(*inspect.signature(fn).parameters))
+        body = Code("return $body", body=body(*argnames))
     if isinstance(body, Code):
         body = body.fill(ndb)
     elif isinstance(body, str):

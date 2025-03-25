@@ -133,6 +133,8 @@ f(123)  # ERROR
 
 `ovld.types.All` is the bottom/empty/void type. You can use it as a wildcard in a contravariant setting, e.g. all 2-argument functions are instances of `Callable[[All, All], Any]` because the arguments are contravariant.
 
+`All[T]` is a type that is a subclass of every subclass of `T`, so e.g. `All[Animal]` is essentially the intersection of all animals, e.g. `Cat & Dog & Gerbil & ...`. No concrete object can have this type, so as an argument type it will never match. However, passing it to `resolve` can give you some information about an ovld. For example, `f.resolve(All[Animal])` will yield the most specific overload that some subclass of `Animal` may match. This is just the natural consequence of the fact that it pretends to be all of them, and it is likely to raise an ambiguity error if there are rules for multiple subclasses.
+
 
 ## Whatever
 
