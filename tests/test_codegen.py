@@ -3,8 +3,10 @@ from dataclasses import dataclass, fields
 from itertools import count
 from types import UnionType
 
+import pytest
+
 from ovld import codegen, recurse
-from ovld.codegen import Code, Lambda, code_generator
+from ovld.codegen import Code, Def, Lambda, code_generator
 from ovld.core import OvldBase, OvldPerInstanceBase, ovld
 from ovld.dependent import Regexp
 from ovld.types import All, Dataclass
@@ -294,7 +296,7 @@ def test_inlining_generator():
     def resolve_subcode(t, f):
         try:
             fn = f.resolve(type[t], All)
-            lbda = getattr(fn, "__lambda__", None)
+            lbda = getattr(fn, "__codegen__", None)
             if lbda:
                 return lbda
         except CodegenInProgress:
@@ -345,3 +347,21 @@ def test_inlining_generator():
     assert f(TwoPoints, TwoPoints(Point(1, 2), Point(7, 8))) == TwoPoints(
         Point(2, 3), Point(8, 9)
     )
+
+
+def test_scoped_subcodes():
+    c = Code([Code("a = $x", x=1234), Code("b = $x + $y", x=4321)], y=666)
+    assert c.fill() == "a = 1234\nb = 4321 + 666\n"
+
+
+def test_lambda():
+    df = Lambda(Code("$x + $body"), body=1234)
+    assert df.create_body(["x", "y"]).fill() == "return x + 1234"
+    assert df.create_expression(["x", "y"]).fill() == "x + 1234"
+
+
+def test_def():
+    df = Def(Code("return $x + $body"), body=1234)
+    assert df.create_body(["x", "y"]).fill() == "return x + 1234"
+    with pytest.raises(ValueError):
+        df.create_expression(["x", "y"])

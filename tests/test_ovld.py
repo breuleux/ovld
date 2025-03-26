@@ -822,7 +822,7 @@ def test_resolve():
     assert f2b("hello") == "hellohellohello"
 
 
-def test_resolve_keyword():
+def test_resolve_special_form():
     @ovld(priority=1)
     def f(x: int):
         return resolve(str)(x)
@@ -834,7 +834,7 @@ def test_resolve_keyword():
     assert f(3) == 9
 
 
-def test_current_code_keyword():
+def test_current_code_special_form():
     @ovld(priority=1)
     def f(x: int):
         return resolve(int, after=current_code)(x)
