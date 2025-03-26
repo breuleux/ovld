@@ -128,7 +128,7 @@ def _gensym():
 
 class Code:
     def __init__(self, template, substitutions={}, **substitutions_kw):
-        self.template = format_code(template)
+        self.template = template
         self.substitutions = {**substitutions, **substitutions_kw}
 
     def sub(self, **subs):
@@ -136,6 +136,15 @@ class Code:
 
     def defaults(self, subs):
         return Code(self.template, subs, **self.substitutions)
+
+    def _mapsub(self, template, code_recurse, getsub):
+        if isinstance(template, (list, tuple)):
+            return [self._mapsub(t, code_recurse, getsub) for t in template]
+
+        if isinstance(template, Code):
+            return code_recurse(template)
+
+        return sub(template, getsub)
 
     def rename(self, subs):
         def getsub(name, sep=False):
@@ -156,8 +165,7 @@ class Code:
                 return v
 
         new_subs.update({k: _rename_step(v) for k, v in self.substitutions.items()})
-
-        new_template = sub(self.template, getsub)
+        new_template = self._mapsub(self.template, lambda c: c.rename(subs), getsub)
         return Code(new_template, new_subs)
 
     def fill(self, ndb=None):
@@ -178,10 +186,13 @@ class Code:
             else:  # pragma: no cover
                 return None
 
-        return sub(self.template, getsub)
+        result = self._mapsub(
+            self.template, lambda c: c.defaults(self.substitutions).fill(ndb), getsub
+        )
+        return format_code(result)
 
 
-class Lambda:
+class Function:
     def __init__(self, args, code=None, **subs):
         if code is None:
             code = args
@@ -196,8 +207,25 @@ class Lambda:
         return self.code.rename(dict(zip(self.args, args)))
 
     def __call__(self, *args):
+        self.args = args if self.args is ... else self.args
         args = [Code(name) if isinstance(name, str) else name for name in args]
         return self.rename(*args)
+
+
+class Def(Function):
+    def create_body(self, argnames):
+        return self(*argnames)
+
+    def create_expression(self, argnames):
+        raise ValueError("Cannot convert Def to expression")
+
+
+class Lambda(Function):
+    def create_body(self, argnames):
+        return Code("return $body", body=self(*argnames))
+
+    def create_expression(self, argnames):
+        return self(*argnames)
 
 
 def regen_signature(fn, ndb):  # pragma: no cover
@@ -244,13 +272,11 @@ def codegen_specializer(typemap, fn, tup):
     ndb = NameDatabase(default_name="INJECT")
     args = regen_signature(fn, ndb)
     body = fn(typemap.ovld.specialization_self, *tup) if is_method else fn(*tup)
-    lbda = None
-    if isinstance(body, Lambda):
+    cg = None
+    if isinstance(body, Function):
+        cg = body
         argnames = inspect.signature(fn).parameters
-        if body.args is ...:
-            body.args = argnames
-        lbda = body
-        body = Code("return $body", body=body(*argnames))
+        body = body.create_body(argnames)
     if isinstance(body, Code):
         body = body.fill(ndb)
     elif isinstance(body, str):
@@ -264,7 +290,7 @@ def codegen_specializer(typemap, fn, tup):
     func = instantiate_code("__GENERATED__", code, inject=ndb.variables)
     adjusted_name = f"{fn.__name__.split('[')[0]}[{sigstring(tup)}]"
     func = rename_function(func, adjusted_name)
-    func.__lambda__ = lbda
+    func.__codegen__ = cg
     return func
 
 
