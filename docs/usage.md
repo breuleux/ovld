@@ -57,6 +57,12 @@ The rough rule to be able to provide an argument as a keyword argument is that:
 !!!note
     If any argument is named differently at the same position in two methods, ovld considers that it must be positional, therefore all arguments before it must also be positional. There is one additional restriction: if the difference between the minimum number of required positional arguments across all functions and the maximum number of positional arguments (required or not) exceeds 1, then they are all considered to be strictly positional (because I don't want to deal with the situation where argument N is given but not argument N-1).
 
+
+## Medleys
+
+A powerful way to define stateful ovlds is through the `Mixer` class. See [Medleys](./medley.md) for more details.
+
+
 ## Methods
 
 You may use `@ovld` on methods as normal:
