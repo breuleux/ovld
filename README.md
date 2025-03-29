@@ -188,20 +188,20 @@ assert Two().f("s") == "a string"
 
 ### Medleys
 
-Inheriting from `ovld.Mixer` lets you combine functionality in a new way. Classes created that way are free-form mixins that you can (almost) arbitrarily combine together.
+Inheriting from `ovld.Medley` lets you combine functionality in a new way. Classes created that way are free-form medleys that you can (almost) arbitrarily combine together.
 
-All mixers are dataclasses and you must define their data fields as you would for a normal dataclass (using `dataclass.field` if needed).
+All medleys are dataclasses and you must define their data fields as you would for a normal dataclass (using `dataclass.field` if needed).
 
 ```python
-from ovld import Mixer
+from ovld import Medley
 
-class Punctuator(Mixer):
+class Punctuator(Medley):
     punctuation: str = "."
 
     def __call__(self, x: str):
         return f"{x}{self.punctuation}"
 
-class Multiplier(Mixer):
+class Multiplier(Medley):
     factor: int = 3
 
     def __call__(self, x: int):
@@ -217,8 +217,8 @@ f2 = Punctuator("!") + Multiplier(3)
 assert f("hello") == f2("hello") == "hello!"
 assert f(10) == f2(10) == 30
 
-# You can also meld mixers inplace, but only if all new fields have defaults
-class Total(Mixer):
+# You can also meld medleys inplace, but only if all new fields have defaults
+class Total(Medley):
     pass
 
 Total.extend(Punctuator, Multiplier)
