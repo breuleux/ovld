@@ -1,3 +1,4 @@
+from dataclasses import field
 from typing import Annotated, Counter
 
 import pytest
@@ -152,3 +153,88 @@ def test_codegen_reuse():
 def test_conflict():
     with pytest.raises(TypeError):
         meld([Apple(3), DarkApple(3)])
+
+
+def test_meld_classes():
+    Abba = Apple + Banana
+    ab = Abba(worms=5, rings=3)
+    assert ab.worms == 5
+    assert ab.rings == 3
+    assert ab.do(10) == "50 worms"
+    assert ab.do("ring") == "ring! ring! ring!"
+
+
+def test_meld_inplace():
+    class One(Mixer):
+        x: int
+
+        def do(self, x: int):
+            return x * self.x
+
+        def do(self, x: object):
+            return "fallback"
+
+    class Two(Mixer):
+        y: str = field(default="?")
+
+        def do(self, x: str):
+            return x + self.y
+
+    before = One(x=5)
+    assert before.do(10) == 50
+    assert before.do("wow") == "fallback"
+
+    One += Two
+
+    # Existing instance should work with the new behavior and the defaults
+    assert before.do("wow") == "wow?"
+
+    # New instances can be created with the new fields
+    onus = One(x=4, y="!!!!!!")
+    assert onus.do(10) == 40
+    assert onus.do("wow") == "wow!!!!!!"
+
+    class Three(Mixer):
+        z: str  # <= should have a default value so that existing code doesn't break
+
+        def do(self, x: str):
+            return self.z
+
+    with pytest.raises(TypeError, match="Dataclass field 'z' must have a default value"):
+        One += Three
+
+    # Unchanged because the melding failed
+    assert onus.do("wow") == "wow!!!!!!"
+
+
+def test_post_init():
+    class One(Mixer):
+        x: int
+
+        def __post_init__(self):
+            self.xx = self.x * self.x
+
+        def do(self, x: int):
+            return x * self.xx
+
+    class Two(Mixer):
+        y: int
+
+        def __post_init__(self):
+            self.yy = self.y + self.y
+
+        def do(self, x: str):
+            return x + self.yy
+
+    ot = One(3) + Two("v")
+    assert ot.xx == 9
+    assert ot.yy == "vv"
+    assert ot.do(10) == 90
+    assert ot.do("z") == "zvv"
+
+    otc = One + Two
+    ot2 = otc(x=3, y="v")
+    assert ot2.xx == 9
+    assert ot2.yy == "vv"
+    assert ot2.do(10) == 90
+    assert ot2.do("z") == "zvv"
