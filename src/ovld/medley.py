@@ -3,7 +3,7 @@ import inspect
 from collections import defaultdict
 from copy import copy
 from dataclasses import MISSING, dataclass, fields, make_dataclass
-from typing import Annotated, get_origin
+from typing import Annotated, TypeVar, get_origin
 
 from .core import Ovld, is_ovld, to_ovld
 from .utils import Named
@@ -226,3 +226,7 @@ def meld(objects):
         for k, v in vars(o).items():
             setattr(obj, k, v)
     return obj
+
+
+T = TypeVar("T")
+CodegenParameter = Annotated[T, CODEGEN]
