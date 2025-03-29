@@ -348,7 +348,7 @@ class TwoPoints:
     b: Point
 
 
-@pytest.mark.skipif(sys.version_info <= (3, 9), reason="Requires Python 3.10+ for UnionType")
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+ for UnionType")
 def test_inlining_generator():
     from types import UnionType
 

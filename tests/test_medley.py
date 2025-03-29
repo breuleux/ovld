@@ -1,3 +1,4 @@
+import sys
 from dataclasses import field
 from typing import Annotated, Counter
 
@@ -6,6 +7,11 @@ import pytest
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
 from ovld.medley import CODEGEN, Mixer, meld
+
+# Skip all tests if Python version is less than 3.10
+pytestmark = pytest.mark.skipif(
+    sys.version_info < (3, 10), reason="These tests require Python 3.10 or higher"
+)
 
 
 class Zero(Mixer):
