@@ -1,7 +1,8 @@
 import functools
 import inspect
 from collections import defaultdict
-from dataclasses import dataclass, fields
+from copy import copy
+from dataclasses import MISSING, dataclass, fields, make_dataclass
 from typing import Annotated, get_origin
 
 from .core import Ovld, is_ovld, to_ovld
@@ -108,6 +109,19 @@ class MixerMC(type):
                 o.specialization_self = dc
         return dc
 
+    def extend(cls, *others):
+        melded = meld_classes((cls, *others), require_defaults=True)
+        for k, v in vars(melded).items():
+            setattr(cls, k, v)
+        # TODO: invalidate all cache entries involving this class
+        return cls
+
+    def __add__(cls, other):
+        return meld_classes((cls, other))
+
+    def __iadd__(cls, other):
+        return cls.extend(other)
+
     def __call__(cls, *args, **kwargs):
         made = super().__call__(*args, **kwargs)
         if not cls._ovld_is_specialized and (keyd := codegen_key(made)):
@@ -124,17 +138,20 @@ class MixerMC(type):
             return made
 
 
-class BaseMixer:
+class Mixer(metaclass=MixerMC):
     def __add__(self, other):
         return meld([self, other])
 
 
-class Mixer(BaseMixer, metaclass=MixerMC):
-    pass
-
-
 def merge_implementations(name, impls):
-    if all(impl == impls[0] for impl in impls[1:]):
+    if name == "__post_init__":
+
+        def __post_init__(self):
+            for impl in impls:
+                impl(self)
+
+        return __post_init__
+    elif all(impl == impls[0] for impl in impls[1:]):
         return impls[0]
     elif all(is_ovld(impl) for impl in impls):
         mixins = [to_ovld(impl) for impl in impls]
@@ -144,22 +161,50 @@ def merge_implementations(name, impls):
 
 
 @functools.cache
-def meld_classes(classes):
+def meld_classes(classes, require_defaults=False):
+    def remap_field(dc_field, require_default):
+        if require_default:
+            if dc_field.default is MISSING:
+                # NOTE: we do not accept default_factory, because we need the default value to be set
+                # in the class so that existing instances of classes[0] can see it.
+                raise TypeError(
+                    f"Dataclass field '{dc_field.name}' must have a default value (not a default_factory) in order to be melded in."
+                )
+        dc_field = copy(dc_field)
+        dc_field.kw_only = True
+        return dc_field
+
     options = defaultdict(list)
+    cg_fields = set()
+    dc_fields = []
+
     for base in classes:
+        rqdef = require_defaults and base is not classes[0]
         for cls in getattr(base, "_ovld_medley", [base]):
-            for field, obj in vars(cls).items():
-                if field in _ignore:
+            for fld, obj in vars(cls).items():
+                if fld in _ignore:
                     continue
-                options[field].append(obj)
+                options[fld].append(obj)
+            cg_fields.update(cls._ovld_codegen_fields)
+            dc_fields.extend(
+                (f.name, f.type, remap_field(f, rqdef))
+                for f in cls.__dataclass_fields__.values()
+            )
 
     merged = {}
     for name, impls in options.items():
         merged[name] = merge_implementations(name, impls)
 
-    merged["_medley"] = classes
-    merged["_ovld_codegen_fields"] = []
-    return type("+".join(c.__name__ for c in classes), (BaseMixer,), merged)
+    merged["_ovld_medley"] = classes
+    merged["_ovld_codegen_fields"] = tuple(cg_fields)
+
+    return make_dataclass(
+        cls_name="+".join(c.__name__ for c in classes),
+        bases=(Mixer,),
+        fields=dc_fields,
+        kw_only=True,
+        namespace=merged,
+    )
 
 
 @functools.cache
