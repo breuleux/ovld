@@ -1,16 +1,17 @@
 
 # Medleys
 
-**Mixers** are a novel and comprehensive way to define and combine functionality. Classes that inherit from `ovld.Mixer` way are free-form mixins that you can (almost) arbitrarily combine together.
+**Medleys** are a novel and comprehensive way to define and combine functionality. Classes that inherit from `ovld.Medley` are free-form mixins that you can (almost) arbitrarily combine together.
+
 
 ## Example
 
 ```python
-from ovld import Mixer
+from ovld import Medley
 
 
-class Walk(Mixer):
-    """This mixer walks through lists and dicts."""
+class Walk(Medley):
+    """This medley walks through lists and dicts."""
 
     def __call__(self, x: list):
         return [self(item) for item in x]
@@ -22,8 +23,8 @@ class Walk(Mixer):
         return x
 
 
-class Punctuate(Mixer):
-    """This mixer punctuates strings."""
+class Punctuate(Medley):
+    """This medley punctuates strings."""
 
     punctuation: str = "."
 
@@ -31,10 +32,10 @@ class Punctuate(Mixer):
         return f"{x}{self.punctuation}"
 
 
-class Multiply(Mixer):
-    """This mixer multiplies integers by a factor."""
+class Multiply(Medley):
+    """This medley multiplies integers by a factor."""
 
-    factor: int = 3
+    factor: int = 2
 
     def __call__(self, x: int):
         return x * self.factor
@@ -53,6 +54,7 @@ assert walkm([10, "hello"]) == [3000, "hello"]
 walkpm = Walk() + Punctuate("!!!!") + Multiply(300)
 assert walkpm([10, "hello"]) == [3000, "hello!!!!"]
 
+
 # You can also combine classes
 walkp = (Walk + Punctuate)(punctuation="!!!!")
 assert walkp([10, "hello"]) == [10, "hello!!!!"]
@@ -66,7 +68,7 @@ assert walkpm([10, "hello"]) == [3000, "hello!!!!"]
 
 ## Usage
 
-All mixers are dataclasses and you must define their data fields as you would for a normal dataclass (using `dataclass.field` if needed). When combining mixers, fields are forced to be keyword only except for the first class in the mix.
+All medleys are dataclasses and you must define their data fields as you would for a normal dataclass (using `dataclass.field` if needed). When combining medleys, fields are forced to be keyword only except for the first class in the mix.
 
 * As with standard dataclasses, `__post_init__` may be defined in order to perform additional tasks after initilization. Melded classes will run all `__post_init__` functions.
 * There can be multiple implementations of any function. All functions will be wrapped with `ovld`.
@@ -74,10 +76,9 @@ All mixers are dataclasses and you must define their data fields as you would fo
 * If two implementations have the exact same signature, the last one will override the others.
 
 ```python
-from ovld import Mixer
+from ovld import Medley
 
-
-class Counter(Mixer):
+class Counter(Medley):
     start: int = 0
 
     def __post_init__(self):
@@ -88,7 +89,7 @@ class Counter(Mixer):
         return self._current
 
 
-class Greeter(Mixer):
+class Greeter(Medley):
     name: str = "John"
     username: str = None
 
@@ -109,7 +110,7 @@ assert cg.greet() == "Hello Barbara, your username is barbara"
 
 ## Combining inplace
 
-It is possible to combine mixer classes inplace with `extend` or `+=`. Existing instances will gain the new behaviors and the default values of the new fields (the new fields *must* define default values).
+It is possible to combine medley classes inplace with `extend` or `+=`. Existing instances will gain the new behaviors and the default values of the new fields (the new fields *must* define default values).
 
 ```python
 # Continuation of the example up top
@@ -120,6 +121,3 @@ assert walk([10, "hello"]) == [10, "hello"]
 Walk.extend(Punctuate, Multiply)
 assert walk([10, "hello"]) == [30, "hello."]
 ```
-
-
-

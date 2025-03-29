@@ -60,7 +60,7 @@ The rough rule to be able to provide an argument as a keyword argument is that:
 
 ## Medleys
 
-A powerful way to define stateful ovlds is through the `Mixer` class. See [Medleys](./medley.md) for more details.
+A powerful way to define stateful ovlds is through the `Medley` class. See [Medleys](./medley.md) for more details.
 
 
 ## Methods

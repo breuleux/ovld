@@ -85,7 +85,7 @@ def specialize(cls, key, base=type):
     return new_t
 
 
-class MixerMC(type):
+class MedleyMC(type):
     @classmethod
     def __prepare__(metacls, name, bases):
         return medley_cls_dict()
@@ -129,7 +129,7 @@ class MixerMC(type):
             if key in cls._ovld_specializations:
                 new_t = cls._ovld_specializations[key]
             else:
-                new_t = specialize(cls, keyd, base=MixerMC)
+                new_t = specialize(cls, keyd, base=MedleyMC)
                 cls._ovld_specializations[key] = new_t
             obj = object.__new__(new_t)
             obj.__dict__.update(made.__dict__)
@@ -138,7 +138,7 @@ class MixerMC(type):
             return made
 
 
-class Mixer(metaclass=MixerMC):
+class Medley(metaclass=MedleyMC):
     def __add__(self, other):
         return meld([self, other])
 
@@ -200,7 +200,7 @@ def meld_classes(classes, require_defaults=False):
 
     return make_dataclass(
         cls_name="+".join(c.__name__ for c in classes),
-        bases=(Mixer,),
+        bases=(Medley,),
         fields=dc_fields,
         kw_only=True,
         namespace=merged,

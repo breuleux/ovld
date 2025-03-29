@@ -6,7 +6,7 @@ import pytest
 
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
-from ovld.medley import CodegenParameter, Mixer, meld
+from ovld.medley import CodegenParameter, Medley, meld
 
 # Skip all tests if Python version is less than 3.10
 pytestmark = pytest.mark.skipif(
@@ -14,19 +14,19 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-class Zero(Mixer):
+class Zero(Medley):
     def do(self, x: object):
         return 0
 
 
-class Apple(Mixer):
+class Apple(Medley):
     worms: int = 1
 
     def do(self, x: int):
         return f"{x * self.worms} worms"
 
 
-class Banana(Mixer):
+class Banana(Medley):
     rings: int
 
     def do(self, x: str):
@@ -36,7 +36,7 @@ class Banana(Mixer):
         return "~fallback~"
 
 
-class CherryBomb(Mixer):
+class CherryBomb(Medley):
     red: CodegenParameter[bool]
 
     @code_generator
@@ -44,12 +44,12 @@ class CherryBomb(Mixer):
         return Lambda(Code("$transform($x)", transform=str.upper if self.red else str.lower))
 
 
-class Dongle(Mixer):
+class Dongle(Medley):
     def do(self, xs: list):
         return [recurse(x) for x in xs]
 
 
-class DarkApple(Mixer):
+class DarkApple(Medley):
     worms: str = "worms"
 
     def do(self, x: int):
@@ -103,7 +103,7 @@ def test_meld_operator():
 def test_codegen_reuse():
     gens = Counter()
 
-    class One(Mixer):
+    class One(Medley):
         flag: CodegenParameter[bool]
         default: object
 
@@ -116,7 +116,7 @@ def test_codegen_reuse():
         def do(self, x: object):
             return self.default
 
-    class Two(Mixer):
+    class Two(Medley):
         factor: CodegenParameter[int]
 
         @code_generator
@@ -171,7 +171,7 @@ def test_meld_classes():
 
 
 def test_meld_inplace():
-    class One(Mixer):
+    class One(Medley):
         x: int
 
         def do(self, x: int):
@@ -180,7 +180,7 @@ def test_meld_inplace():
         def do(self, x: object):
             return "fallback"
 
-    class Two(Mixer):
+    class Two(Medley):
         y: str = field(default="?")
 
         def do(self, x: str):
@@ -200,7 +200,7 @@ def test_meld_inplace():
     assert onus.do(10) == 40
     assert onus.do("wow") == "wow!!!!!!"
 
-    class Three(Mixer):
+    class Three(Medley):
         z: str  # <= should have a default value so that existing code doesn't break
 
         def do(self, x: str):
@@ -214,7 +214,7 @@ def test_meld_inplace():
 
 
 def test_post_init():
-    class One(Mixer):
+    class One(Medley):
         x: int
 
         def __post_init__(self):
@@ -223,7 +223,7 @@ def test_post_init():
         def do(self, x: int):
             return x * self.xx
 
-    class Two(Mixer):
+    class Two(Medley):
         y: int
 
         def __post_init__(self):
