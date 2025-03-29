@@ -294,8 +294,14 @@ def Callable(fn: _Callable, argt, rett):
 
 
 @dependent_check
-def HasKey(value: Mapping, *keys):
-    return all(k in value for k in keys)
+class HasKey:
+    def check(self, value: Mapping):
+        return all(k in value for k in self.parameters)
+
+    def codegen(self):
+        return Code(
+            "($[ and ]checks)", checks=[Code("($k in $arg)", k=k) for k in self.parameters]
+        )
 
 
 @dependent_check
