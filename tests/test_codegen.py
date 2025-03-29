@@ -1,7 +1,7 @@
 import inspect
+import sys
 from dataclasses import dataclass, fields
 from itertools import count
-from types import UnionType
 
 import pytest
 
@@ -348,7 +348,10 @@ class TwoPoints:
     b: Point
 
 
+@pytest.mark.skipif(sys.version_info <= (3, 9), reason="Requires Python 3.10+ for UnionType")
 def test_inlining_generator():
+    from types import UnionType
+
     def resolve_subcode(t, f):
         try:
             fn = f.resolve(type[t], All)

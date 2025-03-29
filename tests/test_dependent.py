@@ -148,7 +148,7 @@ def test_regexp():
     assert f("oh helllllo there") == "hello"
 
 
-def test_with_keys():
+def test_has_key():
     @ovld
     def f(d: Dependent[dict, HasKey["a"]]):
         return "a"
@@ -166,6 +166,13 @@ def test_with_keys():
     assert f({"b": 2, "c": 8}) == "b|c"
     with pytest.raises(TypeError):
         f({"a": 9, "b": 2, "c": 8})
+
+
+def test_has_key_isinstance():
+    assert isinstance({"a": 3}, HasKey["a"])
+    assert not isinstance({"b": 3}, HasKey["a"])
+    assert isinstance({"a": 7, "b": 3}, HasKey["a", "b"])
+    assert not isinstance({"b": 3}, HasKey["a", "b"])
 
 
 def test_dependent_lists():
