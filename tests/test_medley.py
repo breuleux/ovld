@@ -1,12 +1,12 @@
 import sys
 from dataclasses import field
-from typing import Annotated, Counter
+from typing import Counter
 
 import pytest
 
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
-from ovld.medley import CODEGEN, Mixer, meld
+from ovld.medley import CodegenParameter, Mixer, meld
 
 # Skip all tests if Python version is less than 3.10
 pytestmark = pytest.mark.skipif(
@@ -37,7 +37,7 @@ class Banana(Mixer):
 
 
 class CherryBomb(Mixer):
-    red: Annotated[bool, CODEGEN]
+    red: CodegenParameter[bool]
 
     @code_generator
     def do(self, x: str):
@@ -104,7 +104,7 @@ def test_codegen_reuse():
     gens = Counter()
 
     class One(Mixer):
-        flag: Annotated[bool, CODEGEN]
+        flag: CodegenParameter[bool]
         default: object
 
         @code_generator
@@ -117,7 +117,7 @@ def test_codegen_reuse():
             return self.default
 
     class Two(Mixer):
-        factor: Annotated[int, CODEGEN]
+        factor: CodegenParameter[int]
 
         @code_generator
         def do(self, x: int):

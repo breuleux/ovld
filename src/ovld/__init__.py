@@ -18,6 +18,10 @@ from .dependent import (
     ParametrizedDependentType,
     dependent_check,
 )
+from .medley import (
+    CodegenParameter,
+    Mixer,
+)
 from .mro import (
     TypeRelationship,
     subclasscheck,
@@ -77,6 +81,8 @@ __all__ = [
     "ParametrizedDependentType",
     "DependentType",
     "dependent_check",
+    "Mixer",
+    "CodegenParameter",
     "BOOTSTRAP",
     "CodegenInProgress",
     "MISSING",
