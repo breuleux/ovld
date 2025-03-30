@@ -2,7 +2,7 @@ import functools
 import inspect
 from collections import defaultdict
 from copy import copy
-from dataclasses import MISSING, dataclass, fields, make_dataclass
+from dataclasses import MISSING, dataclass, fields, make_dataclass, replace
 from typing import Annotated, TypeVar, get_origin
 
 from .core import Ovld, is_ovld, to_ovld
@@ -140,7 +140,10 @@ class MedleyMC(type):
 
 class Medley(metaclass=MedleyMC):
     def __add__(self, other):
-        return meld([self, other])
+        if isinstance(self, type(other)) and not type(self)._ovld_codegen_fields:
+            return replace(self, **vars(other))
+        else:
+            return meld([self, other])
 
 
 def merge_implementations(name, impls):
@@ -200,7 +203,7 @@ def meld_classes(classes, require_defaults=False):
 
     return make_dataclass(
         cls_name="+".join(c.__name__ for c in classes),
-        bases=(Medley,),
+        bases=classes,
         fields=dc_fields,
         kw_only=True,
         namespace=merged,

@@ -1,5 +1,5 @@
 import sys
-from dataclasses import field
+from dataclasses import field, replace
 from typing import Counter
 
 import pytest
@@ -244,3 +244,21 @@ def test_post_init():
     assert ot2.yy == "vv"
     assert ot2.do(10) == 90
     assert ot2.do("z") == "zvv"
+
+
+def test_medley_isinstance():
+    assert issubclass(Apple + Banana, Apple)
+    assert isinstance(Apple(10) + Banana(7), Banana)
+
+
+def test_medley_replace():
+    ab = Apple(10) + Banana(7)
+    assert ab.do(8) == "80 worms"
+
+    ab2 = replace(ab, worms=100)
+    assert ab2.do(8) == "800 worms"
+
+
+def test_add_same_type():
+    aa = Apple(10) + Apple(20)
+    assert aa.do(8) == "160 worms"
