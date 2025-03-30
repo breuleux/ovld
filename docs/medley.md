@@ -121,3 +121,31 @@ assert walk([10, "hello"]) == [10, "hello"]
 Walk.extend(Punctuate, Multiply)
 assert walk([10, "hello"]) == [30, "hello."]
 ```
+
+
+## Code generation
+
+!!!warning
+    Code generation is **EXPERIMENTAL** and the interface may break at any moment!
+
+Medleys are compatible with ovlds that generate code. However, code generation happens at the class level, so any field which is used in the context of [code generation](./codegen.md) must be annotated as `CodegenParameter[type]`, to ensure its availability.
+
+**Only** the `CodegenParameter[]`-annotated fields should be accessed during codegen.
+
+```python
+from ovld import Medley, CodegenParameter, Lambda, Code, code_generator
+
+class CaseChanger(Medley):
+    upper: CodegenParameter[bool] = True
+
+    @code_generator
+    def __call__(self, x: str):
+        method = str.upper if self.upper else str.lower
+        return Lambda(Code("$method($x)", method=method))
+
+to_upper = Walk() + CaseChanger(True)
+assert to_upper(["Hello", "World"]) == ["HELLO", "WORLD"]
+
+to_lower = Walk() + CaseChanger(False)
+assert to_lower(["Hello", "World"]) == ["hello", "world"]
+```
