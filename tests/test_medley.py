@@ -271,3 +271,33 @@ def test_medley_replace_codegen():
 def test_add_same_type():
     aa = Apple(10) + Apple(20)
     assert aa.do(8) == "160 worms"
+
+
+def test_subtract():
+    a = Apple(10)
+    b = Banana(20)
+    ab = a + b
+    assert ab.worms == 10
+    assert ab.rings == 20
+
+    a2 = ab - Banana
+    assert a2.worms == 10
+    assert isinstance(a2, Apple)
+    assert not isinstance(a2, Banana)
+    assert not hasattr(a2, "rings")
+
+    b2 = ab - Apple
+    assert b2.rings == 20
+    assert not isinstance(b2, Apple)
+    assert isinstance(b2, Banana)
+    assert not hasattr(b2, "worms")
+
+    b3 = ab - Apple - Banana
+    assert not hasattr(b3, "rings")
+    assert not hasattr(b3, "worms")
+
+    with pytest.raises(TypeError, match="unexpected keyword argument 'worms'"):
+        ((Apple + Banana) - Apple)(worms=10, rings=20)
+
+    with pytest.raises(TypeError, match="unexpected keyword argument 'rings'"):
+        ((Apple + Banana) - Banana)(worms=10, rings=20)
