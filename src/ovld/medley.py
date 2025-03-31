@@ -122,6 +122,9 @@ class MedleyMC(type):
     def __iadd__(cls, other):
         return cls.extend(other)
 
+    def __sub__(cls, other):
+        return unmeld_classes(cls, other)
+
     def __call__(cls, *args, **kwargs):
         made = super().__call__(*args, **kwargs)
         if cls._ovld_codegen_fields and (keyd := codegen_key(made)):
@@ -146,6 +149,9 @@ class Medley(metaclass=MedleyMC):
         else:
             return meld([self, other])
 
+    def __sub__(self, other):
+        return unmeld(self, other)
+
 
 def merge_implementations(name, impls):
     if name == "__post_init__":
@@ -162,6 +168,11 @@ def merge_implementations(name, impls):
         return Ovld(name=name, mixins=mixins)
     else:
         raise TypeError(f"Cannot merge implementations for '{name}'.")
+
+
+def unmeld_classes(main: type, exclude: type):
+    classes = tuple(c for c in main.__bases__ if c is not exclude)
+    return meld_classes(classes)
 
 
 @functools.cache
@@ -230,6 +241,18 @@ def meld(objects):
         for k, v in vars(o).items():
             setattr(obj, k, v)
     return obj
+
+
+def unmeld(obj: object, exclude: type):
+    if type(obj)._ovld_codegen_fields:  # pragma: no cover
+        raise TypeError("Cannot unmeld an object with codegen fields")
+    cls = unmeld_classes(type(obj), exclude)
+    values = {}
+    excluded = exclude.__dataclass_fields__
+    for f in cls.__dataclass_fields__.values():
+        if f.name not in excluded:
+            values[f.name] = getattr(obj, f.name)
+    return cls(**values)
 
 
 T = TypeVar("T")
