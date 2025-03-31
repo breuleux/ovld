@@ -259,6 +259,15 @@ def test_medley_replace():
     assert ab2.do(8) == "800 worms"
 
 
+def test_medley_replace_codegen():
+    cb = CherryBomb(red=True)
+    assert cb.red
+    assert cb.do("Hello") == "HELLO"
+    cb2 = replace(cb, red=False)
+    assert not cb2.red
+    assert cb2.do("Hello") == "hello"
+
+
 def test_add_same_type():
     aa = Apple(10) + Apple(20)
     assert aa.do(8) == "160 worms"

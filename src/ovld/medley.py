@@ -47,7 +47,7 @@ _ignore = [
     "__subclasshook__",
     "__weakref__",
     "_ovld_codegen_fields",
-    "_ovld_is_specialized",
+    "_ovld_specialization_parent",
     "_ovld_specializations",
 ]
 
@@ -73,7 +73,7 @@ def codegen_key(*instances):
 
 def specialize(cls, key, base=type):
     new_t = base(cls.__name__, (cls,), {})
-    new_t._ovld_is_specialized = True
+    new_t._ovld_specialization_parent = cls
     for k, v in key.items():
         setattr(new_t, k, v)
     for k, v in vars(cls).items():
@@ -93,7 +93,7 @@ class MedleyMC(type):
     def __new__(mcls, name, bases, namespace):
         result = super().__new__(mcls, name, bases, namespace)
         dc = dataclass(result)
-        dc._ovld_is_specialized = False
+        dc._ovld_specialization_parent = None
         dc._ovld_specializations = {}
         dc._ovld_codegen_fields = [
             field.name
@@ -124,7 +124,8 @@ class MedleyMC(type):
 
     def __call__(cls, *args, **kwargs):
         made = super().__call__(*args, **kwargs)
-        if not cls._ovld_is_specialized and (keyd := codegen_key(made)):
+        if cls._ovld_codegen_fields and (keyd := codegen_key(made)):
+            cls = cls._ovld_specialization_parent or cls
             key = tuple(sorted(keyd.items()))
             if key in cls._ovld_specializations:
                 new_t = cls._ovld_specializations[key]
