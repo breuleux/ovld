@@ -43,7 +43,7 @@ A **variant** of an `ovld` is a copy of the `ovld`, with some methods added or c
 
 ```python
 @add.variant
-def mul(self, x: object, y: object):
+def mul(x: object, y: object):
     return x * y
 
 assert mul([1, 2], [3, 4]) == [3, 8]
