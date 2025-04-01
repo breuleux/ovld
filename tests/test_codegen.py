@@ -7,7 +7,7 @@ import pytest
 
 from ovld import codegen, recurse
 from ovld.codegen import Code, Def, Lambda, code_generator
-from ovld.core import OvldBase, OvldPerInstanceBase, ovld
+from ovld.core import OvldBase, ovld
 from ovld.dependent import Regexp
 from ovld.types import All, Dataclass
 from ovld.utils import MISSING, CodegenInProgress
@@ -135,123 +135,6 @@ def test_method_metaclass(file_regression):
     assert plus.f("wow") == "wow5"
 
     file_regression.check(getcodes(Plusser.f, int, str))
-
-
-def test_method_per_instance(file_regression):
-    class Plusser(OvldPerInstanceBase):
-        def __init__(self, number):
-            self.number = number
-
-        @ovld
-        @code_generator
-        def f(self, thing: object):
-            assert isinstance(self, Plusser)
-            return Code("return thing + $cls($num)", cls=thing, num=self.number)
-
-    plus5 = Plusser(5)
-    plus77 = Plusser(77)
-
-    assert type(plus5) is not type(plus77)
-
-    assert plus5.f(3) == 8
-    assert plus5.f("wow") == "wow5"
-
-    assert plus77.f(3) == 80
-    assert plus77.f("wow") == "wow77"
-
-    assert plus5.f(3) == 8
-    assert plus5.f("wow") == "wow5"
-
-    file_regression.check(
-        getcodes(type(plus5).f, int, str) + SEP + getcodes(type(plus77).f, int, str)
-    )
-
-
-def test_method_per_instance_keyed():
-    ngens = 0
-
-    class Plusser(OvldPerInstanceBase):
-        def __init__(self, number):
-            self.number = number
-
-        @classmethod
-        def ovld_specialization_key(cls, number):
-            return number
-
-        @ovld
-        @code_generator
-        def f(self, thing: object):
-            nonlocal ngens
-            ngens += 1
-            assert isinstance(self, Plusser)
-            return Code("return thing + $cls($num)", cls=thing, num=self.number)
-
-    plus5 = Plusser(5)
-    plus77 = Plusser(77)
-
-    plus5_bis = Plusser(5)
-    assert type(plus5) is type(plus5_bis)
-    assert type(plus5) is not type(plus77)
-
-    assert ngens == 0
-    assert plus5.f(3) == 8
-    assert ngens == 1
-    assert plus5.f("wow") == "wow5"
-    assert ngens == 2
-    assert plus5_bis.f("wow") == "wow5"
-    assert ngens == 2  # no new generation here
-
-    assert plus77.f(3) == 80
-    assert ngens == 3
-    assert plus77.f("wow") == "wow77"
-    assert ngens == 4
-
-
-def test_method_per_instance_keyed_extra_fields():
-    ngens = 0
-
-    @dataclass
-    class PlusserReplacer(OvldPerInstanceBase):
-        number: int  # codegen depends on this
-        key: str  # no codegen depends on this
-
-        @classmethod
-        def ovld_specialization_key(cls, number, key):
-            return number
-
-        @ovld
-        @code_generator
-        def f(self, thing: int):
-            nonlocal ngens
-            ngens += 1
-            assert isinstance(self, PlusserReplacer)
-            return Code("return thing + $cls($num)", cls=thing, num=self.number)
-
-        @ovld
-        def f(self, thing: str):
-            return self.key
-
-    plus5 = PlusserReplacer(5, "wow")
-    plus77 = PlusserReplacer(77, "cool")
-    plus5_bis = PlusserReplacer(5, "radical")
-
-    assert type(plus5) is type(plus5_bis)
-    assert type(plus5) is not type(plus77)
-
-    assert ngens == 0
-    assert plus5.f(3) == 8
-    assert ngens == 1
-    assert plus77.f(3) == 80
-    assert ngens == 2
-    assert plus5_bis.f(3) == 8
-    assert ngens == 2
-
-    assert plus5.f("quack") == "wow"
-    assert ngens == 2
-    assert plus77.f("quack") == "cool"
-    assert ngens == 2
-    assert plus5_bis.f("quack") == "radical"
-    assert ngens == 2
 
 
 def test_variant_generation(file_regression):

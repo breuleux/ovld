@@ -464,45 +464,6 @@ class OvldBase(metaclass=OvldMC):
     """Base class that allows overloading of methods."""
 
 
-class OvldPerInstanceMC(OvldMC):
-    """Metaclass that allows overloading.
-
-    A class which uses this metaclass can define multiple functions with
-    the same name and different type signatures.
-    """
-
-    def __call__(cls, *args, **kwargs):
-        if getattr(cls, "_is_ovld_specialization", False):
-            return super().__call__(*args, **kwargs)
-        else:
-            if hasattr(cls, "ovld_specialization_key"):
-                key = cls.ovld_specialization_key(*args, **kwargs)
-                insts = getattr(cls, "_ovld_specialized_classes", {})
-                cls._ovld_specialized_classes = insts
-                if key in insts:
-                    return insts[key](*args, **kwargs)
-            else:
-                key = MISSING
-
-            new_t = OvldMC(cls.__name__, (cls,), {"_is_ovld_specialization": True})
-            rval = new_t(*args, **kwargs)
-            if key is not MISSING:
-                insts[key] = new_t
-            for k in dir(new_t):
-                val = getattr(new_t, k, None)
-                if orig := to_ovld(val, force=False):
-                    o = orig.copy()
-                    o.rename(orig.name, orig.shortname)
-                    o.compile()
-                    o.specialization_self = rval
-                    setattr(new_t, k, o.dispatch)
-            return rval
-
-
-class OvldPerInstanceBase(metaclass=OvldPerInstanceMC):
-    pass
-
-
 def _find_overload(fn, **kwargs):
     fr = sys._getframe(1)  # We typically expect to get to frame 3.
     while fr and fn.__code__ not in fr.f_code.co_consts:
