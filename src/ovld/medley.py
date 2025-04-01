@@ -54,9 +54,15 @@ _ignore = [
 
 class medley_cls_dict(dict):
     def __setitem__(self, attr, value):
+        if attr == "__init__":
+            raise Exception("Do not define __init__ in a Medley, use __post_init__.")
+
         if attr in self and is_ovld(prev := self[attr]):
             prev = to_ovld(prev)
-            prev.register(value)
+            if ov := to_ovld(value, force=False):
+                prev.add_mixins(ov)
+            else:
+                prev.register(value)
             return
         elif inspect.isfunction(value):
             value = to_ovld(value)
@@ -88,7 +94,17 @@ def specialize(cls, key, base=type):
 class MedleyMC(type):
     @classmethod
     def __prepare__(metacls, name, bases):
-        return medley_cls_dict()
+        d = medley_cls_dict()
+        for base in bases:
+            for k, v in vars(base).items():
+                if k not in _ignore:
+                    if ov := to_ovld(v, force=False):
+                        ov = ov.copy()
+                        ov.rename(k)
+                        d[k] = ov.dispatch
+                    else:
+                        d[k] = v
+        return d
 
     def __new__(mcls, name, bases, namespace):
         result = super().__new__(mcls, name, bases, namespace)

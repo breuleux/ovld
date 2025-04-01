@@ -6,6 +6,7 @@ import pytest
 
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
+from ovld.core import ovld
 from ovld.medley import CodegenParameter, Medley, meld
 
 # Skip all tests if Python version is less than 3.10
@@ -129,6 +130,9 @@ def test_codegen_reuse():
     ot1 = meld([One(True, 51), Two(3)])
     ot2 = meld([One(True, "foo"), Two(3)])
     ot3 = meld([One(False, 51), Two(10)])
+
+    assert type(ot1) is type(ot2)
+    assert type(ot1) is not type(ot3)
 
     assert gens[One] == 0
     assert gens[Two] == 0
@@ -301,3 +305,43 @@ def test_subtract():
 
     with pytest.raises(TypeError, match="unexpected keyword argument 'rings'"):
         ((Apple + Banana) - Banana)(worms=10, rings=20)
+
+
+def test_init_not_allowed():
+    with pytest.raises(Exception, match="Do not define __init__"):
+
+        class Grapes(Medley):
+            def __init__(self, z: int, w=0):
+                self.z = z
+                self.w = w
+
+            def do(self, x: int):
+                return x + self.z + self.w
+
+
+def test_inheritance():
+    class Flapjack(Medley):
+        def do(self, x: int):
+            return x + 1
+
+    class Cake(Flapjack):
+        def do(self, x: str):
+            return x + "s"
+
+    assert Cake().do("egg") == "eggs"
+    assert Cake().do(6) == 7
+
+
+def test_priority():
+    class Habanero(Medley):
+        def do(self, x: int):
+            return "A"
+
+        @ovld(priority=1000)
+        def do(self, x: int):
+            return "B"
+
+        def do(self, x: int):
+            return "C"
+
+    assert Habanero().do(3) == "B"
