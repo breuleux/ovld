@@ -181,6 +181,9 @@ class Ovld:
         self.__name__ = shortname
         self.dispatch = bootstrap_dispatch(self, name=self.shortname)
 
+    def __set_name__(self, inst, name):
+        self.rename(name)
+
     def _set_attrs_from(self, fn):
         """Inherit relevant attributes from the function."""
         if self.name is None:
