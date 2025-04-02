@@ -3,7 +3,6 @@ from numbers import Number
 import pytest
 
 from .common import (
-    fastcore_dispatch,
     function_builder,
     multimethod_dispatch,
     multipledispatch_dispatch,
@@ -107,7 +106,6 @@ def trivial_isinstance(x):
     multimethod=make_trivial(multimethod_dispatch),
     multipledispatch=make_trivial(multipledispatch_dispatch),
     runtype=make_trivial(runtype_dispatch),
-    fastcore=make_trivial(fastcore_dispatch),
     singledispatch=make_trivial(singledispatch_dispatch),
     custom_isinstance=trivial_isinstance,
 )

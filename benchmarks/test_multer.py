@@ -7,7 +7,6 @@ from ovld import recurse
 from ovld.core import OvldBase
 
 from .common import (
-    fastcore_dispatch,
     function_builder,
     multimethod_dispatch,
     ovld_dispatch,
@@ -150,7 +149,6 @@ C = {"xs": list(range(0, 150, 3)), "ys": ("ooo", (18, 21))}
     singledispatch=SingleDispatchMulter,
     multipledispatch=MultipleDispatchMulter,
     runtype=make_multer(runtype_dispatch),
-    fastcore=make_multer(fastcore_dispatch),
     isinstance=IsinstanceMulter,
 )
 def test_multer(fn, benchmark):

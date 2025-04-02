@@ -1,7 +1,6 @@
 import pytest
 
 from .common import (
-    fastcore_dispatch,
     function_builder,
     multimethod_dispatch,
     multipledispatch_dispatch,
@@ -86,7 +85,6 @@ C = {"xs": list(range(10, 110, 2)), "ys": ("ox", (13, 13))}
     multimethod=make_add(multimethod_dispatch),
     multipledispatch=make_add(multipledispatch_dispatch),
     runtype=make_add(runtype_dispatch),
-    fastcore=make_add(fastcore_dispatch),
     isinstance=add_isinstance,
     match=add_match,
 )
