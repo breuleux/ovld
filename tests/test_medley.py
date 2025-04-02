@@ -7,7 +7,7 @@ import pytest
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
 from ovld.core import ovld
-from ovld.medley import CodegenParameter, Medley, meld
+from ovld.medley import CodegenParameter, Medley, ReduceAll, meld, use_combiner
 
 # Skip all tests if Python version is less than 3.10
 pytestmark = pytest.mark.skipif(
@@ -345,3 +345,18 @@ def test_priority():
             return "C"
 
     assert Habanero().do(3) == "B"
+
+
+def test_reduce_all():
+    class Iguana(Medley):
+        @use_combiner(ReduceAll)
+        def increment(self, x):
+            return x + 1
+
+        def increment(self, x):
+            return x + 2
+
+        def increment(self, x):
+            return x + 7
+
+    assert Iguana().increment(3) == 13
