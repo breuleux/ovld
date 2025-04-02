@@ -29,7 +29,6 @@ dev = [
     "mkdocs>=1.6.1",
 ]
 benchmark = [
-    "fastcore>=1.7.5",
     "multimethod>=1.12",
     "multipledispatch>=1.0.0",
     "plum-dispatch>=2.5.2",

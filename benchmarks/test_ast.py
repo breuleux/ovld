@@ -6,7 +6,6 @@ from types import NoneType
 import pytest
 
 from .common import (
-    fastcore_dispatch,
     function_builder,
     multimethod_dispatch,
     multipledispatch_dispatch,
@@ -104,7 +103,6 @@ class NT(ast.NodeTransformer):
     multimethod=make_transform(multimethod_dispatch),
     multipledispatch=make_transform(multipledispatch_dispatch),
     runtype=make_transform(runtype_dispatch),
-    fastcore=make_transform(fastcore_dispatch),
     singledispatch=make_transform(singledispatch_dispatch),
     custom=NT().visit,
 )
