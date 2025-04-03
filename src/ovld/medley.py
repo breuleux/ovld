@@ -107,6 +107,7 @@ class ImplList(Combiner):
 
 class RunAll(ImplList):
     def get(_self):
+        @functools.wraps(_self.impls[0])
         def run_all(self, *args, **kwargs):
             for impl in _self.impls:
                 impl(self, *args, **kwargs)
@@ -117,6 +118,7 @@ class RunAll(ImplList):
 
 class ReduceAll(ImplList):
     def get(_self):
+        @functools.wraps(_self.impls[0])
         def reduce_all(self, x, *args, **kwargs):
             result = _self.impls[0](self, x, *args, **kwargs)
             for impl in _self.impls[1:]:
@@ -125,6 +127,19 @@ class ReduceAll(ImplList):
 
         reduce_all._medley_combiner = _self
         return reduce_all
+
+
+class ChainAll(ImplList):
+    def get(_self):
+        @functools.wraps(_self.impls[0])
+        def chain_all(self, *args, **kwargs):
+            self = _self.impls[0](self, *args, **kwargs)
+            for impl in _self.impls[1:]:
+                self = impl(self, *args, **kwargs)
+            return self
+
+        chain_all._medley_combiner = _self
+        return chain_all
 
 
 class OvldCombiner(Combiner):
