@@ -7,7 +7,17 @@ import pytest
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
 from ovld.core import ovld
-from ovld.medley import ChainAll, CodegenParameter, Medley, ReduceAll, meld, use_combiner
+from ovld.medley import (
+    BuildOvld,
+    ChainAll,
+    CodegenParameter,
+    KeepLast,
+    Medley,
+    ReduceAll,
+    RunAll,
+    meld,
+    use_combiner,
+)
 
 # Skip all tests if Python version is less than 3.10
 pytestmark = pytest.mark.skipif(
@@ -382,3 +392,30 @@ def test_chain_all():
     j = Jellyfish()
     j.swim()
     assert j.x == 5  # ((0 + 1) * 2) + 3
+
+
+def test_incompatible_combiners():
+    class Kangaroo(Medley):
+        jump = KeepLast()
+
+    class Frog(Medley):
+        jump = BuildOvld()
+
+    with pytest.raises(TypeError):
+        Kangaroo + Frog
+
+
+def test_absent():
+    class Lux(Medley):
+        one = KeepLast()
+        two = RunAll()
+        three = BuildOvld()
+
+    lx = Lux()
+
+    with pytest.raises(AttributeError, match="no attribute 'one'"):
+        lx.one
+    with pytest.raises(AttributeError, match="no attribute 'two'"):
+        lx.two
+    with pytest.raises(AttributeError, match="no attribute 'three'"):
+        lx.three
