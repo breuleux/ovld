@@ -7,7 +7,7 @@ import pytest
 from ovld import recurse
 from ovld.codegen import Code, Lambda, code_generator
 from ovld.core import ovld
-from ovld.medley import CodegenParameter, Medley, ReduceAll, meld, use_combiner
+from ovld.medley import ChainAll, CodegenParameter, Medley, ReduceAll, meld, use_combiner
 
 # Skip all tests if Python version is less than 3.10
 pytestmark = pytest.mark.skipif(
@@ -360,3 +360,25 @@ def test_reduce_all():
             return x + 7
 
     assert Iguana().increment(3) == 13
+
+
+def test_chain_all():
+    class Jellyfish(Medley):
+        x: int = 0
+
+        @use_combiner(ChainAll)
+        def swim(self):
+            self.x += 1
+            return self
+
+        def swim(self):
+            self.x *= 2
+            return self
+
+        def swim(self):
+            self.x += 3
+            return self
+
+    j = Jellyfish()
+    j.swim()
+    assert j.x == 5  # ((0 + 1) * 2) + 3
