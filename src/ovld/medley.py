@@ -7,98 +7,70 @@ from typing import Annotated, TypeVar, get_origin
 from .core import Ovld, to_ovld
 from .utils import Named
 
+ABSENT = Named("ABSENT")
 CODEGEN = Named("CODEGEN")
 
 
-_ignore = [
-    "__annotations__",
-    "__class__",
-    "__dataclass_fields__",
-    "__dataclass_params__",
-    "__delattr__",
-    "__dict__",
-    "__dir__",
-    "__doc__",
-    "__eq__",
-    "__firstlineno__",
-    "__format__",
-    "__ge__",
-    "__getattribute__",
-    "__getstate__",
-    "__gt__",
-    "__hash__",
-    "__init__",
-    "__init_subclass__",
-    "__le__",
-    "__lt__",
-    "__match_args__",
-    "__module__",
-    "__ne__",
-    "__new__",
-    "__reduce__",
-    "__reduce_ex__",
-    "__replace__",
-    "__repr__",
-    "__setattr__",
-    "__sizeof__",
-    "__static_attributes__",
-    "__str__",
-    "__subclasshook__",
-    "__weakref__",
-    "_ovld_codegen_fields",
-    "_ovld_specialization_parent",
-    "_ovld_specializations",
-]
-
-
 class Combiner:
-    @staticmethod
-    def extract(attr, value):
-        combiner = value
-        if not isinstance(value, Combiner):
-            combiner = getattr(value, "_medley_combiner", None)
-            if combiner is None:
-                if inspect.isfunction(value) or isinstance(value, Ovld):
-                    return OvldCombiner(attr, value)
-                else:
-                    return KeepLast(attr, value)
-        return combiner
+    def __init__(self, field=None):
+        self.field = field
+
+    def __set_name__(self, obj, field):
+        self.field = field
 
     def get(self):  # pragma: no cover
         raise NotImplementedError()
 
-    def copy(self):  # pragma: no cover
-        raise NotImplementedError()
+    def copy(self):
+        return type(self)(self.field)
 
-    def override(self, new_impl):
-        return self.juxtapose(new_impl)
+    def include(self, other):
+        if type(self) is not type(other):
+            raise TypeError("Cannot merge different combiner classes.")
+        self.include_sametype(other)
+
+    def include_sametype(self, other):  # pragma: no cover
+        pass
 
     def juxtapose(self, impl):  # pragma: no cover
         raise NotImplementedError()
 
 
 class KeepLast(Combiner):
-    def __init__(self, field, impl):
-        self.field = field
-        self.impl = impl
+    def __init__(self, field=None):
+        super().__init__(field)
+        self.impl = ABSENT
 
     def get(self):
         return self.impl
 
-    def copy(self):
-        return self.impl
+    def include_sametype(self, other):
+        self.impl = other.impl
 
     def juxtapose(self, impl):
-        return impl
+        self.impl = impl
+        return self.get()
 
 
 class ImplList(Combiner):
-    def __init__(self, field, impl):
-        self.field = field
-        self.impls = impl if isinstance(impl, list) else [impl]
+    def __init__(self, field=None, impls=None):
+        super().__init__(field)
+        self.impls = impls or []
 
     def copy(self):
-        return type(self)(self.field, list(self.impls)).get()
+        return type(self)(self.field, self.impls)
+
+    def get(self):
+        if not self.impls:
+            return ABSENT
+        rval = self.wrap()
+        return functools.wraps(self.impls[0])(rval)
+
+    def wrap(self):  # pragma: no cover
+        raise NotImplementedError()
+
+    def include_sametype(self, other):
+        self.impls += other.impls
 
     def juxtapose(self, impl):
         self.impls.append(impl)
@@ -106,55 +78,56 @@ class ImplList(Combiner):
 
 
 class RunAll(ImplList):
-    def get(_self):
-        @functools.wraps(_self.impls[0])
+    def wrap(_self):
         def run_all(self, *args, **kwargs):
             for impl in _self.impls:
                 impl(self, *args, **kwargs)
 
-        run_all._medley_combiner = _self
         return run_all
 
 
 class ReduceAll(ImplList):
-    def get(_self):
-        @functools.wraps(_self.impls[0])
+    def wrap(_self):
         def reduce_all(self, x, *args, **kwargs):
             result = _self.impls[0](self, x, *args, **kwargs)
             for impl in _self.impls[1:]:
                 result = impl(self, result, *args, **kwargs)
             return result
 
-        reduce_all._medley_combiner = _self
         return reduce_all
 
 
 class ChainAll(ImplList):
-    def get(_self):
-        @functools.wraps(_self.impls[0])
+    def wrap(_self):
         def chain_all(self, *args, **kwargs):
             self = _self.impls[0](self, *args, **kwargs)
             for impl in _self.impls[1:]:
                 self = impl(self, *args, **kwargs)
             return self
 
-        chain_all._medley_combiner = _self
         return chain_all
 
 
-class OvldCombiner(Combiner):
-    def __init__(self, field, impl):
-        self.field = field
-        self.ovld = Ovld()
+class BuildOvld(Combiner):
+    def __init__(self, field=None, ovld=None):
+        super().__init__(field)
+        self.ovld = ovld or Ovld()
+        if field is not None:
+            self.__set_name__(None, field)
+
+    def __set_name__(self, obj, field):
         self.ovld.rename(field)
-        self.juxtapose(impl)
-        self.ovld.dispatch._medley_combiner = self
 
     def get(self):
+        if not self.ovld.defns:
+            return ABSENT
         return self.ovld.dispatch
 
     def copy(self):
-        return OvldCombiner(self.field, self.ovld).get()
+        return type(self)(self.field, self.ovld.copy())
+
+    def include_sametype(self, other):
+        self.ovld.add_mixins(other.ovld)
 
     def juxtapose(self, impl):
         if ov := to_ovld(impl, force=False):
@@ -169,43 +142,43 @@ class OvldCombiner(Combiner):
 class medley_cls_dict(dict):
     def __init__(self, bases):
         super().__init__()
+        self._combiners = {}
+        self.set_direct("_ovld_combiners", self._combiners)
         self._basic = set()
         for base in bases:
-            for k, v in vars(base).items():
-                if k not in _ignore:
-                    self.set_from_base(k, v)
-
-    def existing(self, attr):
-        if attr in self:
-            return Combiner.extract(attr, self[attr])
-        else:
-            return None
-
-    def set_from_base(self, attr, value):
-        if existing := self.existing(attr):
-            value = existing.juxtapose(value)
-        else:
-            value = Combiner.extract(attr, value).copy()
-        super().__setitem__(attr, value)
-        self._basic.add(attr)
+            for attr, combiner in getattr(base, "_ovld_combiners", {}).items():
+                if attr in self._combiners:
+                    self._combiners[attr].include(combiner)
+                else:
+                    self._combiners[attr] = combiner.copy()
+        for attr, combiner in self._combiners.items():
+            self.set_direct(attr, combiner.get())
 
     def set_direct(self, attr, value):
+        if value is ABSENT:
+            return
         super().__setitem__(attr, value)
 
     def __setitem__(self, attr, value):
         if attr == "__init__":
             raise Exception("Do not define __init__ in a Medley, use __post_init__.")
 
-        if existing := self.existing(attr):
-            if attr in self._basic:
-                value = existing.override(value)
-            else:
-                value = existing.juxtapose(value)
-        else:
-            value = Combiner.extract(attr, value).get()
+        if isinstance(value, Combiner):
+            value.__set_name__(None, attr)
+            self._combiners[attr] = value
+            self.set_direct(attr, value.get())
+            return
 
-        self._basic.discard(attr)
-        super().__setitem__(attr, value)
+        combiner = self._combiners.get(attr, None)
+        if combiner is None:
+            if inspect.isfunction(value) or isinstance(value, Ovld):
+                combiner = BuildOvld(attr)
+            else:
+                combiner = KeepLast(attr)
+            self._combiners[attr] = combiner
+
+        value = combiner.juxtapose(value)
+        self.set_direct(attr, value)
 
 
 def codegen_key(*instances):
@@ -289,25 +262,24 @@ class MedleyMC(type):
 
 def use_combiner(combiner):
     def deco(fn):
-        fn._medley_combiner = combiner(fn.__name__, fn)
-        return fn
+        cmb = combiner(fn.__name__)
+        cmb.juxtapose(fn)
+        return cmb
 
     return deco
 
 
 class Medley(metaclass=MedleyMC):
-    @use_combiner(RunAll)
-    def __post_init__(self):
-        pass
+    __post_init__ = RunAll()
+    __add__ = KeepLast()
+    __sub__ = KeepLast()
 
-    @use_combiner(KeepLast)
     def __add__(self, other):
         if isinstance(self, type(other)) and not type(self)._ovld_codegen_fields:
             return replace(self, **vars(other))
         else:
             return meld([self, other])
 
-    @use_combiner(KeepLast)
     def __sub__(self, other):
         return unmeld(self, other)
 
