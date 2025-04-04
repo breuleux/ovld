@@ -196,9 +196,10 @@ def specialize(cls, key, base=type):
         setattr(new_t, k, v)
     for k, v in vars(cls).items():
         if v := to_ovld(v, force=False):
-            v = v.copy()
-            v.specialization_self = new_t
-            setattr(new_t, k, v)
+            ov = v.copy()
+            ov.rename(v.name)
+            ov.specialization_self = new_t
+            setattr(new_t, k, ov)
     cls._ovld_codegen_fields = list(key.keys())
     return new_t
 
