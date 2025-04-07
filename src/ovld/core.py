@@ -178,7 +178,7 @@ class Ovld:
         """Rename this Ovld."""
         self.name = name
         self.shortname = shortname or name
-        self.__name__ = shortname
+        self.__name__ = self.shortname
         self.dispatch = bootstrap_dispatch(self, name=self.shortname)
 
     def __set_name__(self, inst, name):
