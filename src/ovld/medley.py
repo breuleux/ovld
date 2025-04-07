@@ -197,24 +197,19 @@ def codegen_key(*instances):
     return rval
 
 
-def specialize(cls, key, base=type):
-    new_t = base(cls.__name__, (cls,), {})
+def specialize(cls, key):
+    ns = medley_cls_dict((cls,))
+    new_t = MedleyMC(cls.__name__, (cls,), ns)
     new_t._ovld_specialization_parent = cls
     for k, v in key.items():
         setattr(new_t, k, v)
-    for k, v in vars(cls).items():
-        if v := to_ovld(v, force=False):
-            ov = v.copy(linkback=True)
-            ov.rename(v.name)
-            ov.specialization_self = new_t
-            setattr(new_t, k, ov)
     cls._ovld_codegen_fields = list(key.keys())
     return new_t
 
 
 class MedleyMC(type):
     @classmethod
-    def __prepare__(metacls, name, bases):
+    def __prepare__(mcls, name, bases):
         return medley_cls_dict(bases)
 
     def __new__(mcls, name, bases, namespace):
@@ -272,7 +267,7 @@ class MedleyMC(type):
             if key in cls._ovld_specializations:
                 new_t = cls._ovld_specializations[key]
             else:
-                new_t = specialize(cls, keyd, base=MedleyMC)
+                new_t = specialize(cls, keyd)
                 cls._ovld_specializations[key] = new_t
             obj = object.__new__(new_t)
             obj.__dict__.update(made.__dict__)
