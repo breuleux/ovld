@@ -5,6 +5,7 @@ from dataclasses import MISSING, dataclass, fields, make_dataclass, replace
 from typing import Annotated, TypeVar, get_origin
 
 from .core import Ovld, to_ovld
+from .types import eval_annotation
 from .utils import Named
 
 ABSENT = Named("ABSENT")
@@ -18,7 +19,7 @@ class Combiner:
     def __set_name__(self, obj, field):
         self.field = field
 
-    def get(self):  # pragma: no cover
+    def get(self, cls):  # pragma: no cover
         raise NotImplementedError()
 
     def copy(self):
@@ -41,7 +42,7 @@ class KeepLast(Combiner):
         super().__init__(field)
         self.impl = ABSENT
 
-    def get(self):
+    def get(self, cls):
         return self.impl
 
     def include_sametype(self, other):
@@ -49,7 +50,6 @@ class KeepLast(Combiner):
 
     def juxtapose(self, impl):
         self.impl = impl
-        return self.get()
 
 
 class ImplList(Combiner):
@@ -60,7 +60,7 @@ class ImplList(Combiner):
     def copy(self):
         return type(self)(self.field, self.impls)
 
-    def get(self):
+    def get(self, cls):
         if not self.impls:
             return ABSENT
         rval = self.wrap()
@@ -74,7 +74,6 @@ class ImplList(Combiner):
 
     def juxtapose(self, impl):
         self.impls.append(impl)
-        return self.get()
 
 
 class RunAll(ImplList):
@@ -112,13 +111,18 @@ class BuildOvld(Combiner):
     def __init__(self, field=None, ovld=None):
         super().__init__(field)
         self.ovld = ovld or Ovld()
+        self.pending = []
         if field is not None:
             self.__set_name__(None, field)
 
     def __set_name__(self, obj, field):
         self.ovld.rename(field)
 
-    def get(self):
+    def get(self, cls):
+        self.ovld.specialization_self = cls
+        for f, arg in self.pending:
+            f(arg)
+        self.pending.clear()
         if not self.ovld.defns:
             return ABSENT
         return self.ovld.dispatch
@@ -131,12 +135,11 @@ class BuildOvld(Combiner):
 
     def juxtapose(self, impl):
         if ov := to_ovld(impl, force=False):
-            self.ovld.add_mixins(ov)
+            self.pending.append((self.ovld.add_mixins, ov))
         elif inspect.isfunction(impl):
-            self.ovld.register(impl)
+            self.pending.append((self.ovld.register, impl))
         else:  # pragma: no cover
             raise TypeError("Expected a function or ovld.")
-        return self.get()
 
 
 class medley_cls_dict(dict):
@@ -151,22 +154,21 @@ class medley_cls_dict(dict):
                     self._combiners[attr].include(combiner)
                 else:
                     self._combiners[attr] = combiner.copy()
-        for attr, combiner in self._combiners.items():
-            self.set_direct(attr, combiner.get())
 
     def set_direct(self, attr, value):
-        if value is ABSENT:
-            return
         super().__setitem__(attr, value)
 
     def __setitem__(self, attr, value):
+        if attr == "__annotations__":
+            self.set_direct(attr, value)
+            return
+
         if attr == "__init__":
             raise Exception("Do not define __init__ in a Medley, use __post_init__.")
 
         if isinstance(value, Combiner):
             value.__set_name__(None, attr)
             self._combiners[attr] = value
-            self.set_direct(attr, value.get())
             return
 
         combiner = self._combiners.get(attr, None)
@@ -177,8 +179,13 @@ class medley_cls_dict(dict):
                 combiner = KeepLast(attr)
             self._combiners[attr] = combiner
 
-        value = combiner.juxtapose(value)
-        self.set_direct(attr, value)
+        combiner.juxtapose(value)
+
+    def __missing__(self, attr):
+        if attr in self._combiners:
+            if (value := self._combiners[attr].get(None)) is not ABSENT:
+                return value
+        raise KeyError(attr)
 
 
 def codegen_key(*instances):
@@ -211,6 +218,9 @@ class MedleyMC(type):
 
     def __new__(mcls, name, bases, namespace):
         result = super().__new__(mcls, name, bases, namespace)
+        for attr, combiner in result._ovld_combiners.items():
+            if (value := combiner.get(result)) is not ABSENT:
+                setattr(result, attr, value)
         dc = dataclass(result)
         dc._ovld_specialization_parent = None
         dc._ovld_specializations = {}
@@ -218,14 +228,11 @@ class MedleyMC(type):
             field.name
             for field in fields(dc)
             if (
-                field.type
-                and get_origin(field.type) is Annotated
-                and CODEGEN in field.type.__metadata__
+                (t := eval_annotation(field.type, dc, {}, catch=True))
+                and get_origin(t) is Annotated
+                and CODEGEN in t.__metadata__
             )
         ]
-        for val in namespace.values():
-            if o := to_ovld(val, force=False):
-                o.specialization_self = dc
         return dc
 
     def extend(cls, *others):

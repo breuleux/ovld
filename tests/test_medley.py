@@ -265,6 +265,10 @@ def test_medley_isinstance():
     assert isinstance(Apple(10) + Banana(7), Banana)
 
 
+def test_medley_name():
+    assert (Apple + Banana).__name__ == "Apple+Banana"
+
+
 def test_medley_replace():
     ab = Apple(10) + Banana(7)
     assert ab.do(8) == "80 worms"
@@ -403,6 +407,21 @@ def test_incompatible_combiners():
 
     with pytest.raises(TypeError):
         Kangaroo + Frog
+
+
+def test_refer_to_defined_vars():
+    class Llama(Medley):
+        def do(self, x: int):
+            return x * x
+
+        spit = do
+
+        def do(self, x: str):
+            return x + "s"
+
+    ll = Llama()
+    assert ll.spit(10) == 100
+    assert ll.spit("neat") == "neats"
 
 
 def test_absent():
