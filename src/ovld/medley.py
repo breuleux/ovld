@@ -110,7 +110,7 @@ class ChainAll(ImplList):
 class BuildOvld(Combiner):
     def __init__(self, field=None, ovld=None):
         super().__init__(field)
-        self.ovld = ovld or Ovld()
+        self.ovld = ovld or Ovld(linkback=True)
         self.pending = []
         if field is not None:
             self.__set_name__(None, field)
@@ -125,10 +125,11 @@ class BuildOvld(Combiner):
         self.pending.clear()
         if not self.ovld.defns:
             return ABSENT
+        self.ovld.compile()
         return self.ovld.dispatch
 
     def copy(self):
-        return type(self)(self.field, self.ovld.copy())
+        return type(self)(self.field, self.ovld.copy(linkback=True))
 
     def include_sametype(self, other):
         self.ovld.add_mixins(other.ovld)
@@ -203,7 +204,7 @@ def specialize(cls, key, base=type):
         setattr(new_t, k, v)
     for k, v in vars(cls).items():
         if v := to_ovld(v, force=False):
-            ov = v.copy()
+            ov = v.copy(linkback=True)
             ov.rename(v.name)
             ov.specialization_self = new_t
             setattr(new_t, k, ov)
@@ -236,10 +237,22 @@ class MedleyMC(type):
         return dc
 
     def extend(cls, *others):
+        if not others:
+            return cls
         melded = meld_classes((cls, *others), require_defaults=True)
-        for k, v in vars(melded).items():
-            setattr(cls, k, v)
-        # TODO: invalidate all cache entries involving this class
+        for other in others:
+            for k, v in vars(other).items():
+                if k in ["__module__", "__firstlineno__"]:
+                    continue
+                elif comb := cls._ovld_combiners.get(k):
+                    comb.juxtapose(v)
+                    setattr(cls, k, comb.get(cls))
+                elif not k.startswith("_ovld_") and not k.startswith("__"):
+                    setattr(cls, k, v)
+        cls.__init__ = melded.__init__
+        for subcls in cls.__subclasses__():
+            subothers = [o for o in others if not issubclass(subcls, o)]
+            subcls.extend(*subothers)
         return cls
 
     def __add__(cls, other):
@@ -316,15 +329,12 @@ def meld_classes(classes, require_defaults=False):
 
     for base in classes:
         rqdef = require_defaults and base is not classes[0]
-        for cls in getattr(base, "_ovld_medley", [base]):
-            cg_fields.update(cls._ovld_codegen_fields)
-            dc_fields.extend(
-                (f.name, f.type, remap_field(f, rqdef))
-                for f in cls.__dataclass_fields__.values()
-            )
+        cg_fields.update(base._ovld_codegen_fields)
+        dc_fields.extend(
+            (f.name, f.type, remap_field(f, rqdef)) for f in base.__dataclass_fields__.values()
+        )
 
     merged = medley_cls_dict(classes)
-    merged.set_direct("_ovld_medley", classes)
     merged.set_direct("_ovld_codegen_fields", tuple(cg_fields))
 
     return make_dataclass(

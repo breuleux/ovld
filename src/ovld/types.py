@@ -1,3 +1,4 @@
+import importlib
 import inspect
 import sys
 import typing
@@ -19,6 +20,24 @@ def get_args(tp):
     return args
 
 
+def eval_annotation(t, ctx, locals, catch=False):
+    try:
+        if isinstance(t, str):
+            if hasattr(ctx, "__globals__"):
+                glb = ctx.__globals__
+            elif hasattr(ctx, "__module__"):
+                glb = vars(importlib.import_module(ctx.__module__))
+            else:
+                glb = {}
+            return eval(t, glb, locals)
+        else:
+            return t
+    except Exception:
+        if catch:
+            return None
+        raise
+
+
 class TypeNormalizer:
     def __init__(self, generic_handlers=None):
         self.generic_handlers = generic_handlers or TypeMap()
@@ -33,7 +52,7 @@ class TypeNormalizer:
         from .dependent import DependentType
 
         if isinstance(t, str):
-            t = eval(t, getattr(fn, "__globals__", {}))
+            t = eval_annotation(t, fn, {})
 
         if t is type:
             t = type[object]
