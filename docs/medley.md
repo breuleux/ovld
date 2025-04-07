@@ -128,7 +128,7 @@ assert walk([10, "hello"]) == [30, "hello."]
 !!!warning
     Code generation is **EXPERIMENTAL** and the interface may break at any moment!
 
-Medleys are compatible with ovlds that generate code. However, code generation happens at the class level, so any field which is used in the context of [code generation](./codegen.md) must be annotated as `CodegenParameter[type]`, to ensure its availability.
+Medleys are compatible with ovlds that generate code. However, code generation happens at the class level, so any field which is used in the context of [code generation](./codegen.md) must be annotated as `CodegenParameter[type]`, to ensure its availability. The first argument to the generator will be a subclass of the original class, tweaked for the particular values of the codegen parameters.
 
 **Only** the `CodegenParameter[]`-annotated fields should be accessed during codegen.
 
@@ -139,8 +139,8 @@ class CaseChanger(Medley):
     upper: CodegenParameter[bool] = True
 
     @code_generator
-    def __call__(self, x: str):
-        method = str.upper if self.upper else str.lower
+    def __call__(cls, x: str):
+        method = str.upper if cls.upper else str.lower
         return Lambda(Code("$method($x)", method=method))
 
 to_upper = Walk() + CaseChanger(True)

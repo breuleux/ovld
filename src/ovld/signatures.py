@@ -127,8 +127,11 @@ class Signature:
 
         arginfo = []
         for i, (name, param) in enumerate(sig.parameters.items()):
-            if name == "self":
-                assert i == 0
+            if name == "self" or name == "cls":
+                if i != 0:  # pragma: no cover
+                    raise Exception(
+                        f"Argument name '{name}' marks a method and must always be in the first position."
+                    )
                 is_method = True
                 continue
             pos = nm = None

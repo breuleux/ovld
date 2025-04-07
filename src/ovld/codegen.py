@@ -234,6 +234,8 @@ def regen_signature(fn, ndb):  # pragma: no cover
     ko_flag = False
     po_flag = False
     for argname, arg in sig.parameters.items():
+        if argname == "cls":
+            argname = "self"
         ndb.register(argname)
         argstring = argname
         if arg.default is not inspect._empty:
@@ -275,7 +277,9 @@ def codegen_specializer(typemap, fn, tup):
     cg = None
     if isinstance(body, Function):
         cg = body
-        argnames = inspect.signature(fn).parameters
+        argnames = [
+            "self" if arg == "cls" else arg for arg in inspect.signature(fn).parameters
+        ]
         body = body.create_body(argnames)
     if isinstance(body, Code):
         body = body.fill(ndb)

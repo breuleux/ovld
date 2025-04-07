@@ -51,8 +51,8 @@ class CherryBomb(Medley):
     red: CodegenParameter[bool]
 
     @code_generator
-    def do(self, x: str):
-        return Lambda(Code("$transform($x)", transform=str.upper if self.red else str.lower))
+    def do(cls, x: str):
+        return Lambda(Code("$transform($x)", transform=str.upper if cls.red else str.lower))
 
 
 class Dongle(Medley):
@@ -119,9 +119,9 @@ def test_codegen_reuse():
         default: object
 
         @code_generator
-        def do(self, x: str):
+        def do(cls, x: str):
             gens[One] += 1
-            method = str.upper if self.flag else str.lower
+            method = str.upper if cls.flag else str.lower
             return Lambda(Code("$method($x)", method=method))
 
         def do(self, x: object):
@@ -131,9 +131,9 @@ def test_codegen_reuse():
         factor: CodegenParameter[int]
 
         @code_generator
-        def do(self, x: int):
+        def do(cls, x: int):
             gens[Two] += 1
-            return Lambda(Code("$x * $factor", factor=self.factor))
+            return Lambda(Code("$x * $factor", factor=cls.factor))
 
     obby = object()
 
