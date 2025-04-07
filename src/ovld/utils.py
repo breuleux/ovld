@@ -144,10 +144,12 @@ class NameDatabase:
     def register(self, name):
         self.registered.add(name)
 
-    def gensym(self, desired_name):
+    def gensym(self, desired_name, value=None):
         i = 1
         name = desired_name
-        while name in self.registered:
+        while name in self.registered or (
+            name in __builtins__ and __builtins__[name] != value
+        ):
             name = f"{desired_name}{i}"
             i += 1
         self.registered.add(name)
@@ -159,10 +161,13 @@ class NameDatabase:
         if id(value) in self.names:
             return self.names[id(value)]
         dflt = suggested_name or self.default_name
-        name = getattr(value, "__name__", dflt)
+        if isinstance(value, GenericAlias) and typing.get_origin(value) is type:
+            name = "t_" + getattr(typing.get_args(value)[0], "__name__", dflt)
+        else:
+            name = getattr(value, "__name__", dflt)
         if not re.match(string=name, pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$"):
             name = dflt
-        name = self.gensym(name)
+        name = self.gensym(name, value)
         self.variables[name] = value
         self.names[id(value)] = name
         return name
