@@ -227,6 +227,65 @@ def test_meld_inplace():
     assert onus.do("wow") == "wow!!!!!!"
 
 
+def test_meld_inplace_keep_pointers():
+    class One(Medley):
+        x: int
+
+        def do(self, x: int):
+            return x * self.x
+
+        def do(self, x: object):
+            return "fallback"
+
+    class Two(Medley):
+        y: str = field(default="?")
+
+        def do(self, x: str):
+            return x + self.y
+
+    before = One(x=5)
+
+    saved_do = before.do
+    assert saved_do(10) == 50
+    assert saved_do("wow") == "fallback"
+
+    assert saved_do.__ovld__ is before.do.__ovld__
+    One += Two
+    assert saved_do.__ovld__ is before.do.__ovld__
+
+    # Existing method should work with the new behavior and the defaults
+    assert saved_do(10) == 50
+    assert saved_do("wow") == "wow?"
+
+
+def test_meld_inplace_propagates_to_subclasses():
+    class One(Medley):
+        x: int
+
+        def do(self, x: int):
+            return x * self.x
+
+        def do(self, x: object):
+            return "fallback"
+
+    class Two(Medley):
+        y: str = field(default="?")
+
+        def do(self, x: str):
+            return x + self.y
+
+    class Three(Medley):
+        def do(self, x: float):
+            return -x
+
+    one3 = (One + Three)(x=7)
+
+    assert one3.do("wow") == "fallback"
+    One += Two
+    assert one3.do("wow") == "wow?"
+    assert one3.do(5.5) == -5.5
+
+
 def test_post_init():
     class One(Medley):
         x: int

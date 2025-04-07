@@ -9,10 +9,7 @@ from functools import cached_property
 from types import GenericAlias
 
 from .types import normalize_type
-from .utils import (
-    MISSING,
-    subtler_type,
-)
+from .utils import MISSING, subtler_type
 
 
 class LazySignature(inspect.Signature):
@@ -161,7 +158,7 @@ class Signature:
                     position=pos,
                     name=nm,
                     required=param.default is inspect._empty,
-                    ann=normalize_type(param.annotation, fn),
+                    ann=ann,
                 )
             )
 

@@ -405,8 +405,11 @@ def _search_names(co, specials, glb, closure=None):
         if isinstance(co, CodeType):
             if closure is not None:
                 for varname, cell in zip(co.co_freevars, closure):
-                    if any(cell.cell_contents is v for v in values):
-                        yield varname
+                    try:
+                        if any(cell.cell_contents is v for v in values):
+                            yield varname
+                    except ValueError:  # cell is empty
+                        pass
             for name in co.co_names:
                 if any(glb.get(name, None) is v for v in values):
                     yield name
