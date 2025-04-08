@@ -208,6 +208,11 @@ def specialize(cls, key):
 
 
 class MedleyMC(type):
+    def __subclasscheck__(cls, subclass):
+        if getattr(cls, "_ovld_medleys", None):
+            return all(issubclass(subclass, m) for m in cls._ovld_medleys)
+        return super().__subclasscheck__(subclass)
+
     @classmethod
     def __prepare__(mcls, name, bases):
         return medley_cls_dict(bases)
@@ -305,8 +310,29 @@ def unmeld_classes(main: type, exclude: type):
     return meld_classes(classes)
 
 
-@functools.cache
+_meld_classes_cache = {}
+
+
 def meld_classes(classes, require_defaults=False):
+    medleys = {}
+    for i, cls in enumerate(classes):
+        if require_defaults and i == 0:
+            medleys[cls] = True
+        else:
+            medleys.update({x: True for x in getattr(cls, "_ovld_medleys", [cls])})
+    for cls in classes:
+        if not hasattr(cls, "_ovld_medleys"):
+            for base in cls.mro():
+                if base is not cls and base in medleys:
+                    del medleys[base]
+    medleys = tuple(medleys)
+    if len(medleys) == 1:
+        return medleys[0]
+
+    cache_key = (medleys, require_defaults)
+    if cache_key in _meld_classes_cache:
+        return _meld_classes_cache[cache_key]
+
     def remap_field(dc_field, require_default):
         if require_default:
             if dc_field.default is MISSING:
@@ -322,23 +348,27 @@ def meld_classes(classes, require_defaults=False):
     cg_fields = set()
     dc_fields = []
 
-    for base in classes:
-        rqdef = require_defaults and base is not classes[0]
+    for base in medleys:
+        rqdef = require_defaults and base is not medleys[0]
         cg_fields.update(base._ovld_codegen_fields)
         dc_fields.extend(
             (f.name, f.type, remap_field(f, rqdef)) for f in base.__dataclass_fields__.values()
         )
 
-    merged = medley_cls_dict(classes)
+    merged = medley_cls_dict(medleys)
     merged.set_direct("_ovld_codegen_fields", tuple(cg_fields))
+    merged.set_direct("_ovld_medleys", tuple(medleys))
 
-    return make_dataclass(
-        cls_name="+".join(c.__name__ for c in classes),
-        bases=classes,
+    result = make_dataclass(
+        cls_name="+".join(sorted(c.__name__ for c in medleys)),
+        bases=tuple(medleys),
         fields=dc_fields,
         kw_only=True,
         namespace=merged,
     )
+
+    _meld_classes_cache[cache_key] = result
+    return result
 
 
 @functools.cache
