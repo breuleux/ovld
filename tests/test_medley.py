@@ -457,6 +457,39 @@ def test_chain_all():
     assert j.x == 5  # ((0 + 1) * 2) + 3
 
 
+def test_class_cache():
+    ab1 = Apple + Banana
+    ab2 = Apple + Banana
+    assert ab1 is ab2
+
+    # Same overall order
+    abc1 = (Apple + Banana) + CherryBomb
+    abc2 = Apple + (Banana + CherryBomb)
+    assert abc1 is abc2
+
+    # Different order
+    abc3 = Banana + (CherryBomb + Apple)
+    assert abc1 is not abc3
+
+
+def test_adding_superclasses_is_idempotent():
+    class Plantain(Banana):
+        yellow: bool = True
+
+    assert (Banana + Plantain) is Plantain
+
+
+def test_issubclass():
+    class Plantain(Banana):
+        yellow: bool = True
+
+    assert issubclass(Apple + Plantain, Banana)
+    ABC = Apple + Banana + CherryBomb
+    assert issubclass(ABC, Apple + Banana)
+    assert issubclass(ABC, Apple + CherryBomb)
+    assert issubclass(ABC, Banana + CherryBomb)
+
+
 def test_incompatible_combiners():
     class Kangaroo(Medley):
         jump = KeepLast()
