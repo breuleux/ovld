@@ -1,6 +1,10 @@
 
 # Medleys
 
+!!!warning
+    This is a new feature and there may be a few rough edges.
+
+
 **Medleys** are a novel and comprehensive way to define and combine functionality. Classes that inherit from `ovld.Medley` are free-form mixins that you can (almost) arbitrarily combine together.
 
 
@@ -70,7 +74,10 @@ assert walkpm([10, "hello"]) == [3000, "hello!!!!"]
 
 All medleys are dataclasses and you must define their data fields as you would for a normal dataclass (using `dataclass.field` if needed). When combining medleys, fields are forced to be keyword only except for the first class in the mix.
 
-* As with standard dataclasses, `__post_init__` may be defined in order to perform additional tasks after initilization. Melded classes will run all `__post_init__` functions.
+!!!warning
+    You may not define `__init__` in a Medley, because it would interfere with combining them with the `+` operator.
+
+* As with standard dataclasses, define `__post_init__` in order to perform additional tasks after initilization. Melded classes will run **all** `__post_init__` functions.
 * There can be multiple implementations of any function. All functions will be wrapped with `ovld`.
 * Melding multiple classes together means melding all of their methods.
 * If two implementations have the exact same signature, the last one will override the others.
@@ -121,6 +128,28 @@ assert walk([10, "hello"]) == [10, "hello"]
 Walk.extend(Punctuate, Multiply)
 assert walk([10, "hello"]) == [30, "hello."]
 ```
+
+
+## Alternative combiners
+
+Multiple dispatch with `ovld` is the default way multiple implementations of the same method are combined, but there are others, which you can declare like this:
+
+```python
+from ovld.medley import KeepLast, RunAll, ReduceAll, ChainAll
+
+class Custom(Medley):
+    fn1 = KeepLast()   # Only the last implementation will be valid (default Python behavior)
+    fn2 = RunAll()     # All implementations will be run (e.g. __post_init__ = RunAll())
+    fn3 = ReduceAll()  # Combine as: impl_C(impl_B(impl_A(arg)))
+    fn4 = ChainAll()   # Combine as: obj.impl_A(*args).impl_B(*args).impl_C(*args)
+
+    def fn1(self):
+        ...
+
+    ...
+```
+
+Setting a field to a Combiner only declares the combiner to use for the field with that name, it does not set the actual attribute. Only the first implementation will do that.
 
 
 ## Code generation

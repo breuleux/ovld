@@ -7,10 +7,11 @@ Fast multiple dispatch in Python, with many extra features.
 
 With ovld, you can write a version of the same function for every type signature using annotations instead of writing an awkward sequence of `isinstance` statements. Unlike Python's `singledispatch`, it works for multiple arguments.
 
-* ⚡️ **[Fast](https://ovld.readthedocs.io/en/latest/compare/#results):** `ovld` is the fastest multiple dispatch library around, by some margin.
-* 🚀 [**Variants**](https://ovld.readthedocs.io/en/latest/usage/#variants) and [**mixins**](https://ovld.readthedocs.io/en/latest/usage/#mixins) of functions and methods.
+* ⚡️ **[Fast](https://ovld.readthedocs.io/en/latest/compare/#results):** ovld is the fastest multiple dispatch library around, by some margin.
+* 🚀 [**Variants**](https://ovld.readthedocs.io/en/latest/usage/#variants), [**mixins**](https://ovld.readthedocs.io/en/latest/usage/#mixins) and [**medleys**](https://ovld.readthedocs.io/en/latest/medley) of functions and methods.
 * 🦄 **[Dependent types](https://ovld.readthedocs.io/en/latest/dependent/):** Overloaded functions can depend on more than argument types: they can depend on actual values.
-* 🔑 **Extensive:** Dispatch on functions, methods, positional arguments and even [keyword arguments](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments) (with some restrictions).
+* 🔑 **[Extensive](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments):** Dispatch on functions, methods, positional arguments and even keyword arguments (with some restrictions).
+* ⚙️ **[Codegen](https://ovld.readthedocs.io/en/latest/codegen/):** (Experimental) For advanced use cases, you can generate custom code for overloads.
 
 ## Example
 
@@ -186,9 +187,9 @@ assert Two().f(1) == "an integer"
 assert Two().f("s") == "a string"
 ```
 
-### Medleys
+## Medleys
 
-Inheriting from `ovld.Medley` lets you combine functionality in a new way. Classes created that way are free-form medleys that you can (almost) arbitrarily combine together.
+Inheriting from [`ovld.Medley`](https://ovld.readthedocs.io/en/latest/medley/) lets you combine functionality in a new way. Classes created that way are free-form medleys that you can (almost) arbitrarily combine together.
 
 All medleys are dataclasses and you must define their data fields as you would for a normal dataclass (using `dataclass.field` if needed).
 
@@ -237,7 +238,7 @@ f3 = Total(punctuation="!", factor=3)
 
 Time relative to the fastest implementation (1.00) (lower is better).
 
-| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multimethod](https://github.com/coady/multimethod) | [multipledispatch](https://github.com/mrocklin/multipledispatch) | [runtype](https://github.com/erezsh/runtype) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
+| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch) | [runtype](https://github.com/erezsh/runtype) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 |[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.45|1.00|3.32|4.63|2.04|2.41|1.91|
 |[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.13|1.00|11.05|4.53|8.31|2.19|7.32|
