@@ -161,7 +161,9 @@ class NameDatabase:
         if id(value) in self.names:
             return self.names[id(value)]
         dflt = suggested_name or self.default_name
-        if isinstance(value, GenericAlias) and typing.get_origin(value) is type:  # pragma: no cover
+        if (
+            isinstance(value, GenericAlias) and typing.get_origin(value) is type
+        ):  # pragma: no cover
             name = "t_" + getattr(typing.get_args(value)[0], "__name__", dflt)
         else:
             name = getattr(value, "__name__", dflt)
