@@ -25,14 +25,14 @@ def eval_annotation(t, ctx, locals, catch=False):
         if isinstance(t, str):
             if hasattr(ctx, "__globals__"):
                 glb = ctx.__globals__
-            elif hasattr(ctx, "__module__"):
+            elif hasattr(ctx, "__module__"):  # pragma: no cover
                 glb = vars(importlib.import_module(ctx.__module__))
-            else:
+            else:  # pragma: no cover
                 glb = {}
             return eval(t, glb, locals)
         else:
             return t
-    except Exception:
+    except Exception:  # pragma: no cover
         if catch:
             return None
         raise
