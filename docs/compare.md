@@ -42,7 +42,7 @@ Time relative to the fastest implementation (1.00) (lower is better). Python ver
 
 The **custom** column represents custom implementations using isinstance, match, a dispatch dict, etc. They are usually the fastest, but that should not be surprising. ovld's performance ranges from 1.5x faster to 3.3x slower.
 
-| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multimethod](https://github.com/coady/multimethod) | [multipledispatch](https://github.com/mrocklin/multipledispatch) | [runtype](https://github.com/erezsh/runtype) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
+| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch) | [runtype](https://github.com/erezsh/runtype) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 |[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.45|1.00|3.32|4.63|2.04|2.41|1.91|
 |[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.13|1.00|11.05|4.53|8.31|2.19|7.32|
