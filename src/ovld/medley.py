@@ -144,10 +144,14 @@ class BuildOvld(Combiner):
 
 
 class medley_cls_dict(dict):
-    def __init__(self, bases):
+    def __init__(self, bases, default_combiner=None):
+        if default_combiner is None:
+            (default_combiner,) = {b._ovld_default_combiner for b in bases}
         super().__init__()
         self._combiners = {}
+        self._default_combiner = default_combiner
         self.set_direct("_ovld_combiners", self._combiners)
+        self.set_direct("_ovld_default_combiner", default_combiner)
         self._basic = set()
         for base in bases:
             for attr, combiner in getattr(base, "_ovld_combiners", {}).items():
@@ -175,7 +179,7 @@ class medley_cls_dict(dict):
         combiner = self._combiners.get(attr, None)
         if combiner is None:
             if inspect.isfunction(value) or isinstance(value, Ovld):
-                combiner = BuildOvld(attr)
+                combiner = self._default_combiner(attr)
             else:
                 combiner = KeepLast(attr)
             self._combiners[attr] = combiner
@@ -214,10 +218,10 @@ class MedleyMC(type):
         return super().__subclasscheck__(subclass)
 
     @classmethod
-    def __prepare__(mcls, name, bases):
-        return medley_cls_dict(bases)
+    def __prepare__(mcls, name, bases, default_combiner=None):
+        return medley_cls_dict(bases, default_combiner=default_combiner)
 
-    def __new__(mcls, name, bases, namespace):
+    def __new__(mcls, name, bases, namespace, default_combiner=None):
         result = super().__new__(mcls, name, bases, namespace)
         for attr, combiner in result._ovld_combiners.items():
             if (value := combiner.get(result)) is not ABSENT:
@@ -290,7 +294,7 @@ def use_combiner(combiner):
     return deco
 
 
-class Medley(metaclass=MedleyMC):
+class Medley(metaclass=MedleyMC, default_combiner=BuildOvld):
     __post_init__ = RunAll()
     __add__ = KeepLast()
     __sub__ = KeepLast()
@@ -358,6 +362,9 @@ def meld_classes(classes, require_defaults=False):
     merged = medley_cls_dict(medleys)
     merged.set_direct("_ovld_codegen_fields", tuple(cg_fields))
     merged.set_direct("_ovld_medleys", tuple(medleys))
+
+    if "__qualname__" in merged._combiners:
+        del merged._combiners["__qualname__"]
 
     result = make_dataclass(
         cls_name="+".join(sorted(c.__name__ for c in medleys)),
