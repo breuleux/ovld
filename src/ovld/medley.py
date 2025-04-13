@@ -240,10 +240,11 @@ class MedleyMC(type):
         ]
         return dc
 
-    def extend(cls, *others):
-        if not others:
+    def extend(cls, *others, extend_subclasses=True):
+        if not others:  # pragma: no cover
             return cls
-        melded = meld_classes((cls, *others), require_defaults=True)
+        melded = meld_classes((cls, *others), require_defaults=True, use_cache=False)
+        melded._medley_extend_ignore = True
         for other in others:
             for k, v in vars(other).items():
                 if k in ["__module__", "__firstlineno__"]:
@@ -254,9 +255,12 @@ class MedleyMC(type):
                 elif not k.startswith("_ovld_") and not k.startswith("__"):
                     setattr(cls, k, v)
         cls.__init__ = melded.__init__
-        for subcls in cls.__subclasses__():
-            subothers = [o for o in others if not issubclass(subcls, o)]
-            subcls.extend(*subothers)
+        if extend_subclasses:
+            for subcls in cls.__subclasses__():
+                if getattr(subcls, "_medley_extend_ignore", False):
+                    continue
+                subothers = [o for o in others if not issubclass(subcls, o)]
+                subcls.extend(*subothers, extend_subclasses=False)
         return cls
 
     def __add__(cls, other):
@@ -317,7 +321,7 @@ def unmeld_classes(main: type, exclude: type):
 _meld_classes_cache = {}
 
 
-def meld_classes(classes, require_defaults=False):
+def meld_classes(classes, require_defaults=False, use_cache=True):
     medleys = {}
     for i, cls in enumerate(classes):
         if require_defaults and i == 0:
@@ -334,7 +338,7 @@ def meld_classes(classes, require_defaults=False):
         return medleys[0]
 
     cache_key = (medleys, require_defaults)
-    if cache_key in _meld_classes_cache:
+    if use_cache and cache_key in _meld_classes_cache:
         return _meld_classes_cache[cache_key]
 
     def remap_field(dc_field, require_default):
@@ -374,7 +378,8 @@ def meld_classes(classes, require_defaults=False):
         namespace=merged,
     )
 
-    _meld_classes_cache[cache_key] = result
+    if use_cache:
+        _meld_classes_cache[cache_key] = result
     return result
 
 
