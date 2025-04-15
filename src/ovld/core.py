@@ -18,6 +18,7 @@ from .signatures import ArgumentAnalyzer, LazySignature, Signature
 from .typemap import MultiTypeMap
 from .utils import (
     MISSING,
+    ResolutionError,
     UsageError,
     keyword_decorator,
     sigstring,
@@ -162,12 +163,12 @@ class Ovld:
     def _key_error(self, key, possibilities=None):
         typenames = sigstring(key)
         if not possibilities:
-            return TypeError(f"No method in {self} for argument types [{typenames}]")
+            return ResolutionError(f"No method in {self} for argument types [{typenames}]")
         else:
             hlp = ""
             for c in possibilities:
                 hlp += f"* {c.handler.__name__}  (priority: {c.priority}, specificity: {list(c.specificity)})\n"
-            return TypeError(
+            return ResolutionError(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
                 f"Candidates are:\n{hlp}"

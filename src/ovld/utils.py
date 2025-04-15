@@ -65,6 +65,10 @@ class UsageError(Exception):
     pass
 
 
+class ResolutionError(TypeError):
+    pass
+
+
 class SpecialForm:
     def __init__(self, name, message=None):
         self.__name = name
