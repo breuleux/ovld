@@ -258,6 +258,7 @@ class Ovld:
         """Register a function."""
         if fn is None:
             return partial(self._register, priority=priority)
+        priority = getattr(fn, "priority", priority)
         return self._register(fn, priority)
 
     def _register(self, fn, priority):

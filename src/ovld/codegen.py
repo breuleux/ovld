@@ -6,7 +6,7 @@ from ast import _splitlines_no_ff as splitlines
 from itertools import count
 from types import FunctionType
 
-from .utils import MISSING, NameDatabase, sigstring
+from .utils import MISSING, NameDatabase, keyword_decorator, sigstring
 
 _current = count()
 
@@ -298,6 +298,9 @@ def codegen_specializer(typemap, fn, tup):
     return func
 
 
-def code_generator(fn):
+@keyword_decorator
+def code_generator(fn, priority=0):
     fn.specializer = codegen_specializer
+    if priority:
+        fn.priority = priority
     return fn

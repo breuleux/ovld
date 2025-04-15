@@ -307,3 +307,17 @@ def test_def():
     assert df.create_body(["x", "y"]).fill() == "return x + 1234"
     with pytest.raises(ValueError):
         df.create_expression(["x", "y"])
+
+
+def test_codegen_priority():
+    @ovld
+    @code_generator
+    def f(x: int):
+        return Lambda(..., "'A'")
+
+    @ovld
+    @code_generator(priority=1)
+    def f(x: object):
+        return Lambda(..., "'B'")
+
+    assert f(2) == "B"
