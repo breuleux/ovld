@@ -52,6 +52,7 @@ def bootstrap_dispatch(ov, name):
     dispatch.add_mixins = ov.add_mixins
     dispatch.unregister = ov.unregister
     dispatch.next = ov.next
+    dispatch.first_entry = first_entry
     return dispatch
 
 
@@ -96,6 +97,7 @@ class Ovld:
         self._locked = False
         self.mixins = []
         self.argument_analysis = ArgumentAnalyzer()
+        self.dispatch = bootstrap_dispatch(self, name=self.shortname)
         self.add_mixins(*mixins)
 
     @property
@@ -177,10 +179,11 @@ class Ovld:
 
     def rename(self, name, shortname=None):
         """Rename this Ovld."""
-        self.name = name
-        self.shortname = shortname or name
-        self.__name__ = self.shortname
-        self.dispatch = bootstrap_dispatch(self, name=self.shortname)
+        if name != self.name:
+            self.name = name
+            self.shortname = shortname or name
+            self.__name__ = self.shortname
+            self.dispatch = bootstrap_dispatch(self, name=self.shortname)
 
     def __set_name__(self, inst, name):
         self.rename(name)
@@ -218,8 +221,6 @@ class Ovld:
 
         self.analyze_arguments()
         dispatch = generate_dispatch(self, self.argument_analysis)
-        if not hasattr(self, "dispatch"):
-            self.dispatch = bootstrap_dispatch(self, name=self.shortname)
         self.dispatch.__code__ = rename_code(dispatch.__code__, self.shortname)
         self.dispatch.__kwdefaults__ = dispatch.__kwdefaults__
         self.dispatch.__annotations__ = dispatch.__annotations__
@@ -292,12 +293,15 @@ class Ovld:
         self._update()
 
     def _update(self):
-        if self._compiled:
-            self.compile()
+        self.reset()
         for child in self.children:
             child._update()
         if hasattr(self, "dispatch"):
             self.dispatch.__doc__ = self.mkdoc()
+
+    def reset(self):
+        self._compiled = False
+        self.dispatch.__code__ = self.dispatch.first_entry.__code__
 
     def copy(self, mixins=[], linkback=False):
         """Create a copy of this Ovld.
@@ -321,8 +325,6 @@ class Ovld:
             return ov
 
     def __get__(self, obj, cls):
-        if not self._compiled:
-            self.compile()
         return self.dispatch.__get__(obj, cls)
 
     def __call__(self, *args, **kwargs):  # pragma: no cover
@@ -330,8 +332,6 @@ class Ovld:
 
         This should be replaced by an auto-generated function.
         """
-        if not self._compiled:
-            self.compile()
         return self.dispatch(*args, **kwargs)
 
     def next(self, *args):

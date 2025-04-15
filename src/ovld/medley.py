@@ -110,7 +110,7 @@ class ChainAll(ImplList):
 class BuildOvld(Combiner):
     def __init__(self, field=None, ovld=None):
         super().__init__(field)
-        self.ovld = ovld or Ovld(linkback=True)
+        self.ovld = ovld or Ovld(name=field, linkback=True)
         self.pending = []
         if field is not None:
             self.__set_name__(None, field)
@@ -125,7 +125,7 @@ class BuildOvld(Combiner):
         self.pending.clear()
         if not self.ovld.defns:
             return ABSENT
-        self.ovld.compile()
+        self.ovld.reset()
         return self.ovld.dispatch
 
     def copy(self):
@@ -211,6 +211,19 @@ def specialize(cls, key):
     return new_t
 
 
+def remap_field(dc_field, require_default=False):
+    if require_default:
+        if dc_field.default is MISSING:
+            # NOTE: we do not accept default_factory, because we need the default value to be set
+            # in the class so that existing instances of classes[0] can see it.
+            raise TypeError(
+                f"Dataclass field '{dc_field.name}' must have a default value (not a default_factory) in order to be melded in."
+            )
+    dc_field = copy(dc_field)
+    dc_field.kw_only = True
+    return dc_field
+
+
 class MedleyMC(type):
     def __subclasscheck__(cls, subclass):
         if getattr(cls, "_ovld_medleys", None):
@@ -243,11 +256,13 @@ class MedleyMC(type):
     def extend(cls, *others, extend_subclasses=True):
         if not others:  # pragma: no cover
             return cls
-        melded = meld_classes((cls, *others), require_defaults=True, use_cache=False)
-        melded._medley_extend_ignore = True
+        all_fields = [(f.name, f.type, f) for f in fields(cls)]
+        for other in others:
+            all_fields += [(f.name, f.type, remap_field(f, True)) for f in fields(other)]
+        melded = make_dataclass("_", fields=all_fields)
         for other in others:
             for k, v in vars(other).items():
-                if k in ["__module__", "__firstlineno__"]:
+                if k in ["__module__", "__firstlineno__", "__static_attributes__"]:
                     continue
                 elif comb := cls._ovld_combiners.get(k):
                     comb.juxtapose(v)
@@ -257,8 +272,6 @@ class MedleyMC(type):
         cls.__init__ = melded.__init__
         if extend_subclasses:
             for subcls in cls.__subclasses__():
-                if getattr(subcls, "_medley_extend_ignore", False):
-                    continue
                 subothers = [o for o in others if not issubclass(subcls, o)]
                 subcls.extend(*subothers, extend_subclasses=False)
         return cls
@@ -321,13 +334,10 @@ def unmeld_classes(main: type, exclude: type):
 _meld_classes_cache = {}
 
 
-def meld_classes(classes, require_defaults=False, use_cache=True):
+def meld_classes(classes):
     medleys = {}
-    for i, cls in enumerate(classes):
-        if require_defaults and i == 0:
-            medleys[cls] = True
-        else:
-            medleys.update({x: True for x in getattr(cls, "_ovld_medleys", [cls])})
+    for cls in classes:
+        medleys.update({x: True for x in getattr(cls, "_ovld_medleys", [cls])})
     for cls in classes:
         if not hasattr(cls, "_ovld_medleys"):
             for base in cls.mro():
@@ -337,30 +347,17 @@ def meld_classes(classes, require_defaults=False, use_cache=True):
     if len(medleys) == 1:
         return medleys[0]
 
-    cache_key = (medleys, require_defaults)
-    if use_cache and cache_key in _meld_classes_cache:
+    cache_key = medleys
+    if cache_key in _meld_classes_cache:
         return _meld_classes_cache[cache_key]
-
-    def remap_field(dc_field, require_default):
-        if require_default:
-            if dc_field.default is MISSING:
-                # NOTE: we do not accept default_factory, because we need the default value to be set
-                # in the class so that existing instances of classes[0] can see it.
-                raise TypeError(
-                    f"Dataclass field '{dc_field.name}' must have a default value (not a default_factory) in order to be melded in."
-                )
-        dc_field = copy(dc_field)
-        dc_field.kw_only = True
-        return dc_field
 
     cg_fields = set()
     dc_fields = []
 
     for base in medleys:
-        rqdef = require_defaults and base is not medleys[0]
         cg_fields.update(base._ovld_codegen_fields)
         dc_fields.extend(
-            (f.name, f.type, remap_field(f, rqdef)) for f in base.__dataclass_fields__.values()
+            (f.name, f.type, remap_field(f)) for f in base.__dataclass_fields__.values()
         )
 
     merged = medley_cls_dict(medleys)
@@ -378,8 +375,7 @@ def meld_classes(classes, require_defaults=False, use_cache=True):
         namespace=merged,
     )
 
-    if use_cache:
-        _meld_classes_cache[cache_key] = result
+    _meld_classes_cache[cache_key] = result
     return result
 
 
