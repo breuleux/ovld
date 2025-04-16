@@ -496,7 +496,18 @@ def recode(fn, ovld, syms, newname):
     if fn.__closure__:
         new = closure_wrap(new.body[0], "irrelevant", fn.__code__.co_freevars)
     ast.fix_missing_locations(new)
-    ast.increment_lineno(new, fn.__code__.co_firstlineno - 1)
+    line_delta = fn.__code__.co_firstlineno - 1
+    col_delta = len(firstline := src.split("\n", 1)[0]) - len(firstline.lstrip())
+    for node in ast.walk(new):
+        if hasattr(node, "lineno"):
+            node.lineno += line_delta
+        if hasattr(node, "end_lineno"):
+            node.end_lineno += line_delta
+        if hasattr(node, "col_offset"):
+            node.col_offset += col_delta
+        if hasattr(node, "end_col_offset"):
+            node.end_col_offset += col_delta
+
     res = compile(new, mode="exec", filename=fn.__code__.co_filename)
     if fn.__closure__:
         res = [x for x in res.co_consts if isinstance(x, CodeType)][0]
