@@ -178,7 +178,9 @@ class medley_cls_dict(dict):
 
         combiner = self._combiners.get(attr, None)
         if combiner is None:
-            if inspect.isfunction(value) or isinstance(value, Ovld):
+            if to_ovld(value, force=False):
+                combiner = BuildOvld(attr)
+            elif inspect.isfunction(value):
                 combiner = self._default_combiner(attr)
             else:
                 combiner = KeepLast(attr)

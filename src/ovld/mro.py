@@ -137,7 +137,7 @@ def subclasscheck(t1, t2):
     if o1 or o2:
         o1 = o1 or t1
         o2 = o2 or t2
-        if issubclass(o1, o2):
+        if isinstance(o1, type) and isinstance(o2, type) and issubclass(o1, o2):
             if o2 is t2:  # pragma: no cover
                 return True
             else:
