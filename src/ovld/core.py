@@ -169,7 +169,10 @@ class Ovld:
         else:
             hlp = ""
             for c in possibilities:
-                hlp += f"* {c.handler.__name__}  (priority: {c.priority}, specificity: {list(c.specificity)})\n"
+                hn = getattr(c.handler, "__orig_name__", c.handler.__name__)
+                hlp += (
+                    f"* {hn}  (priority: {c.priority}, specificity: {list(c.specificity)})\n"
+                )
             return ResolutionError(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"

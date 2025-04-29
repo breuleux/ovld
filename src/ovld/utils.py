@@ -106,7 +106,7 @@ def clsstring(cls):
         return f"{origin.__name__}[{args}]"
     else:
         r = repr(cls)
-        if r.startswith("<class "):
+        if r.startswith("<class ") or r.startswith("<enum "):
             return cls.__name__
         else:
             return r

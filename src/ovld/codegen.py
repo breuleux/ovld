@@ -295,6 +295,7 @@ def codegen_specializer(typemap, fn, tup):
     adjusted_name = f"{fn.__name__.split('[')[0]}[{sigstring(tup)}]"
     func = rename_function(func, adjusted_name)
     func.__codegen__ = cg
+    func.__orig_name__ = fn.__name__
     return func
 
 
