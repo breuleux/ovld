@@ -1,6 +1,6 @@
 [project]
 name = "ovld"
-version = "0.5.2"
+version = "0.5.3"
 description = "Overloading Python functions"
 authors = [
     { name = "Olivier Breuleux", email = "breuleux@gmail.com" }
@@ -32,7 +32,7 @@ benchmark = [
     "multimethod>=1.12",
     "multipledispatch>=1.0.0",
     "plum-dispatch>=2.5.2",
-    "runtype>=0.5.2",
+    "runtype>=0.5.3",
 ]
 
 [tool.hatch.build.targets.wheel]
