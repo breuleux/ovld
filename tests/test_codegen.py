@@ -231,6 +231,11 @@ class TwoPoints:
     b: Point
 
 
+@dataclass
+class Empty:
+    pass
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Requires Python 3.10+ for UnionType")
 def test_inlining_generator():
     from types import UnionType
@@ -289,6 +294,7 @@ def test_inlining_generator():
     assert f(TwoPoints, TwoPoints(Point(1, 2), Point(7, 8))) == TwoPoints(
         Point(2, 3), Point(8, 9)
     )
+    assert f(Empty, Empty()) == Empty()
 
 
 def test_scoped_subcodes():

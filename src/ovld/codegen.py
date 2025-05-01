@@ -161,6 +161,8 @@ class Code:
             elif isinstance(v, (list, tuple)):
                 if any(isinstance(x, Code) for x in v):
                     return [_rename_step(x) for x in v]
+                else:
+                    return v
             else:
                 return v
 
