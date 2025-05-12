@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9"
 
 [[package]]
@@ -15,7 +16,7 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
 wheels = [
@@ -285,7 +286,7 @@ version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "ghp-import" },
     { name = "importlib-metadata", marker = "python_full_version < '3.10'" },
     { name = "jinja2" },
@@ -339,7 +340,7 @@ wheels = [
 
 [[package]]
 name = "ovld"
-version = "0.5.0"
+version = "0.5.4"
 source = { editable = "." }
 
 [package.dev-dependencies]
@@ -365,7 +366,7 @@ benchmark = [
     { name = "multimethod", specifier = ">=1.12" },
     { name = "multipledispatch", specifier = ">=1.0.0" },
     { name = "plum-dispatch", specifier = ">=2.5.2" },
-    { name = "runtype", specifier = ">=0.5.0" },
+    { name = "runtype", specifier = ">=0.5.3" },
 ]
 dev = [
     { name = "codefind", specifier = "~=0.1.6" },
