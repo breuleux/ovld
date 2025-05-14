@@ -85,8 +85,8 @@ C = {"xs": list(range(10, 110, 2)), "ys": ("ox", (13, 13))}
     multimethod=make_add(multimethod_dispatch),
     multipledispatch=make_add(multipledispatch_dispatch),
     runtype=make_add(runtype_dispatch),
-    isinstance=add_isinstance,
-    match=add_match,
+    custom__isinstance=add_isinstance,
+    custom__match=add_match,
 )
 def test_add(fn, benchmark):
     result = benchmark(fn, A, B)

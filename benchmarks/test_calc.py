@@ -135,8 +135,8 @@ expected_result = 19
     ovld=make_calc(ovld_dispatch),
     plum=make_calc(plum_dispatch),
     multimethod=make_calc(multimethod_dispatch),
-    custom_dict=calc_dict,
-    custom_match=calc_match,
+    custom__dict=calc_dict,
+    custom__match=calc_match,
 )
 def test_calc(fn, benchmark):
     result = benchmark(fn, expr)

@@ -82,9 +82,9 @@ def regexp_compiled_nonexclusive(x):
 @with_functions(
     ovld=make_regexp(ovld_dispatch),
     plum=make_regexp(plum_dispatch),
-    custom_search=regexp_search,
-    custom_compiled=regexp_compiled,
-    custom_compiled_nx=regexp_compiled_nonexclusive,
+    custom__search=regexp_search,
+    custom__compiled=regexp_compiled,
+    custom__compiled_nx=regexp_compiled_nonexclusive,
 )
 def test_regexp(fn, benchmark):
     def run():

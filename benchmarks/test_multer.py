@@ -143,13 +143,13 @@ C = {"xs": list(range(0, 150, 3)), "ys": ("ooo", (18, 21))}
 @pytest.mark.benchmark(group="multer")
 @with_functions(
     ovld=make_multer(ovld_dispatch),
-    recurse=OvldRecurseMulter,
+    ovld__recurse=OvldRecurseMulter,
     plum=make_multer(plum_dispatch),
     multimethod=make_multer(multimethod_dispatch),
     singledispatch=SingleDispatchMulter,
     multipledispatch=MultipleDispatchMulter,
     runtype=make_multer(runtype_dispatch),
-    isinstance=IsinstanceMulter,
+    custom=IsinstanceMulter,
 )
 def test_multer(fn, benchmark):
     result = benchmark(fn(3), A)

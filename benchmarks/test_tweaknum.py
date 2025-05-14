@@ -66,8 +66,8 @@ def tweaknum_match(n, **kwargs):
 @pytest.mark.benchmark(group="tweaknum")
 @with_functions(
     ovld=make_tweaknum(ovld_dispatch),
-    custom_ifs=tweaknum_ifs,
-    custom_match=tweaknum_match,
+    custom__ifs=tweaknum_ifs,
+    custom__match=tweaknum_match,
 )
 def test_tweaknum(fn, benchmark):
     def run():

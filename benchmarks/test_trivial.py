@@ -107,7 +107,7 @@ def trivial_isinstance(x):
     multipledispatch=make_trivial(multipledispatch_dispatch),
     runtype=make_trivial(runtype_dispatch),
     singledispatch=make_trivial(singledispatch_dispatch),
-    custom_isinstance=trivial_isinstance,
+    custom__isinstance=trivial_isinstance,
 )
 def test_trivial(fn, benchmark):
     def run():

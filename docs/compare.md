@@ -3,7 +3,7 @@
 
 ## Unique features
 
-Current as of October 2024: I have investigated and benchmarked six other multiple/single dispatch libraries. Performance-wise, `ovld` is faster than all of them, ranging from 1.5x to 100x less overhead. Feature-wise, `ovld` is among the most featureful. Some features I could not find elsewhere:
+Current as of May 2025: I have investigated and benchmarked five other multiple/single dispatch libraries. Performance-wise, `ovld` is faster than all of them, ranging from 1.5x to 100x less overhead. Feature-wise, `ovld` is among the most featureful. Some features I could not find elsewhere:
 
 * Support for [keyword arguments](usage.md#keyword-arguments).
 * [Variants](usage.md#variants), especially working with recursion.
@@ -18,7 +18,6 @@ Current as of October 2024: I have investigated and benchmarked six other multip
 * [**multimethod**](https://github.com/coady/multimethod): Also pretty featureful. Performs a bit worse than plum in simple cases, but better in more complicated cases.
 * [**multipledispatch**](https://github.com/mrocklin/multipledispatch/): Fair performance, interface is a bit dated, does not support dependent types.
 * [**runtype**](https://github.com/erezsh/runtype): Fair performance. Runtype supports Literal in theory, but it unfortunately bugged out on the calc and fib benchmarks.
-* [**fastcore**](https://github.com/fastai/fastcore): Somewhat limited (seems like it only dispatches on two arguments at most), and for a library with "fast" in its name, I must say it is impressively slow.
 * [**singledispatch**](https://docs.python.org/3/library/functools.html#functools.singledispatch): Comes native in Python, but only supports dispatch on a single argument.
 
 
@@ -38,20 +37,21 @@ Applicable libraries were tested on the following problems:
 
 ## Results
 
-Time relative to the fastest implementation (1.00) (lower is better). Python version: 3.12.4
+Time relative to the fastest implementation (1.00) (lower is better). Python version: 3.13.0
 
 The **custom** column represents custom implementations using isinstance, match, a dispatch dict, etc. They are usually the fastest, but that should not be surprising. ovld's performance ranges from 1.5x faster to 3.3x slower.
 
-| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch) | [runtype](https://github.com/erezsh/runtype) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
+| Benchmark | custom | [ovld](https://github.com/breuleux/ovld) | [plum](https://github.com/beartype/plum) | [multim](https://github.com/coady/multimethod) | [multid](https://github.com/mrocklin/multipledispatch/) | [runtype](https://github.com/erezsh/runtype) | [sd](https://docs.python.org/3/library/functools.html#functools.singledispatch) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-|[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.45|1.00|3.32|4.63|2.04|2.41|1.91|
-|[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.13|1.00|11.05|4.53|8.31|2.19|7.32|
-|[add](https://github.com/breuleux/ovld/tree/master/benchmarks/test_add.py)|1.08|1.00|3.73|5.21|2.37|2.79|x|
-|[ast](https://github.com/breuleux/ovld/tree/master/benchmarks/test_ast.py)|1.00|1.08|23.14|3.09|1.68|1.91|1.66|
-|[calc](https://github.com/breuleux/ovld/tree/master/benchmarks/test_calc.py)|1.00|1.23|54.61|29.32|x|x|x|
-|[regexp](https://github.com/breuleux/ovld/tree/master/benchmarks/test_regexp.py)|1.00|1.87|19.18|x|x|x|x|
-|[fib](https://github.com/breuleux/ovld/tree/master/benchmarks/test_fib.py)|1.00|3.30|444.31|125.77|x|x|x|
-|[tweaknum](https://github.com/breuleux/ovld/tree/master/benchmarks/test_tweaknum.py)|1.00|2.09|x|x|x|x|x|
+|[trivial](https://github.com/breuleux/ovld/tree/master/benchmarks/test_trivial.py)|1.56|1.00|3.38|4.92|2.00|2.38|2.15|
+|[multer](https://github.com/breuleux/ovld/tree/master/benchmarks/test_multer.py)|1.22|1.00|11.06|4.67|9.22|2.24|3.92|
+|[add](https://github.com/breuleux/ovld/tree/master/benchmarks/test_add.py)|1.27|1.00|3.61|4.93|2.24|2.62|x|
+|[ast](https://github.com/breuleux/ovld/tree/master/benchmarks/test_ast.py)|1.01|1.00|22.98|2.72|1.52|1.70|1.57|
+|[calc](https://github.com/breuleux/ovld/tree/master/benchmarks/test_calc.py)|1.00|1.28|57.86|29.79|x|x|x|
+|[regexp](https://github.com/breuleux/ovld/tree/master/benchmarks/test_regexp.py)|1.00|2.28|22.71|x|x|x|x|
+|[fib](https://github.com/breuleux/ovld/tree/master/benchmarks/test_fib.py)|1.00|3.39|403.38|114.69|x|x|x|
+|[tweaknum](https://github.com/breuleux/ovld/tree/master/benchmarks/test_tweaknum.py)|1.00|1.86|x|x|x|x|x||[tweaknum](https://github.com/breuleux/ovld/tree/master/benchmarks/test_tweaknum.py)|1.00|1.86|x|x|x|x|x|
+
 
 ## Comments
 
