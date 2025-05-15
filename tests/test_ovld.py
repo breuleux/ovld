@@ -1160,6 +1160,10 @@ def test_unregister():
         f([-2, -1, 0, 1, 2, 3])
 
 
+@pytest.mark.xfail(
+    condition="platform.python_implementation() == 'PyPy'",
+    reason="codefind dependency fails here",
+)
 def test_conform():
     @ovld
     def f(xs: list):
@@ -1182,6 +1186,10 @@ def test_conform():
         f([-2, -1, 0, 1, 2, 3])
 
 
+@pytest.mark.xfail(
+    condition="platform.python_implementation() == 'PyPy'",
+    reason="codefind dependency fails here",
+)
 def test_conform_2():
     @ovld
     def f(xs: list):

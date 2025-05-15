@@ -39,6 +39,8 @@ jobs:
           coverage: false
         - python: '3.11'
           coverage: false
+        - python: 'pypy3.11'
+          coverage: false
         - python: '3.12'
           coverage: false
         - python: '3.13'

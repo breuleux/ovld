@@ -1,7 +1,8 @@
 import json
-from ovld import ovld, recurse
 
 from pytest_benchmark import utils
+
+from ovld import ovld, recurse
 
 
 @ovld

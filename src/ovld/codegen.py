@@ -45,13 +45,22 @@ def transfer_function(
     globals=MISSING,
     name=MISSING,
 ):
-    new_fn = FunctionType(
-        argdefs=func.__defaults__ if argdefs is MISSING else argdefs,
-        closure=func.__closure__ if closure is MISSING else closure,
-        code=func.__code__ if code is MISSING else code,
-        globals=func.__globals__ if globals is MISSING else globals,
-        name=func.__name__ if name is MISSING else name,
-    )
+    closure = func.__closure__ if closure is MISSING else closure
+    if closure:
+        new_fn = FunctionType(
+            argdefs=func.__defaults__ if argdefs is MISSING else argdefs,
+            closure=func.__closure__ if closure is MISSING else closure,
+            code=func.__code__ if code is MISSING else code,
+            globals=func.__globals__ if globals is MISSING else globals,
+            name=func.__name__ if name is MISSING else name,
+        )
+    else:
+        new_fn = FunctionType(
+            argdefs=func.__defaults__ if argdefs is MISSING else argdefs,
+            code=func.__code__ if code is MISSING else code,
+            globals=func.__globals__ if globals is MISSING else globals,
+            name=func.__name__ if name is MISSING else name,
+        )
     new_fn.__kwdefaults__ = func.__kwdefaults__
     new_fn.__annotations__ = func.__annotations__
     new_fn.__dict__.update(func.__dict__)

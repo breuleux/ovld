@@ -1,9 +1,13 @@
 """Miscellaneous utilities."""
 
+import builtins
 import functools
 import re
 import typing
 from itertools import count
+
+_builtins_dict = vars(builtins)
+
 
 try:
     from types import UnionType
@@ -152,7 +156,7 @@ class NameDatabase:
         i = 1
         name = desired_name
         while name in self.registered or (
-            name in __builtins__ and __builtins__[name] != value
+            name in _builtins_dict and _builtins_dict[name] != value
         ):
             name = f"{desired_name}{i}"
             i += 1
