@@ -6,7 +6,7 @@ from types import CodeType
 
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
-from .utils import MISSING, CodegenInProgress, subtler_type
+from .utils import MISSING, CodegenInProgress, is_dependent, subtler_type
 
 
 class TypeMap(dict):
@@ -213,8 +213,6 @@ class MultiTypeMap(dict):
             sig: A Signature object.
             handler: A function to handle the tuple.
         """
-        from .dependent import is_dependent
-
         self.clear()
 
         obj_t_tup = sig.types
@@ -251,8 +249,6 @@ class MultiTypeMap(dict):
             print(f"{'':{width - 2}} @ {co.co_filename}:{co.co_firstlineno}")
 
     def display_resolution(self, *args, **kwargs):
-        from .dependent import is_dependent
-
         def dependent_match(tup, args):
             for t, a in zip(tup, args):
                 if isinstance(t, tuple):

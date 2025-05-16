@@ -10,14 +10,7 @@ from .codegen import Code
 from .mro import Order, TypeRelationship, subclasscheck, typeorder
 from .recode import generate_checking_code
 from .typemap import TypeMap
-from .utils import UnionType, UnionTypes, UsageError, clsstring
-
-
-def get_args(tp):
-    args = getattr(tp, "__args__", None)
-    if not isinstance(args, tuple):
-        args = ()
-    return args
+from .utils import UnionType, UnionTypes, UsageError, clsstring, get_args
 
 
 def eval_annotation(t, ctx, locals, catch=False):
@@ -103,6 +96,8 @@ def _(self, t, fn):
 
 
 class MetaMC(type):
+    __dependent__ = False
+
     def __new__(T, name, handler):
         return super().__new__(T, name, (), {"_handler": handler})
 

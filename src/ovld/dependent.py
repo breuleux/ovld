@@ -15,22 +15,15 @@ from .types import (
     Intersection,
     Order,
     clsstring,
-    get_args,
     normalize_type,
     subclasscheck,
     typeorder,
 )
 
 
-def is_dependent(t):
-    if isinstance(t, DependentType):
-        return True
-    elif any(is_dependent(subt) for subt in get_args(t)):
-        return True
-    return False
-
-
 class DependentType(type):
+    __dependent__ = True
+
     exclusive_type = False
     keyable_type = False
     bound_is_name = False

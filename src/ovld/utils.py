@@ -183,3 +183,18 @@ class NameDatabase:
         return name
 
     __getitem__ = get
+
+
+def get_args(tp):
+    args = getattr(tp, "__args__", None)
+    if not isinstance(args, tuple):
+        args = ()
+    return args
+
+
+def is_dependent(t):
+    if any(is_dependent(subt) for subt in get_args(t)):
+        return True
+    elif hasattr(t, "__dependent__"):
+        return t.__dependent__
+    return False

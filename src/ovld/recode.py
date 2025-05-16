@@ -12,7 +12,7 @@ from .codegen import (
     rename_function,
     transfer_function,
 )
-from .utils import MISSING, NameDatabase, SpecialForm, UsageError, subtler_type
+from .utils import MISSING, NameDatabase, SpecialForm, UsageError, is_dependent, subtler_type
 
 recurse = SpecialForm("recurse")
 call_next = SpecialForm("call_next")
@@ -160,8 +160,6 @@ def generate_dispatch(ov, arganal):
 
 
 def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
-    from .dependent import is_dependent
-
     def to_dict(tup):
         return dict(
             entry if isinstance(entry, tuple) else (i, entry) for i, entry in enumerate(tup)
