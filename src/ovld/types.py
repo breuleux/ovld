@@ -12,6 +12,8 @@ from .recode import generate_checking_code
 from .typemap import TypeMap
 from .utils import UnionType, UnionTypes, UsageError, clsstring, get_args
 
+NoneType = type(None)
+
 
 def eval_annotation(t, ctx, locals, catch=False):
     try:
@@ -83,6 +85,8 @@ class TypeNormalizer:
             raise UsageError(
                 f"Dependent type {t} has not been given a type bound. Please use Dependent[<bound>, {t}] instead."
             )
+        elif t is None:
+            return NoneType
         else:
             return t
 

@@ -324,6 +324,19 @@ def test_optional():
     assert f(1.0) == "f"
 
 
+def test_none():
+    @ovld
+    def f(x: None):
+        return "null"
+
+    @ovld
+    def f(x: object):
+        return "X"
+
+    assert f(None) == "null"
+    assert f(123) == "X"
+
+
 def test_abstract_types():
     from collections.abc import Iterable
 
