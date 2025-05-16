@@ -4,6 +4,7 @@ import builtins
 import functools
 import re
 import typing
+from abc import ABCMeta
 from itertools import count
 
 _builtins_dict = vars(builtins)
@@ -192,9 +193,22 @@ def get_args(tp):
     return args
 
 
+_standard_instancechecks = {
+    type.__instancecheck__,
+    GenericAlias.__instancecheck__,
+    type(list[object]).__instancecheck__,
+    ABCMeta.__instancecheck__,
+    type(typing.Protocol).__instancecheck__,
+}
+
+
 def is_dependent(t):
     if any(is_dependent(subt) for subt in get_args(t)):
         return True
     elif hasattr(t, "__dependent__"):
         return t.__dependent__
+    elif not isinstance(t, type):
+        return False
+    elif type(t).__instancecheck__ not in _standard_instancechecks:
+        return True
     return False

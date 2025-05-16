@@ -350,3 +350,31 @@ def test_keyed_plus_other():
     assert f(0, 50) == "yes"
     assert f(3, 50) == "yes"
     assert f(0, 150) == "no"
+
+
+class Lettered(type):
+    def __instancecheck__(cls, x):
+        return cls.letter in (getattr(x, "__name__", None) or str(x))
+
+
+LetterF = Lettered("LetterF", (), {"letter": "f"})
+LetterX = Lettered("LetterX", (), {"letter": "x"})
+
+
+def test_arbitrary_instancecheck():
+    @ovld
+    def f(x: LetterX):
+        return "X-TREME"
+
+    @ovld
+    def f(x: LetterF):
+        return "fudged"
+
+    @ovld
+    def f(x: object):
+        return False
+
+    assert f(next) == "X-TREME"
+    assert f("wow") is False
+    assert f("extreme") == "X-TREME"
+    assert f(filter) == "fudged"

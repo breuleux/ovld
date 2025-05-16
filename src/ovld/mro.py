@@ -3,7 +3,7 @@ from enum import Enum
 from graphlib import TopologicalSorter
 from typing import get_args, get_origin
 
-from .utils import UnionTypes
+from .utils import UnionTypes, is_dependent
 
 
 class Order(Enum):
@@ -122,6 +122,11 @@ def subclasscheck(t1, t2):
         and (result := t1.__is_subtype__(t2)) is not NotImplemented
     ):
         return result
+
+    if is_dependent(t2):
+        # t2's instancecheck could return anything, and unless it defines
+        # __is_supertype__ or __is_subtype__ the bound devolves to object
+        return True
 
     if t2 in UnionTypes:
         return isinstance(t1, t2)
