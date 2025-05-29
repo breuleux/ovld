@@ -13,9 +13,49 @@ With ovld, you can write a version of the same function for every type signature
 * 🔑 **[Extensive](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments):** Dispatch on functions, methods, positional arguments and even keyword arguments (with some restrictions).
 * ⚙️ **[Codegen](https://ovld.readthedocs.io/en/latest/codegen/):** (Experimental) For advanced use cases, you can generate custom code for overloads.
 
+Install with `pip install ovld`
+
+
 ## Example
 
-Here's a function that recursively adds lists, tuples and dictionaries:
+Define one version of your function for each type signature you want to support. `ovld` supports all basic types, plus literals and value-dependent types such as `Regexp`.
+
+```python
+from ovld import ovld
+from ovld.dependent import Regexp
+from typing import Literal
+
+@ovld
+def f(x: str):
+    return f"The string {x!r}"
+
+@ovld
+def f(x: int):
+    return f"The number {x}"
+
+@ovld
+def f(x: int, y: int):
+    return "Two numbers!"
+
+@ovld
+def f(x: Literal[0]):
+    return "zero"
+
+@ovld
+def f(x: Regexp[r"^X"]):
+    return "A string that starts with X"
+
+assert f("hello") == "The string 'hello'"
+assert f(3) == "The number 3"
+assert f(1, 2) == "Two numbers!"
+assert f(0) == "zero"
+assert f("XSECRET") == "A string that starts with X"
+```
+
+
+## Recursive example
+
+`ovld` shines particularly with recursive definitions, for example tree maps or serialization. Here we define a function that recursively adds lists of lists and integers:
 
 ```python
 from ovld import ovld, recurse
@@ -25,18 +65,19 @@ def add(x: list, y: list):
     return [recurse(a, b) for a, b in zip(x, y)]
 
 @ovld
-def add(x: tuple, y: tuple):
-    return tuple(recurse(a, b) for a, b in zip(x, y))
+def add(x: list, y: int):
+    return [recurse(a, y) for a in x]
 
 @ovld
-def add(x: dict, y: dict):
-    return {k: recurse(v, y[k]) for k, v in x.items()}
+def add(x: int, y: list):
+    return [recurse(x, a) for a in x]
 
 @ovld
-def add(x: object, y: object):
+def add(x: int, y: int):
     return x + y
 
 assert add([1, 2], [3, 4]) == [4, 6]
+assert add([1, 2, [3]], 7) == [8, 9, [10]]
 ```
 
 The `recurse` function is special: it will recursively call the current ovld object. You may ask: how is it different from simply calling `add`? The difference is that if you create a *variant* of `add`, `recurse` will automatically call the variant.
@@ -50,7 +91,7 @@ A *variant* of an `ovld` is a copy of the `ovld`, with some methods added or cha
 
 ```python
 @add.variant
-def mul(x: object, y: object):
+def mul(x: int, y: int):
     return x * y
 
 assert mul([1, 2], [3, 4]) == [3, 8]
@@ -79,9 +120,9 @@ assert f(10) == 121
 
 Both definitions above have the same type signature, but since the first has higher priority, that is the one that will be called.
 
-However, that does not mean there is no way to call the second one. Indeed, when the first function calls the special function `call_next(x + 1)`, it will call the next function in the list below itself.
+However, that does not mean there is no way to call the second one. Indeed, when the first function calls the special function `call_next(x + 1)`, it will call the next function in line, in order of priority and specificity.
 
-The pattern you see above is how you may wrap each call with some generic behavior. For instance, if you did something like that:
+The pattern you see above is how you may wrap each call with some generic behavior. For instance, if you did something like this:
 
 ```python
 @f.variant(priority=1000)
@@ -90,7 +131,7 @@ def f2(x: object)
     return call_next(x)
 ```
 
-You would effectively be creating a clone of `f` that traces every call.
+The above is effectively a clone of `f` that traces every call. Useful for debugging.
 
 
 ## Dependent types
