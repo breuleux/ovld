@@ -64,7 +64,7 @@ def add(x: list, y: int):
 
 @ovld
 def add(x: int, y: list):
-    return [recurse(x, a) for a in x]
+    return [recurse(x, a) for a in y]
 
 @ovld
 def add(x: int, y: int):

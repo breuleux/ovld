@@ -9,7 +9,7 @@ With ovld, you can write a version of the same function for every type signature
 
 * ⚡️ **[Fast](https://ovld.readthedocs.io/en/latest/compare/#results):** ovld is the fastest multiple dispatch library around, by some margin.
 * 🚀 [**Variants**](https://ovld.readthedocs.io/en/latest/usage/#variants), [**mixins**](https://ovld.readthedocs.io/en/latest/usage/#mixins) and [**medleys**](https://ovld.readthedocs.io/en/latest/medley) of functions and methods.
-* 🦄 **[Dependent types](https://ovld.readthedocs.io/en/latest/dependent/):** Overloaded functions can depend on more than argument types: they can depend on actual values.
+* 🦄 **[Value-based dispatch](https://ovld.readthedocs.io/en/latest/dependent/):** Overloaded functions can depend on more than argument types: they can depend on actual values.
 * 🔑 **[Extensive](https://ovld.readthedocs.io/en/latest/usage/#keyword-arguments):** Dispatch on functions, methods, positional arguments and even keyword arguments (with some restrictions).
 * ⚙️ **[Codegen](https://ovld.readthedocs.io/en/latest/codegen/):** (Experimental) For advanced use cases, you can generate custom code for overloads.
 
@@ -70,7 +70,7 @@ def add(x: list, y: int):
 
 @ovld
 def add(x: int, y: list):
-    return [recurse(x, a) for a in x]
+    return [recurse(x, a) for a in y]
 
 @ovld
 def add(x: int, y: int):
@@ -136,7 +136,7 @@ The above is effectively a clone of `f` that traces every call. Useful for debug
 
 ## Dependent types
 
-A dependent type is a type that depends on a value. `ovld` supports this, either through `Literal[value]` or `Dependent[bound, check]`. For example, this definition of factorial:
+A dependent type is a type that depends on a value. This enables dispatching based on the actual value of an argument. The simplest example of a dependent type is `typing.Literal[value]`, which matches one single value. `ovld` also supports `Dependent[bound, check]` for arbitrary checks. For example, this definition of factorial:
 
 ```python
 from typing import Literal
