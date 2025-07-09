@@ -45,6 +45,7 @@ def bootstrap_dispatch(ov, name):
     dispatch.register = ov.register
     dispatch.resolve_for_values = ov.resolve_for_values
     dispatch.resolve = ov.resolve
+    dispatch.resolve_all = ov.resolve_all
     dispatch.copy = ov.copy
     dispatch.variant = ov.variant
     dispatch.display_methods = ov.display_methods
@@ -249,6 +250,11 @@ class Ovld:
             return self.map[(getattr(after, "__code__", after), *args)]
         else:
             return self.map[args]
+
+    def resolve_all(self, *args, **kwargs):
+        """Yield all methods that match the arguments, in priority order."""
+        self.ensure_compiled()
+        return self.map.resolve_all(*args, **kwargs)
 
     def register_signature(self, sig, orig_fn):
         """Register a function for the given signature."""

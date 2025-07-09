@@ -19,7 +19,7 @@ from ovld import (
     recurse,
     resolve,
 )
-from ovld.dependent import Dependent, Equals, StartsWith
+from ovld.dependent import Dependent, Equals, Regexp, StartsWith
 from ovld.types import UnionTypes
 from ovld.utils import MISSING, UsageError
 
@@ -1689,6 +1689,33 @@ def test_keywords_recurse():
         return x * factor
 
     assert f([1, 2, 3], factor=3) == [3, 6, 9]
+
+
+def test_resolve_all():
+    @ovld
+    def f(x: str):
+        return "str"
+
+    @ovld(priority=7)
+    def f(x: str):
+        return "MAX"
+
+    @ovld(priority=1)
+    def f(x: Regexp["^hello"]):
+        return "hello"
+
+    @ovld
+    def f(x: Regexp["world$"]):
+        return "world"
+
+    @ovld
+    def f(x: int):
+        return "int"
+
+    assert [t() for t in f.resolve_all("hello world")] == ["MAX", "hello", "world", "str"]
+    assert [t() for t in f.resolve_all("hello, you!")] == ["MAX", "hello", "str"]
+    assert [t() for t in f.resolve_all(73)] == ["int"]
+    assert [t() for t in f.resolve_all(object())] == []
 
 
 def test_passing_types_to_normal_func():

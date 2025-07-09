@@ -1,6 +1,7 @@
 import inspect
 import math
 from dataclasses import dataclass
+from functools import partial
 from itertools import count
 from types import CodeType
 
@@ -248,7 +249,7 @@ class MultiTypeMap(dict):
             co = h.__code__
             print(f"{'':{width - 2}} @ {co.co_filename}:{co.co_firstlineno}")
 
-    def display_resolution(self, *args, **kwargs):
+    def _resolve_all_helper(self, *args, **kwargs):
         def dependent_match(tup, args):
             for t, a in zip(tup, args):
                 if isinstance(t, tuple):
@@ -258,21 +259,35 @@ class MultiTypeMap(dict):
                     return False
             return True
 
-        message = "No method will be called."
         argt = [
             *map(subtler_type, args),
             *[(k, subtler_type(v)) for k, v in kwargs.items()],
         ]
-        finished = False
-        rank = 1
         for grp in self.mro(tuple(argt)):
-            grp.sort(key=lambda x: x.handler.__name__)
-            match = [
-                dependent_match(self.type_tuples[c.base_handler], [*args, *kwargs.items()])
+            yield [
+                (
+                    c,
+                    dependent_match(
+                        self.type_tuples[c.base_handler], [*args, *kwargs.items()]
+                    ),
+                )
                 for c in grp
             ]
-            ambiguous = len([m for m in match if m]) > 1
-            for m, c in zip(match, grp):
+
+    def resolve_all(self, *args, **kwargs):
+        for grp in self._resolve_all_helper(*args, **kwargs):
+            for c, m in grp:
+                if m:
+                    yield partial(c.handler, *args, **kwargs)
+
+    def display_resolution(self, *args, **kwargs):
+        message = "No method will be called."
+        finished = False
+        rank = 1
+        for grp in self._resolve_all_helper(*args, **kwargs):
+            grp.sort(key=lambda x: x[0].handler.__name__)
+            ambiguous = len([m for _, m in grp if m]) > 1
+            for c, m in grp:
                 handler = c.handler
                 color = "\033[0m"
                 if finished:
