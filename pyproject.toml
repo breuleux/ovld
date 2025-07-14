@@ -44,6 +44,8 @@ line-length = 95
 [tool.ruff.lint]
 extend-select = ["I"]
 ignore = ["E241", "F722", "E501", "E203", "F811", "F821"]
+# Ignore these for now, ruff reports SyntaxError because they use Python 3.10+ features
+exclude = ["benchmarks/test_calc.py", "benchmarks/test_tweaknum.py"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
