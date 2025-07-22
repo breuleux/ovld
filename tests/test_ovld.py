@@ -3,6 +3,7 @@ import re
 import sys
 import typing
 from dataclasses import dataclass
+from typing import Annotated
 
 import pytest
 
@@ -21,7 +22,7 @@ from ovld import (
 )
 from ovld.dependent import Dependent, Equals, Regexp, StartsWith
 from ovld.types import UnionTypes
-from ovld.utils import MISSING, UsageError
+from ovld.utils import MISSING, ResolutionError, UsageError
 
 from .test_typemap import Animal, Bird, Mammal
 
@@ -1275,6 +1276,64 @@ def test_generic_type_argument():
 
     assert f(dict) == "dict"
     assert f(dict[str, int]) == "dict"
+
+
+def test_annotated_type_argument():
+    @ovld
+    def f(t: type[Annotated[str, "hello"]]):
+        return "hello"
+
+    @ovld
+    def f(t: type[Annotated[str, "world"]]):
+        return "world"
+
+    @ovld
+    def f(t: object):
+        return False
+
+    assert f(Annotated[str, "hello"]) == "hello"
+    assert f(Annotated[str, "world"]) == "world"
+    assert f(Annotated[str, "hello", "X"]) == "hello"
+    assert f(Annotated[str, 1, 2, 3, "world"]) == "world"
+
+
+@dataclass(frozen=True)
+class Anno:
+    name: str
+    annotation_priority: int = 0
+
+
+def test_annotated_multiple_ann():
+    hello = Anno("hello", 1)
+    world = Anno("hello", 2)
+    foo = Anno("foo", 1)
+    bar = Anno("bar", 1)
+
+    @ovld
+    def f(t: type[Annotated[str, hello]]):
+        return "hello"
+
+    @ovld
+    def f(t: type[Annotated[str, world]]):
+        return "world"
+
+    @ovld
+    def f(t: type[Annotated[str, foo]]):
+        return "foo"
+
+    @ovld
+    def f(t: type[Annotated[object, bar]]):
+        return "bar"
+
+    @ovld
+    def f(t: object):
+        return False
+
+    assert f(Annotated[str, hello, world]) == "world"
+    assert f(Annotated[str, hello, bar]) == "hello"
+    with pytest.raises(ResolutionError):
+        assert f(Annotated[str, hello, foo]) == "world"
+    assert f("ah") is False
 
 
 def test_any():

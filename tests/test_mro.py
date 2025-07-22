@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Annotated, Iterable, Mapping
 
 from ovld.dependent import Dependent, Regexp
 from ovld.mro import Order, subclasscheck, typeorder
@@ -130,6 +130,34 @@ def test_subclasscheck_generic():
 
 def test_subclasscheck_type():
     assert subclasscheck(type[int], type[object])
+
+
+def test_subclasscheck_anntype():
+    assert subclasscheck(type[Annotated[int, "hello"]], type[int])
+    assert not subclasscheck(type[int], type[Annotated[int, "hello"]])
+
+
+@dataclass(frozen=True)
+class Anno:
+    name: str
+    annotation_priority: int = 0
+
+
+def test_typeorder_anntype():
+    assert (
+        typeorder(type[Annotated[int, "hello"]], type[Annotated[int, "world"]]) is Order.SAME
+    )
+    assert (
+        typeorder(type[Annotated[object, "hello"]], type[Annotated[int, "world"]])
+        is Order.MORE
+    )
+    assert typeorder(type[Annotated[int, "hello"]], type[int]) is Order.SAME
+    assert typeorder(type[int], type[Annotated[int, "hello"]]) is Order.SAME
+
+    zap = Anno("zap", 2)
+    zop = Anno("zap", 5)
+    assert typeorder(type[Annotated[int, zap]], type[Annotated[int, zop]]) is Order.MORE
+    assert typeorder(type[Annotated[int, zop]], type[Annotated[int, zap]]) is Order.LESS
 
 
 def test_subclasscheck_type_union():

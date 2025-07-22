@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from graphlib import TopologicalSorter
-from typing import get_args, get_origin
+from typing import Annotated, get_args, get_origin
 
 from .utils import UnionTypes, is_dependent
 
@@ -66,6 +66,23 @@ def typeorder(t1, t2):
 
     o1 = get_origin(t1)
     o2 = get_origin(t2)
+
+    if o1 is Annotated and o2 is Annotated:
+        t1, *a1 = get_args(t1)
+        t2, *a2 = get_args(t2)
+        p1 = max([getattr(ann, "annotation_priority", 0) for ann in a1], default=0)
+        p2 = max([getattr(ann, "annotation_priority", 0) for ann in a2], default=0)
+        if p1 < p2:
+            return Order.MORE
+        elif p2 < p1:
+            return Order.LESS
+        else:
+            return typeorder(t1, t2)
+
+    if o1 is Annotated:
+        return typeorder(get_args(t1)[0], t2)
+    if o2 is Annotated:
+        return typeorder(t1, get_args(t2)[0])
 
     if o2 and not o1:
         return typeorder(t2, t1).opposite()
@@ -133,6 +150,14 @@ def subclasscheck(t1, t2):
 
     o1 = get_origin(t1)
     o2 = get_origin(t2)
+
+    if o1 is Annotated and o2 is Annotated:
+        t1, *a1 = get_args(t1)
+        t2, *a2 = get_args(t2)
+        return subclasscheck(t1, t2) and any(ann in a2 for ann in a1)
+
+    if o1 is Annotated:
+        return subclasscheck(get_args(t1)[0], t2)
 
     if not isinstance(o1, type):
         o1 = None
