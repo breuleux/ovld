@@ -164,7 +164,7 @@ def subclasscheck(t1, t2):
     if not isinstance(o2, type):
         o2 = None
 
-    if o1 or o2:
+    if (o1 or o2) and o2 not in UnionTypes:
         o1 = o1 or t1
         o2 = o2 or t2
         if isinstance(o1, type) and isinstance(o2, type) and issubclass(o1, o2):

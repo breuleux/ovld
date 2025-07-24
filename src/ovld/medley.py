@@ -164,7 +164,7 @@ class medley_cls_dict(dict):
         super().__setitem__(attr, value)
 
     def __setitem__(self, attr, value):
-        if attr == "__annotations__":
+        if attr == "__annotations__" or attr == "__annotate_func__":
             self.set_direct(attr, value)
             return
 
@@ -365,6 +365,7 @@ def meld_classes(classes):
     merged = medley_cls_dict(medleys)
     merged.set_direct("_ovld_codegen_fields", tuple(cg_fields))
     merged.set_direct("_ovld_medleys", tuple(medleys))
+    merged.set_direct("__annotations__", {name: t for name, t, f in dc_fields})
 
     if "__qualname__" in merged._combiners:
         del merged._combiners["__qualname__"]

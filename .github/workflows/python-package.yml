@@ -45,6 +45,8 @@ jobs:
           coverage: false
         - python: '3.13'
           coverage: true
+        - python: '3.14'
+          coverage: false
     steps:
     - name: Check out the code
       uses: actions/checkout@v3

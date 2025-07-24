@@ -530,3 +530,14 @@ def test_absent():
         lx.two
     with pytest.raises(AttributeError, match="no attribute 'three'"):
         lx.three
+
+
+def test_default_factory_inheritance():
+    class Lost(Medley):
+        xs: list = field(default_factory=list)
+
+    class Lust(Lost):
+        pass
+
+    lu = Lust()
+    assert lu.xs == []
