@@ -133,7 +133,17 @@ def test_subclasscheck_type():
 
 
 def test_subclasscheck_anntype():
-    assert subclasscheck(type[Annotated[int, "hello"]], type[int])
+    assert subclasscheck(type[Annotated[int, "hello"]], type[Annotated])
+    assert subclasscheck(type[Annotated[int, "hello"]], type[Annotated[object, "hello"]])
+    assert subclasscheck(
+        type[Annotated[int, "hello"]], type[Annotated[object, "hello", "world"]]
+    )
+    assert subclasscheck(
+        type[Annotated[int, "hello", "world"]], type[Annotated[object, "hello"]]
+    )
+    assert not subclasscheck(type[Annotated[object, "hello"]], type[Annotated[int, "hello"]])
+    assert not subclasscheck(type[Annotated[int, "hello"]], type[Annotated[int, "world"]])
+    assert not subclasscheck(type[Annotated[int, "hello"]], type[int])
     assert not subclasscheck(type[int], type[Annotated[int, "hello"]])
 
 

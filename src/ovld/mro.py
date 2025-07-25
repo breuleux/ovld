@@ -157,7 +157,7 @@ def subclasscheck(t1, t2):
         return subclasscheck(t1, t2) and any(ann in a2 for ann in a1)
 
     if o1 is Annotated:
-        return subclasscheck(get_args(t1)[0], t2)
+        return t2 is Annotated
 
     if not isinstance(o1, type):
         o1 = None
