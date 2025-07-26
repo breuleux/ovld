@@ -150,6 +150,12 @@ def test_subclasscheck_anntype():
     assert not subclasscheck(type[int], type[Annotated[int, "hello"]])
 
 
+def test_subclasscheck_anntype_type():
+    assert subclasscheck(type[Annotated[int, "hello"]], type[Annotated[int, str]])
+    assert subclasscheck(type[Annotated[int, str]], type[Annotated[object, str]])
+    assert not subclasscheck(type[Annotated[int, "hello"]], type[Annotated[int, int]])
+
+
 @pytest.mark.skipif(
     sys.version_info < (3, 12), reason="Python 3.11 is more strict on Annotated"
 )

@@ -134,6 +134,15 @@ def typeorder(t1, t2):
         return Order.NONE
 
 
+def _find_ann(main, others):
+    if main in others:
+        return True
+    elif isinstance(main, type):
+        return any(isinstance(x, main) for x in others)
+    else:
+        return False
+
+
 def subclasscheck(t1, t2):
     """Check whether t1 is a "subclass" of t2."""
     if t1 == t2 or t2 is Any:
@@ -165,7 +174,7 @@ def subclasscheck(t1, t2):
     if o1 is Annotated and o2 is Annotated:
         t1, *a1 = get_args(t1)
         t2, *a2 = get_args(t2)
-        return subclasscheck(t1, t2) and any(ann in a2 for ann in a1)
+        return subclasscheck(t1, t2) and any(_find_ann(main, a1) for main in a2)
 
     if o1 is Annotated:
         return t2 is Annotated
