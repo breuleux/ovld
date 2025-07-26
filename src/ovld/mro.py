@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from graphlib import TopologicalSorter
-from typing import Annotated, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin
 
 from .utils import UnionTypes, is_dependent
 
@@ -52,6 +52,10 @@ def typeorder(t1, t2):
     """
     if t1 == t2:
         return Order.SAME
+    if t1 is Any:
+        return Order.MORE
+    if t2 is Any:
+        return Order.LESS
 
     if (
         hasattr(t1, "__type_order__")
@@ -80,8 +84,12 @@ def typeorder(t1, t2):
             return typeorder(t1, t2)
 
     if o1 is Annotated:
+        if t2 is Annotated:
+            return Order.LESS
         return typeorder(get_args(t1)[0], t2)
     if o2 is Annotated:
+        if t1 is Annotated:
+            return Order.MORE
         return typeorder(t1, get_args(t2)[0])
 
     if o2 and not o1:
@@ -90,8 +98,8 @@ def typeorder(t1, t2):
     if o1:
         if not o2:
             order = typeorder(o1, t2)
-            if order is order.SAME:
-                order = order.LESS
+            if order is Order.SAME:
+                order = Order.LESS
             return order
 
         if (order := typeorder(o1, o2)) is not Order.SAME:
@@ -110,6 +118,9 @@ def typeorder(t1, t2):
         ords = [typeorder(a1, a2) for a1, a2 in zip(args1, args2)]
         return Order.merge(ords)
 
+    if not isinstance(t1, type) or not isinstance(t2, type):  # pragma: no cover
+        return Order.SAME
+
     sx = issubclass(t1, t2)
     sy = issubclass(t2, t1)
     if sx and sy:  # pragma: no cover
@@ -125,7 +136,7 @@ def typeorder(t1, t2):
 
 def subclasscheck(t1, t2):
     """Check whether t1 is a "subclass" of t2."""
-    if t1 == t2:
+    if t1 == t2 or t2 is Any:
         return True
 
     if (

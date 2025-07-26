@@ -1,5 +1,8 @@
+import sys
 from dataclasses import dataclass
-from typing import Annotated, Iterable, Mapping
+from typing import Annotated, Any, Iterable, Mapping
+
+import pytest
 
 from ovld.dependent import Dependent, Regexp
 from ovld.mro import Order, subclasscheck, typeorder
@@ -147,6 +150,20 @@ def test_subclasscheck_anntype():
     assert not subclasscheck(type[int], type[Annotated[int, "hello"]])
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="Python 3.11 is more strict on Annotated"
+)
+def test_subclasscheck_anntype_any():
+    assert subclasscheck(type[Annotated[int, "hello"]], type[Annotated[Any, "hello"]])
+    assert subclasscheck(type[Annotated[123, "hello"]], type[Annotated[Any, "hello"]])
+
+
+def test_typeorder_any():
+    assert typeorder(int, Any) is Order.LESS
+    assert typeorder(Any, int) is Order.MORE
+    assert typeorder(Any, Any) is Order.SAME
+
+
 @dataclass(frozen=True)
 class Anno:
     name: str
@@ -154,6 +171,8 @@ class Anno:
 
 
 def test_typeorder_anntype():
+    assert typeorder(type[Annotated], type[Annotated[int, "hello"]]) is Order.MORE
+    assert typeorder(type[Annotated[int, "hello"]], type[Annotated]) is Order.LESS
     assert (
         typeorder(type[Annotated[int, "hello"]], type[Annotated[int, "world"]]) is Order.SAME
     )

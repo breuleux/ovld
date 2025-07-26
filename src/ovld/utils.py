@@ -199,6 +199,7 @@ _standard_instancechecks = {
     type(list[object]).__instancecheck__,
     ABCMeta.__instancecheck__,
     type(typing.Protocol).__instancecheck__,
+    type(typing.Any).__instancecheck__,
 }
 
 

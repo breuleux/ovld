@@ -3,7 +3,7 @@ import re
 import sys
 import typing
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 
 import pytest
 
@@ -1295,6 +1295,23 @@ def test_annotated_type_argument():
     assert f(Annotated[str, "world"]) == "world"
     assert f(Annotated[str, "hello", "X"]) == "hello"
     assert f(Annotated[str, 1, 2, 3, "world"]) == "world"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="Python 3.11 is more strict on Annotated"
+)
+def test_annotated_type_argument_any():
+    @ovld
+    def f(t: type[Annotated[Any, "hello"]]):
+        return "hello"
+
+    @ovld
+    def f(t: object):
+        return False
+
+    assert f(Annotated[str, "hello"]) == "hello"
+    assert f(Annotated[123, "hello", "X"]) == "hello"
+    assert f(Annotated[str, 1, 2, 3, "hello"]) == "hello"
 
 
 @dataclass(frozen=True)
