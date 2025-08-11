@@ -118,8 +118,8 @@ def typeorder(t1, t2):
         ords = [typeorder(a1, a2) for a1, a2 in zip(args1, args2)]
         return Order.merge(ords)
 
-    if not isinstance(t1, type) or not isinstance(t2, type):  # pragma: no cover
-        return Order.SAME
+    if not isinstance(t1, type) or not isinstance(t2, type):
+        return Order.NONE
 
     sx = issubclass(t1, t2)
     sy = issubclass(t2, t1)

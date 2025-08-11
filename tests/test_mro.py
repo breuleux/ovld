@@ -9,6 +9,7 @@ from ovld.mro import Order, subclasscheck, typeorder
 from ovld.types import (
     All,
     Dataclass,
+    HasMethod,
     Intersection,
     Order,
     Union,
@@ -168,6 +169,11 @@ def test_typeorder_any():
     assert typeorder(int, Any) is Order.LESS
     assert typeorder(Any, int) is Order.MORE
     assert typeorder(Any, Any) is Order.SAME
+
+
+def test_typeorder_exotic():
+    assert typeorder(HasMethod["meth"], Annotated) is Order.NONE
+    assert typeorder(Annotated, HasMethod["meth"]) is Order.NONE
 
 
 @dataclass(frozen=True)
