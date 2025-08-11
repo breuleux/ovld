@@ -242,7 +242,8 @@ class MultiTypeMap(dict):
             self.maps[-1].register(object, entry)
 
     def display_methods(self):
-        for h, prio in sorted(self.priorities.items(), key=lambda kv: -kv[1]):
+        for h, prio in sorted(self.priorities.items(), key=lambda kv: kv[1], reverse=True):
+            prio = ":".join(map(str, prio))
             prio = f"[{prio}]"
             width = 6
             print(f"{prio:{width}} \033[1m{h.__name__}\033[0m")
@@ -306,7 +307,8 @@ class MultiTypeMap(dict):
                         color = "\033[1;32m"
                     rank += 1
                 spec = ".".join(map(str, c.specificity))
-                lvl = f"[{c.priority}:{spec}]"
+                prios = ":".join(map(str, c.priority))
+                lvl = f"[{prios}:{spec}]"
                 width = 2 * len(args) + 6
                 print(f"{color}{bullet} {lvl:{width}} {handler.__name__}")
                 co = handler.__code__

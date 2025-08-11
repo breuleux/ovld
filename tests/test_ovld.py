@@ -809,6 +809,20 @@ def test_priority():
     assert f([1, "x"]) == ["TOP", [["TOP", 2], ["TOP", "BOTTOM"]]]
 
 
+def test_priority_tuple():
+    f = Ovld()
+
+    @f.register(priority=(1, 2))
+    def f(x: object):
+        return ["TOP", call_next(x)]
+
+    @f.register(priority=(1, 1))
+    def f(x: object):
+        return "BOTTOM"
+
+    assert f(123) == ["TOP", "BOTTOM"]
+
+
 def test_resolve_for_values():
     f = Ovld()
 

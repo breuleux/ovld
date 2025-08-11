@@ -275,6 +275,9 @@ class Ovld:
     def _register(self, fn, priority):
         """Register a function."""
 
+        if not isinstance(priority, tuple):
+            priority = (priority,)
+
         self._attempt_modify()
 
         self._set_attrs_from(fn)
