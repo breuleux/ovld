@@ -304,26 +304,23 @@ class Ovld:
 
         _set(sig, fn)
 
-        self._update()
+        self.invalidate()
         return self
 
     def unregister(self, fn):
         """Unregister a function."""
         self._attempt_modify()
         self._defns = {sig: f for sig, f in self._defns.items() if f is not fn}
-        self._update()
+        self.invalidate()
 
-    def _update(self):
-        self.reset()
-        for child in self.children:
-            child._update()
-        if hasattr(self, "dispatch"):
-            self.dispatch.__calculate_doc__ = self.mkdoc
-
-    def reset(self):
+    def invalidate(self):
         if self._compiled:
             self._compiled = False
             self.dispatch.__code__ = self.dispatch.first_entry.__code__
+        for child in self.children:
+            child.invalidate()
+        if hasattr(self, "dispatch"):
+            self.dispatch.__calculate_doc__ = self.mkdoc
 
     def copy(self, mixins=[], linkback=False):
         """Create a copy of this Ovld.

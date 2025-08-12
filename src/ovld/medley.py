@@ -125,7 +125,7 @@ class BuildOvld(Combiner):
         self.pending.clear()
         if not self.ovld.defns:
             return ABSENT
-        self.ovld.reset()
+        self.ovld.invalidate()
         return self.ovld.dispatch
 
     def copy(self):
