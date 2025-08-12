@@ -1160,18 +1160,6 @@ def test_replacement():
     assert f(5) == 2
 
 
-def test_disallow_replacement():
-    @ovld(allow_replacement=False)
-    def f(x: int):
-        pass
-
-    with pytest.raises(TypeError):
-
-        @f.register
-        def f2(x: int):
-            pass
-
-
 def test_unregister():
     @ovld
     def f(xs: list):

@@ -87,8 +87,6 @@ class Ovld:
             dispatch.
         linkback: Whether to keep a pointer in the parent mixins to this
             ovld so that updates can be propagated. (default: False)
-        allow_replacement: Allow replacing a method by another with the
-            same signature. (default: True)
     """
 
     def __init__(
@@ -97,7 +95,6 @@ class Ovld:
         mixins=[],
         name=None,
         linkback=False,
-        allow_replacement=True,
     ):
         """Initialize an Ovld."""
         self.id = next(_current_id)
@@ -105,7 +102,6 @@ class Ovld:
         self._compiled = False
         self.linkback = linkback
         self.children = []
-        self.allow_replacement = allow_replacement
         self.name = name
         self.shortname = name or f"__OVLD{self.id}"
         self.__name__ = name
@@ -298,8 +294,6 @@ class Ovld:
         self._set_attrs_from(fn)
 
         sig = replace(Signature.extract(fn), priority=priority)
-        if not self.allow_replacement and sig in self._defns:
-            raise TypeError(f"There is already a method for {sigstring(sig.types)}")
 
         def _set(sig, fn):
             if sig in self._defns:
