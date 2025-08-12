@@ -1833,12 +1833,12 @@ def test_doc(file_regression):
         return None
 
     doc = f"{mushroom.__name__}{inspect.signature(mushroom)}\n\n"
-    doc += mushroom.__doc__
+    doc += inspect.getdoc(mushroom)
 
     file_regression.check(doc)
 
-    assert mushroom.__doc__ == mushroom.__ovld__.__doc__
-    assert mushroom.__signature__ == mushroom.__ovld__.__signature__
+    assert inspect.getdoc(mushroom) == inspect.getdoc(mushroom.__ovld__)
+    assert inspect.signature(mushroom) == inspect.signature(mushroom.__ovld__)
 
 
 def test_doc2(file_regression):
@@ -1855,7 +1855,7 @@ def test_doc2(file_regression):
     def mushroom(x: str, y: object, *, beauty, bigness):
         return None
 
-    doc = mushroom.__doc__
+    doc = inspect.getdoc(mushroom)
     doc = f"{mushroom.__name__}{inspect.signature(mushroom)}\n\n" + doc
 
     file_regression.check(doc)
@@ -1877,7 +1877,7 @@ def test_method_doc(file_regression):
             return None
 
     mushroom = Mushroom()
-    doc = mushroom.rise.__doc__
+    doc = inspect.getdoc(mushroom.rise)
     doc = f"{mushroom.rise.__name__}{inspect.signature(mushroom.rise)}\n\n" + doc
 
     file_regression.check(doc)

@@ -7,4 +7,3 @@ rise(self, x: int)
 rise(self, x: str)
 
 rise(self, x: str, y: object, *, beauty, bigness)
-

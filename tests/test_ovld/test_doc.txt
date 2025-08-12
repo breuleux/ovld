@@ -10,4 +10,3 @@ mushroom(x: str)
 
 mushroom(x: str, y: object, *, beauty, bigness)
     Whatever.
-

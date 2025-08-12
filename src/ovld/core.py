@@ -25,6 +25,21 @@ from .utils import (
     subtler_type,
 )
 
+_orig_getdoc = inspect.getdoc
+
+
+def _getdoc(fn):
+    if hasattr(fn, "__calculate_doc__"):
+        if inspect.ismethod(fn):
+            fn = fn.__func__
+        fn.__doc__ = fn.__calculate_doc__()
+        del fn.__calculate_doc__
+    return _orig_getdoc(fn)
+
+
+inspect.getdoc = _getdoc
+
+
 _current_id = itertools.count()
 
 
@@ -231,7 +246,7 @@ class Ovld:
         self.dispatch.__defaults__ = dispatch.__defaults__
         self.dispatch.__globals__.update(dispatch.__globals__)
         self.dispatch.map = self.map
-        self.dispatch.__doc__ = self.mkdoc()
+        self.dispatch.__generate_doc__ = self.mkdoc
 
         for key, fn in list(self.defns.items()):
             self.register_signature(key, fn)
@@ -309,11 +324,12 @@ class Ovld:
         for child in self.children:
             child._update()
         if hasattr(self, "dispatch"):
-            self.dispatch.__doc__ = self.mkdoc()
+            self.dispatch.__calculate_doc__ = self.mkdoc
 
     def reset(self):
-        self._compiled = False
-        self.dispatch.__code__ = self.dispatch.first_entry.__code__
+        if self._compiled:
+            self._compiled = False
+            self.dispatch.__code__ = self.dispatch.first_entry.__code__
 
     def copy(self, mixins=[], linkback=False):
         """Create a copy of this Ovld.
