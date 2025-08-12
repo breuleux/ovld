@@ -337,11 +337,25 @@ def test_keyed_plus_other():
     # Tests a failure mode of generating dispatch code like HANDLER = HANDLERS[x]
     # if you also have to check a condition on y.
 
-    for i in range(10):
+    @ovld
+    def f(x: Literal[0], y: Bounded[0, 100]):
+        return "yes"
 
-        @ovld
-        def f(x: Literal[i], y: Bounded[0, 100]):
-            return "yes"
+    @ovld
+    def f(x: Literal[1], y: Bounded[0, 100]):
+        return "yes"
+
+    @ovld
+    def f(x: Literal[2], y: Bounded[0, 100]):
+        return "yes"
+
+    @ovld
+    def f(x: Literal[3], y: Bounded[0, 100]):
+        return "yes"
+
+    @ovld
+    def f(x: Literal[4], y: Bounded[0, 100]):
+        return "yes"
 
     @ovld
     def f(x: int, y: int):

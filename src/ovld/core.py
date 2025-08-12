@@ -100,43 +100,38 @@ class Ovld:
         self.id = next(_current_id)
         self.specialization_self = MISSING
         self._compiled = False
+        self._signatures = None
+        self._argument_analysis = None
         self.linkback = linkback
         self.children = []
         self.name = name
         self.shortname = name or f"__OVLD{self.id}"
         self.__name__ = name
-        self._defns = {}
+        self._regs = {}
         self._locked = False
         self.mixins = []
-        self.argument_analysis = ArgumentAnalyzer()
         self.dispatch = bootstrap_dispatch(self, name=self.shortname)
         self.add_mixins(*mixins)
 
-    @property
-    def defns(self):
-        defns = {}
+    def regs(self):
         for mixin in self.mixins:
-            defns.update(mixin.defns)
-        defns.update(self._defns)
-        return defns
+            yield from mixin.regs()
+        yield from self._regs.items()
 
-    def analyze_arguments(self):
-        self.argument_analysis = ArgumentAnalyzer()
-        for key, fn in list(self.defns.items()):
-            self.argument_analysis.add(fn)
-        self.argument_analysis.compile()
-        return self.argument_analysis
+    def empty(self):
+        return not self._regs and all(m.empty() for m in self.mixins)
 
     def mkdoc(self):
+        fns = [f for f, _ in self.regs()]
         try:
-            docs = [fn.__doc__ for fn in self.defns.values() if fn.__doc__]
+            docs = [fn.__doc__ for fn in fns if fn.__doc__]
             if len(docs) == 1:
                 maindoc = docs[0]
             else:
-                maindoc = f"Ovld with {len(self.defns)} methods."
+                maindoc = f"Ovld with {len(fns)} methods."
 
             doc = f"{maindoc}\n\n"
-            for fn in self.defns.values():
+            for fn in fns:
                 fndef = inspect.signature(fn)
                 fdoc = fn.__doc__
                 if not fdoc or fdoc == maindoc:
@@ -203,16 +198,37 @@ class Ovld:
     def __set_name__(self, inst, name):
         self.rename(name)
 
-    def _set_attrs_from(self, fn):
-        """Inherit relevant attributes from the function."""
-        if self.name is None:
-            self.__qualname__ = fn.__qualname__
-            self.__module__ = fn.__module__
-            self.rename(f"{fn.__module__}.{fn.__qualname__}", fn.__name__)
-
     def ensure_compiled(self):
         if not self._compiled:
             self.compile()
+
+    @property
+    def signatures(self):
+        if self._signatures is None:
+            regs = {}
+            for fn, priority in self.regs():
+                sig = replace(Signature.extract(fn), priority=priority)
+
+                def _set(sig, fn):
+                    if sig in regs:
+                        # Push down the existing handler with a lower tiebreak
+                        msig = replace(sig, tiebreak=sig.tiebreak - 1)
+                        _set(msig, regs[sig])
+                    regs[sig] = fn
+
+                _set(sig, fn)
+            self._signatures = regs
+        return self._signatures
+
+    @property
+    def argument_analysis(self):
+        if self._argument_analysis is None:
+            aa = ArgumentAnalyzer()
+            for sig in self.signatures:
+                aa.add(sig)
+            aa.compile()
+            self._argument_analysis = aa
+        return self._argument_analysis
 
     def compile(self):
         """Finalize this overload.
@@ -234,7 +250,9 @@ class Ovld:
         name = self.__name__
         self.map = MultiTypeMap(name=name, key_error=self._key_error, ovld=self)
 
-        self.analyze_arguments()
+        for sig, fn in list(self.signatures.items()):
+            self.register_signature(sig, fn)
+
         dispatch = generate_dispatch(self, self.argument_analysis)
         self.dispatch.__code__ = rename_code(dispatch.__code__, self.shortname)
         self.dispatch.__kwdefaults__ = dispatch.__kwdefaults__
@@ -243,9 +261,6 @@ class Ovld:
         self.dispatch.__globals__.update(dispatch.__globals__)
         self.dispatch.map = self.map
         self.dispatch.__generate_doc__ = self.mkdoc
-
-        for key, fn in list(self.defns.items()):
-            self.register_signature(key, fn)
 
         self._compiled = True
 
@@ -290,19 +305,11 @@ class Ovld:
             priority = (priority,)
 
         self._attempt_modify()
-
-        self._set_attrs_from(fn)
-
-        sig = replace(Signature.extract(fn), priority=priority)
-
-        def _set(sig, fn):
-            if sig in self._defns:
-                # Push down the existing handler with a lower tiebreak
-                msig = replace(sig, tiebreak=sig.tiebreak - 1)
-                _set(msig, self._defns[sig])
-            self._defns[sig] = fn
-
-        _set(sig, fn)
+        if self.name is None:
+            self.__qualname__ = fn.__qualname__
+            self.__module__ = fn.__module__
+            self.rename(f"{fn.__module__}.{fn.__qualname__}", fn.__name__)
+        self._regs[fn] = priority
 
         self.invalidate()
         return self
@@ -310,10 +317,12 @@ class Ovld:
     def unregister(self, fn):
         """Unregister a function."""
         self._attempt_modify()
-        self._defns = {sig: f for sig, f in self._defns.items() if f is not fn}
+        del self._regs[fn]
         self.invalidate()
 
     def invalidate(self):
+        self._signatures = None
+        self._argument_analysis = None
         if self._compiled:
             self._compiled = False
             self.dispatch.__code__ = self.dispatch.first_entry.__code__

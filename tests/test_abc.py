@@ -30,16 +30,20 @@ def test_literal():
     assert f(4) == "nah"
 
 
+def f_i(i):
+    def f(x: Literal[i]):
+        return x * x
+
+    return f
+
+
 def test_many_literals():
     f = Ovld()
 
     n = 10
 
     for i in range(n):
-
-        @ovld
-        def f(x: Literal[i]):
-            return x * x
+        f.register(f_i(i))
 
     for i in range(n):
         assert f(i) == i * i

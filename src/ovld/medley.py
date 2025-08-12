@@ -123,7 +123,7 @@ class BuildOvld(Combiner):
         for f, arg in self.pending:
             f(arg)
         self.pending.clear()
-        if not self.ovld.defns:
+        if self.ovld.empty():
             return ABSENT
         self.ovld.invalidate()
         return self.ovld.dispatch
