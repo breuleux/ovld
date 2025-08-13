@@ -25,7 +25,7 @@ def eval_annotation(t, ctx, locals, catch=False):
             else:  # pragma: no cover
                 glb = {}
             return eval(t, glb, locals)
-        else:
+        else:  # pragma: no cover
             return t
     except Exception:  # pragma: no cover
         if catch:
@@ -43,11 +43,11 @@ class TypeNormalizer:
         else:
             self.generic_handlers.register(generic, handler)
 
-    def __call__(self, t, fn):
+    def __call__(self, t, fn, lcl={}):
         from .dependent import DependentType
 
         if isinstance(t, str):
-            t = eval_annotation(t, fn, {})
+            t = eval_annotation(t, fn, lcl)
 
         if t is type:
             t = type[object]

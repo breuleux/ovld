@@ -207,7 +207,9 @@ class Ovld:
         if self._signatures is None:
             regs = {}
             for fn, priority in self.regs():
-                sig = replace(Signature.extract(fn), priority=priority)
+                ss = self.specialization_self
+                lcl = {} if ss is MISSING else vars(ss)
+                sig = replace(Signature.extract(fn, lcl), priority=priority)
 
                 def _set(sig, fn):
                     if sig in regs:
