@@ -208,7 +208,8 @@ class Ovld:
             regs = {}
             for fn, priority in self.regs():
                 ss = self.specialization_self
-                lcl = {} if ss is MISSING else vars(ss)
+                cgf = getattr(ss, "_ovld_codegen_fields", ())
+                lcl = {f: getattr(ss, f) for f in cgf}
                 sig = replace(Signature.extract(fn, lcl), priority=priority)
 
                 def _set(sig, fn):

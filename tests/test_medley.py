@@ -546,16 +546,17 @@ def test_default_factory_inheritance():
     assert lu.xs == []
 
 
+class Monkey(Medley):
+    regex: CodegenParameter[str] = "monk[iey]+"
+
+    def hi(self, x: Regexp[regex]):
+        return "hello!"
+
+    def hi(self, x: str):
+        return "goodbye!"
+
+
 def test_configure_dependent():
-    class Monkey(Medley):
-        regex: CodegenParameter[str] = "monk[iey]+"
-
-        def hi(self, x: Regexp[regex]):
-            return "hello!"
-
-        def hi(self, x: str):
-            return "goodbye!"
-
     m1 = Monkey()
     m2 = Monkey(regex="go+rilla")
 
@@ -566,3 +567,8 @@ def test_configure_dependent():
     assert m2.hi("monki") == "goodbye!"
     assert m2.hi("monkeeeee") == "goodbye!"
     assert m2.hi("goorilla") == "hello!"
+
+
+def test_configure_dependent_pileon():
+    m = Monkey(regex="chimpanze+") + Monkey(regex="go+rilla")
+    assert m.hi("goorilla") == "hello!"

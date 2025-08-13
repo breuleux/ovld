@@ -337,15 +337,20 @@ _meld_classes_cache = {}
 
 
 def meld_classes(classes):
+    def key(cls):
+        return getattr(cls, "_ovld_specialization_parent", None) or cls
+
     medleys = {}
     for cls in classes:
-        medleys.update({x: True for x in getattr(cls, "_ovld_medleys", [cls])})
+        medleys.update({key(x): x for x in getattr(cls, "_ovld_medleys", [cls])})
     for cls in classes:
+        cls = key(cls)
         if not hasattr(cls, "_ovld_medleys"):
             for base in cls.mro():
                 if base is not cls and base in medleys:
                     del medleys[base]
-    medleys = tuple(medleys)
+
+    medleys = tuple(medleys.values())
     if len(medleys) == 1:
         return medleys[0]
 
@@ -372,7 +377,7 @@ def meld_classes(classes):
 
     result = make_dataclass(
         cls_name="+".join(sorted(c.__name__ for c in medleys)),
-        bases=tuple(medleys),
+        bases=medleys,
         fields=dc_fields,
         kw_only=True,
         namespace=merged,
