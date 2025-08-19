@@ -205,7 +205,7 @@ _standard_instancechecks = {
 
 def is_dependent(t):
     if any(is_dependent(subt) for subt in get_args(t)):
-        return True
+        return typing.get_origin(t) is not type
     elif hasattr(t, "__dependent__"):
         return t.__dependent__
     elif not isinstance(t, type):
