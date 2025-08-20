@@ -58,7 +58,7 @@ class ImplList(Combiner):
         self.impls = impls or []
 
     def copy(self):
-        return type(self)(self.field, self.impls)
+        return type(self)(self.field, list(self.impls))
 
     def get(self, cls):
         if not self.impls:
