@@ -57,6 +57,10 @@ class ImplList(Combiner):
         super().__init__(field)
         self.impls = impls or []
 
+    @property
+    def unique_impls(self):
+        return list({impl: True for impl in self.impls}.keys())
+
     def copy(self):
         return type(self)(self.field, list(self.impls))
 
@@ -79,7 +83,7 @@ class ImplList(Combiner):
 class RunAll(ImplList):
     def wrap(_self):
         def run_all(self, *args, **kwargs):
-            for impl in _self.impls:
+            for impl in _self.unique_impls:
                 impl(self, *args, **kwargs)
 
         return run_all
@@ -88,8 +92,9 @@ class RunAll(ImplList):
 class ReduceAll(ImplList):
     def wrap(_self):
         def reduce_all(self, x, *args, **kwargs):
-            result = _self.impls[0](self, x, *args, **kwargs)
-            for impl in _self.impls[1:]:
+            impls = _self.unique_impls
+            result = impls[0](self, x, *args, **kwargs)
+            for impl in impls[1:]:
                 result = impl(self, result, *args, **kwargs)
             return result
 
@@ -99,8 +104,9 @@ class ReduceAll(ImplList):
 class ChainAll(ImplList):
     def wrap(_self):
         def chain_all(self, *args, **kwargs):
-            self = _self.impls[0](self, *args, **kwargs)
-            for impl in _self.impls[1:]:
+            impls = _self.unique_impls
+            self = impls[0](self, *args, **kwargs)
+            for impl in impls[1:]:
                 self = impl(self, *args, **kwargs)
             return self
 
@@ -359,18 +365,21 @@ def meld_classes(classes):
         return _meld_classes_cache[cache_key]
 
     cg_fields = set()
-    dc_fields = []
+    dc_fields = {}
 
     for base in medleys:
         cg_fields.update(base._ovld_codegen_fields)
-        dc_fields.extend(
-            (f.name, f.type, remap_field(f)) for f in base.__dataclass_fields__.values()
+        dc_fields.update(
+            {
+                (f.name, f.type): (f.name, f.type, remap_field(f))
+                for f in base.__dataclass_fields__.values()
+            }
         )
 
     merged = medley_cls_dict(medleys)
     merged.set_direct("_ovld_codegen_fields", tuple(cg_fields))
     merged.set_direct("_ovld_medleys", tuple(medleys))
-    merged.set_direct("__annotations__", {name: t for name, t, f in dc_fields})
+    merged.set_direct("__annotations__", {name: t for name, t, f in dc_fields.values()})
 
     if "__qualname__" in merged._combiners:
         del merged._combiners["__qualname__"]
@@ -378,7 +387,7 @@ def meld_classes(classes):
     result = make_dataclass(
         cls_name="+".join(sorted(c.__name__ for c in medleys)),
         bases=medleys,
-        fields=dc_fields,
+        fields=list(dc_fields.values()),
         kw_only=True,
         namespace=merged,
     )

@@ -572,3 +572,22 @@ def test_configure_dependent():
 def test_configure_dependent_pileon():
     m = Monkey(regex="chimpanze+") + Monkey(regex="go+rilla")
     assert m.hi("goorilla") == "hello!"
+
+
+class Bot(Medley):
+    a: int
+
+
+class Mid1(Bot):
+    b: int
+
+
+class Mid2(Bot):
+    c: int
+
+
+def test_redundant_base():
+    synth = Mid1(a=1, b=2) + Mid2(a=3, c=4)
+    assert synth.a == 3
+    assert synth.b == 2
+    assert synth.c == 4
