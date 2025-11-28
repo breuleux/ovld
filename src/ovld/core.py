@@ -180,6 +180,12 @@ class Ovld:
                 hlp += (
                     f"* {hn}  (priority: {c.priority}, specificity: {list(c.specificity)})\n"
                 )
+                try:
+                    filename = inspect.getsourcefile(c.handler)
+                    lineno = inspect.getsourcelines(c.handler)[1]
+                    hlp += f"    @ {filename}:{lineno}\n"
+                except Exception:  # pragma: no cover
+                    pass
             return ResolutionError(
                 f"Ambiguous resolution in {self} for"
                 f" argument types [{typenames}]\n"
