@@ -81,7 +81,7 @@ class SpecialForm:
             message or f"{name}() can only be used from inside an @ovld-registered function."
         )
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> typing.Any:
         raise UsageError(self.__message)
 
     def __getattr__(self, attr):
