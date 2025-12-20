@@ -4,8 +4,9 @@ import inspect
 import itertools
 import sys
 import textwrap
+import threading
 from dataclasses import replace
-from functools import partial
+from functools import partial, wraps
 from types import FunctionType
 
 from .recode import (
@@ -41,6 +42,15 @@ inspect.getdoc = _getdoc
 
 
 _current_id = itertools.count()
+
+
+def locked(fn):
+    @wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        with self._mutex:
+            return fn(self, *args, **kwargs)
+
+    return wrapper
 
 
 def bootstrap_dispatch(ov, name):
@@ -111,6 +121,7 @@ class Ovld:
         self._locked = False
         self.mixins = []
         self.dispatch = bootstrap_dispatch(self, name=self.shortname)
+        self._mutex = threading.Lock()
         self.add_mixins(*mixins)
 
     def regs(self):
@@ -239,6 +250,7 @@ class Ovld:
             self._argument_analysis = aa
         return self._argument_analysis
 
+    @locked
     def compile(self):
         """Finalize this overload.
 
@@ -249,6 +261,11 @@ class Ovld:
         This will also lock this ovld's parent mixins to prevent their
         modification.
         """
+        if self._compiled:  # pragma: no cover
+            return
+
+        self._compiled = False
+
         for mixin in self.mixins:
             if self not in mixin.children:
                 mixin.lock()
