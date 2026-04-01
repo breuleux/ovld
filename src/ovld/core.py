@@ -29,13 +29,13 @@ from .utils import (
 _orig_getdoc = inspect.getdoc
 
 
-def _getdoc(fn):
+def _getdoc(fn, **orig_kwargs):
     if hasattr(fn, "__calculate_doc__"):
         if inspect.ismethod(fn):
             fn = fn.__func__
         fn.__doc__ = fn.__calculate_doc__()
         del fn.__calculate_doc__
-    return _orig_getdoc(fn)
+    return _orig_getdoc(fn, **orig_kwargs)
 
 
 inspect.getdoc = _getdoc
