@@ -298,7 +298,7 @@ class Ovld:
         """Find the correct method to call for the given argument types."""
         self.ensure_compiled()
         if after:
-            return self.map[(getattr(after, "__code__", after), *args)]
+            return self.map[(after, *args)]
         else:
             return self.map[args]
 

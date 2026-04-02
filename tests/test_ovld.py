@@ -842,11 +842,9 @@ def test_resolve():
         return x * 3
 
     f1 = f.resolve(int)
-    f2a = f.resolve(int, after=f1)
-    f2b = f.resolve(int, after=f1.__code__)
+    f2 = f.resolve(int, after=f1)
     assert f1("hello") == "hellohello"
-    assert f2a("hello") == "hellohellohello"
-    assert f2b("hello") == "hellohellohello"
+    assert f2("hello") == "hellohellohello"
 
 
 def test_resolve_special_form():

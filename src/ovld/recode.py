@@ -421,29 +421,11 @@ def lazy_recode(fn, ovld, syms, newname):
     result = None
 
     def trigger(*args, **kwargs):
-        recoded = recode(fn, ovld, syms, newname)
-        old_code = result.__code__
+        recoded = recode(fn, ovld, syms, newname, target=result)
         result.__code__ = recoded.__code__
         result.__defaults__ = recoded.__defaults__
         result.__kwdefaults__ = recoded.__kwdefaults__
         result.__annotations__ = recoded.__annotations__
-        new_code = recoded.__code__
-        # call_next entries are keyed by (code_object, *types). After replacing
-        # __code__, the old bootstrap code object is stale — swap it out.
-        m = ovld.map
-        if m is not None:
-            for k in list(m.keys()):
-                if (
-                    isinstance(k, tuple)
-                    and k
-                    and isinstance(k[0], CodeType)
-                    and k[0] is old_code
-                ):
-                    m[(new_code,) + k[1:]] = m.pop(k)
-            for codes in m.all.values():
-                if old_code in codes:
-                    codes.discard(old_code)
-                    codes.add(new_code)
         del fn.__globals__[key]
         return result(*args, **kwargs)
 
@@ -513,7 +495,7 @@ def closure_wrap(tree, fname, names):
     return ast.Module(body=[wrap], type_ignores=[])
 
 
-def recode(fn, ovld, syms, newname):
+def recode(fn, ovld, syms, newname, target=None):
     ovld_mangled = f"___OVLD{ovld.id}"
     map_mangled = f"___MAP{ovld.id}"
     code_mangled = f"___CODE{next(_current)}"
@@ -575,5 +557,5 @@ def recode(fn, ovld, syms, newname):
     new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
     new_fn.__globals__[ovld_mangled] = ovld.dispatch
     new_fn.__globals__[map_mangled] = ovld.map
-    new_fn.__globals__[code_mangled] = new_fn.__code__
+    new_fn.__globals__[code_mangled] = target or new_fn
     return new_fn

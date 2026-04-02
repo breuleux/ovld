@@ -3,7 +3,7 @@ import math
 from dataclasses import dataclass
 from functools import partial
 from itertools import count
-from types import CodeType
+from types import FunctionType
 
 from .mro import sort_types
 from .recode import generate_dependent_dispatch
@@ -182,7 +182,7 @@ class MultiTypeMap(dict):
 
         candidates.sort(key=Candidate.sort_key, reverse=True)
 
-        self.all[obj_t_tup] = {getattr(c.handler, "__code__", None) for c in candidates}
+        self.all[obj_t_tup] = {c.handler for c in candidates}
 
         processed = set()
 
@@ -350,13 +350,12 @@ class MultiTypeMap(dict):
                 nxt = None
             else:
                 nxt = handlers[0]
-            codes = [h.__code__ for h in handlers if hasattr(h, "__code__")]
-            funcs.append((nxt, codes))
+            funcs.append((nxt, handlers))
 
         funcs.reverse()
 
         parents = []
-        for group, (func, codes) in zip(results, funcs):
+        for group, (func, hdlrs) in zip(results, funcs):
             tups = [obj_t_tup] if not parents else [(parent, *obj_t_tup) for parent in parents]
             if func is None:
                 for tup in tups:
@@ -365,14 +364,14 @@ class MultiTypeMap(dict):
             else:
                 for tup in tups:
                     self[tup] = func
-            if not codes:
+            if not hdlrs:  # pragma: no cover
                 break
-            parents = codes
+            parents = hdlrs
 
         return True
 
     def __missing__(self, obj_t_tup):
-        if obj_t_tup and isinstance(obj_t_tup[0], CodeType):
+        if obj_t_tup and isinstance(obj_t_tup[0], FunctionType):
             real_tup = obj_t_tup[1:]
             self[real_tup]
             if obj_t_tup[0] not in self.all[real_tup]:
