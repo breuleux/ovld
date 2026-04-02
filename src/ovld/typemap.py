@@ -322,7 +322,9 @@ class MultiTypeMap(dict):
 
     def wrap_dependent(self, tup, group, next_call):
         htup = [(c.handler, self.type_tuples[c.base_handler]) for c in group]
-        slf = "self, " if inspect.getfullargspec(group[0].handler).args[0] == "self" else ""
+        sig = inspect.signature(group[0].handler)
+        params = list(sig.parameters.values())
+        slf = "self, " if params and params[0].name == "self" else ""
         return generate_dependent_dispatch(
             tup,
             htup,

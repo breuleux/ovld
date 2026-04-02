@@ -636,14 +636,13 @@ def test_recurse_renamed():
 def test_call_next_must_be_called():
     f = Ovld()
 
+    @f.register
+    def f(xs: list):
+        cn = call_next
+        return [cn(x) for x in xs]
+
     with pytest.raises(UsageError, match="call_next should be called right away"):
-
-        @f.register
-        def f(xs: list):
-            cn = call_next
-            return [cn(x) for x in xs]
-
-        f.compile()
+        f([1, 2, 3])
 
 
 def test_recurse_closure():

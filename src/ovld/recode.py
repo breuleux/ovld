@@ -415,6 +415,56 @@ def _search_names(co, specials, glb, closure=None):
     return {k: list(_search(co, v, glb, closure)) for k, v in specials.items()}
 
 
+def lazy_recode(fn, ovld, syms, newname):
+    idx = next(_current)
+    key = f"__OVLD_LAZY_{idx}"
+    result = None
+
+    def trigger(*args, **kwargs):
+        recoded = recode(fn, ovld, syms, newname)
+        old_code = result.__code__
+        result.__code__ = recoded.__code__
+        result.__defaults__ = recoded.__defaults__
+        result.__kwdefaults__ = recoded.__kwdefaults__
+        result.__annotations__ = recoded.__annotations__
+        new_code = recoded.__code__
+        # call_next entries are keyed by (code_object, *types). After replacing
+        # __code__, the old bootstrap code object is stale — swap it out.
+        m = ovld.map
+        if m is not None:
+            for k in list(m.keys()):
+                if (
+                    isinstance(k, tuple)
+                    and k
+                    and isinstance(k[0], CodeType)
+                    and k[0] is old_code
+                ):
+                    m[(new_code,) + k[1:]] = m.pop(k)
+            for codes in m.all.values():
+                if old_code in codes:
+                    codes.discard(old_code)
+                    codes.add(new_code)
+        del fn.__globals__[key]
+        return result(*args, **kwargs)
+
+    fn.__globals__[key] = trigger
+
+    bootstrap_src = f"def __BOOTSTRAP__(*args, **kwargs): return {key}(*args, **kwargs)"
+    bootstrap_module = compile(bootstrap_src, "<lazy_bootstrap>", "exec")
+    bootstrap_code = next(c for c in bootstrap_module.co_consts if isinstance(c, CodeType))
+
+    result = FunctionType(
+        rename_code(bootstrap_code, newname),
+        fn.__globals__,
+        newname,
+        None,
+        None,
+    )
+    result.__wrapped__ = fn
+    result.__dict__.update(fn.__dict__)
+    return result
+
+
 def adapt_function(fn, ovld, newname):
     """Create a copy of the function with a different name."""
     syms = _search_names(
@@ -429,7 +479,10 @@ def adapt_function(fn, ovld, newname):
         fn.__closure__,
     )
     if any(syms.values()):
-        return recode(fn, ovld, syms, newname)
+        if fn.__closure__:
+            return recode(fn, ovld, syms, newname)
+        else:
+            return lazy_recode(fn, ovld, syms, newname)
     else:
         return rename_function(fn, newname)
 
