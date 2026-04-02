@@ -408,7 +408,7 @@ def test_next_abstract_ambiguity():
 
     @o.register(priority=10)
     def f(x: object):
-        return f.next(x)
+        return call_next(x)
 
     @o.register
     def f(x: CanFly):
@@ -585,7 +585,7 @@ def test_call_next_unrelated():
 
     @f.register
     def f(x: int):
-        return f.next(str(x))
+        return call_next(str(x))
 
     @f.register
     def f(x: str):
@@ -698,7 +698,7 @@ def test_next():
         if x >= 0:
             return x
         else:
-            return f.next(x)
+            return call_next(x)
 
     @f.register
     def f(xs: list):
@@ -716,15 +716,15 @@ def test_next_long_chain():
 
     @f.register
     def f(x: int):
-        return ["A", f.next(x)]
+        return ["A", call_next(x)]
 
     @f.register
     def f(x: object):
-        return ["B", f.next(x)]
+        return ["B", call_next(x)]
 
     @f.register(priority=-1)
     def f(x: object):
-        return ["C", f.next(x)]
+        return ["C", call_next(x)]
 
     @f.register(priority=-2)
     def f(x: object):
@@ -741,7 +741,7 @@ def test_next_bottom():
         if x >= 0:
             return x
         else:
-            return f.next(x)
+            return call_next(x)
 
     @f.register
     def f(xs: list):
@@ -756,7 +756,7 @@ def test_next_different():
 
     @f.register
     def f(x: int):
-        return f.next(str(x))
+        return call_next(str(x))
 
     @f.register
     def f(x: str):
@@ -773,7 +773,7 @@ def test_next_nodispatch():
         if x >= 0:
             return x
         else:
-            return f.next(x)
+            return call_next(x)
 
     @f.register
     def f(xs: list):
@@ -791,7 +791,7 @@ def test_priority():
 
     @f.register(priority=1)
     def f(x: object):
-        return ["TOP", f.next(x)]
+        return ["TOP", call_next(x)]
 
     @f.register
     def f(xs: list):

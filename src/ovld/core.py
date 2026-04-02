@@ -77,7 +77,6 @@ def bootstrap_dispatch(ov, name):
     dispatch.display_resolution = ov.display_resolution
     dispatch.add_mixins = ov.add_mixins
     dispatch.unregister = ov.unregister
-    dispatch.next = ov.next
     dispatch.first_entry = first_entry
     return dispatch
 
@@ -387,13 +386,6 @@ class Ovld:
         This should be replaced by an auto-generated function.
         """
         return self.dispatch(*args, **kwargs)
-
-    def next(self, *args):
-        """Call the next matching method after the caller, in terms of priority or specificity."""
-        fr = sys._getframe(1)
-        key = (fr.f_code, *map(subtler_type, args))
-        method = self.map[key]
-        return method(*args)
 
     def __repr__(self):
         return f"<Ovld {self.name or hex(id(self))}>"
