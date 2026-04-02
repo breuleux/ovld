@@ -27,7 +27,7 @@ from .mro import (
 )
 from .recode import (
     call_next,
-    current_code,
+    current_function,
     recurse,
     resolve,
 )
@@ -98,6 +98,6 @@ __all__ = [
     "call_next",
     "recurse",
     "resolve",
-    "current_code",
+    "current_function",
     "__version__",
 ]

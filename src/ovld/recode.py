@@ -17,7 +17,7 @@ from .utils import MISSING, NameDatabase, SpecialForm, UsageError, is_dependent,
 recurse = SpecialForm("recurse")
 call_next = SpecialForm("call_next")
 resolve = SpecialForm("resolve")
-current_code = SpecialForm("current_code")
+current_function = SpecialForm("current_function")
 
 
 dispatch_template = """
@@ -309,7 +309,7 @@ class NameConverter(ast.NodeTransformer):
         self.mapping = mapping
         self.ovld_mangled = mapping[recurse]
         self.map_mangled = mapping[resolve]
-        self.code_mangled = mapping[current_code]
+        self.func_mangled = mapping[current_function]
         self.count = count()
 
     def is_special(self, name, *kinds):
@@ -369,7 +369,7 @@ class NameConverter(ast.NodeTransformer):
         ]
 
         if cn:
-            type_parts.insert(0, ast.Name(id=self.code_mangled, ctx=ast.Load()))
+            type_parts.insert(0, ast.Name(id=self.func_mangled, ctx=ast.Load()))
         method = ast.Subscript(
             value=ast.Name(id=self.map_mangled, ctx=ast.Load()),
             slice=ast.Tuple(
@@ -455,7 +455,7 @@ def adapt_function(fn, ovld, newname):
             recurse: (recurse, ovld, ovld.dispatch),
             call_next: (call_next,),
             resolve: (resolve,),
-            current_code: (current_code,),
+            current_function: (current_function,),
         },
         fn.__globals__,
         fn.__closure__,
@@ -497,8 +497,8 @@ def closure_wrap(tree, fname, names):
 
 def recode(fn, ovld, syms, newname, target=None):
     ovld_mangled = f"___OVLD{ovld.id}"
-    map_mangled = f"___MAP{ovld.id}"
-    code_mangled = f"___CODE{next(_current)}"
+    map_mangled = f"___OVLD_MAP{ovld.id}"
+    func_mangled = f"___OVLD_FUNC{next(_current)}"
     try:
         src = inspect.getsource(fn)
     except OSError:  # pragma: no cover
@@ -513,7 +513,7 @@ def recode(fn, ovld, syms, newname, target=None):
     mapping = {
         recurse: ovld_mangled,
         resolve: map_mangled,
-        current_code: code_mangled,
+        current_function: func_mangled,
     }
     for special, symbols in syms.items():
         for sym in symbols:
@@ -557,5 +557,5 @@ def recode(fn, ovld, syms, newname, target=None):
     new_fn.__globals__["__SUBTLER_TYPE"] = subtler_type
     new_fn.__globals__[ovld_mangled] = ovld.dispatch
     new_fn.__globals__[map_mangled] = ovld.map
-    new_fn.__globals__[code_mangled] = target or new_fn
+    new_fn.__globals__[func_mangled] = target or new_fn
     return new_fn

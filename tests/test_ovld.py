@@ -13,7 +13,7 @@ from ovld import (
     OvldBase,
     OvldMC,
     call_next,
-    current_code,
+    current_function,
     extend_super,
     is_ovld,
     ovld,
@@ -859,10 +859,10 @@ def test_resolve_special_form():
     assert f(3) == 9
 
 
-def test_current_code_special_form():
+def test_current_function_special_form():
     @ovld(priority=1)
     def f(x: int):
-        return resolve(int, after=current_code)(x)
+        return resolve(int, after=current_function)(x)
 
     @ovld(priority=0)
     def f(x: int):
