@@ -94,6 +94,11 @@ def test_deferred():
 
     assert "gingerbread" not in sys.modules
 
+    # In Python >= 3.14, Deferred will be evaluated here
+    assert f(1234) == "object"
+
+    assert "gingerbread" not in sys.modules
+
     import gingerbread
 
     assert f(gingerbread.House()) == "Gingerbread house!"
