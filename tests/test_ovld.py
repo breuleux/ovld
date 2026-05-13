@@ -566,6 +566,21 @@ def test_recurse_nested():
     assert f(["a", "bbb", "cc"]) == 36
 
 
+def test_recurse_generator():
+    f = Ovld()
+
+    @f.register
+    def f(xs: list):
+        for x in xs:
+            yield from recurse(x)
+
+    @f.register
+    def f(x: int):
+        yield x + 1
+
+    assert list(f([1, 2, 3])) == [2, 3, 4]
+
+
 def test_call_next():
     f = Ovld()
 

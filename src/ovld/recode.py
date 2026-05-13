@@ -431,7 +431,12 @@ def lazy_recode(fn, ovld, syms, newname):
 
     fn.__globals__[key] = trigger
 
-    bootstrap_src = f"def __BOOTSTRAP__(*args, **kwargs): return {key}(*args, **kwargs)"
+    if inspect.isgeneratorfunction(fn):
+        bootstrap_src = (
+            f"def __BOOTSTRAP__(*args, **kwargs): yield from {key}(*args, **kwargs)"
+        )
+    else:
+        bootstrap_src = f"def __BOOTSTRAP__(*args, **kwargs): return {key}(*args, **kwargs)"
     bootstrap_module = compile(bootstrap_src, "<lazy_bootstrap>", "exec")
     bootstrap_code = next(c for c in bootstrap_module.co_consts if isinstance(c, CodeType))
 
