@@ -1781,6 +1781,18 @@ def test_keywords_recurse():
     assert f([1, 2, 3], factor=3) == [3, 6, 9]
 
 
+def test_keywords_mixed():
+    @ovld
+    def f(x: object, *, indent: int):
+        return recurse(x, str(indent))
+
+    @ovld
+    def f(x: None, state: str):
+        return "null"
+
+    assert f(None, indent=3) == "null"
+
+
 def test_resolve_all():
     @ovld
     def f(x: str):

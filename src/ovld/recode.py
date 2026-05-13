@@ -126,12 +126,14 @@ def generate_dispatch(ov, arganal):
         body.append(f"    KWARGS[{name!r}] = {name}")
         body.append(f"    TARGS.append(({name!r}, {lookup_for(name)}({name})))")
 
-    posargs.append(kwargsstar)
-    lookup.append(targsstar)
+    def cut(elems, n, star):
+        if n is not None:
+            elems = elems[:n]
+        return [*elems, star]
 
     fullcall = call_template.format(
-        lookup=join(lookup, trail=True),
-        posargs=join(posargs),
+        lookup=join(cut(lookup, None, targsstar), trail=True),
+        posargs=join(cut(posargs, None, kwargsstar)),
         mvar=mv,
     )
 
@@ -140,8 +142,8 @@ def generate_dispatch(ov, arganal):
         req = len(spr + pr)
         for i, arg in enumerate(spo + po):
             call = call_template.format(
-                lookup=join(lookup[: req + i], trail=True),
-                posargs=join(posargs[: req + i + 1]),
+                lookup=join(cut(lookup, req + i, targsstar), trail=True),
+                posargs=join(cut(posargs, req + i + 1, kwargsstar)),
                 mvar=mv,
             )
             call = textwrap.indent(call, "        ")
