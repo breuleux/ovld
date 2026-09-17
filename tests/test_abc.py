@@ -1,4 +1,5 @@
-from typing import Any, Callable, Literal, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable, Literal
 
 import pytest
 

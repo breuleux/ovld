@@ -111,7 +111,7 @@ def clsstring(cls):
         return f"{origin.__name__}[{args}]"
     else:
         r = repr(cls)
-        if r.startswith("<class ") or r.startswith("<enum "):
+        if r.startswith(("<class ", "<enum ")):
             return cls.__name__
         else:
             return r
@@ -132,7 +132,7 @@ def sigstring(types):
 def subtler_type(obj):
     if isinstance(obj, GenericAlias):
         return type[obj]
-    elif isinstance(obj, UnionTypes):
+    elif isinstance(obj, UnionTypes):  # pragma: no cover
         return type[obj]
     elif obj is typing.Any:
         return type[object]

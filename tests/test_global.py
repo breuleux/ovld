@@ -11,7 +11,7 @@ try:
     def pluralize(x: str):
         return x + "s"
 
-except Exception as exc:
+except Exception as exc:  # noqa: BLE001
     _ovld_exc = exc
 
 
@@ -34,7 +34,7 @@ try:
     def roesti(xs: list, _):
         return [recurse(x) for x in xs]
 
-except Exception as exc:
+except Exception as exc:  # noqa: BLE001
     _ovld_dispatch_exc = exc
 
 

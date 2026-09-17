@@ -35,7 +35,7 @@ def test_Ovld():
         """Integers!"""
         return "int"
 
-    @o.register  # noqa: F811
+    @o.register
     def f(x: float):
         """Floats!"""
         return "float"
@@ -171,7 +171,7 @@ def test_redefine_parent():
     assert f2(Bird()) == "a bird"
     assert f2(Mammal()) == "mammal"
 
-    with pytest.raises(Exception):
+    with pytest.raises(UsageError):
 
         @o.register
         def f(x: Bird):

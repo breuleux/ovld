@@ -136,7 +136,7 @@ class IsinstanceMulter:
 ####################
 
 
-A = {"xs": list(range(0, 50)), "ys": ("o", (6, 7))}
+A = {"xs": list(range(50)), "ys": ("o", (6, 7))}
 C = {"xs": list(range(0, 150, 3)), "ys": ("ooo", (18, 21))}
 
 

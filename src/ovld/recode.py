@@ -182,9 +182,9 @@ def generate_dependent_dispatch(tup, handlers, next_call, slf, name, err, nerr):
     keyexpr = None
     keyed = None
     for k in tup:
-        featured = set(types[k] for h, types in handlers)
+        featured = {types[k] for h, types in handlers}
         if len(featured) == len(handlers):
-            possibilities = set(type(t) for t in featured)
+            possibilities = {type(t) for t in featured}
             focus = possibilities.pop()
             # Possibilities is now empty if only one type of DependentType
 
@@ -550,7 +550,7 @@ def recode(fn, ovld, syms, newname, target=None):
 
     res = compile(new, mode="exec", filename=fn.__code__.co_filename)
     if fn.__closure__:
-        res = [x for x in res.co_consts if isinstance(x, CodeType)][0]
+        res = next(x for x in res.co_consts if isinstance(x, CodeType))
     (*_, new_code) = [ct for ct in res.co_consts if isinstance(ct, CodeType)]
     new_closure = tuple(
         [fn.__closure__[fn.__code__.co_freevars.index(name)] for name in new_code.co_freevars]

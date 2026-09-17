@@ -43,8 +43,11 @@ class TypeNormalizer:
         else:
             self.generic_handlers.register(generic, handler)
 
-    def __call__(self, t, fn, lcl={}):
+    def __call__(self, t, fn, lcl=None):
         from .dependent import DependentType
+
+        if lcl is None:
+            lcl = {}
 
         if isinstance(t, str):
             t = eval_annotation(t, fn, lcl)
@@ -95,7 +98,7 @@ normalize_type = TypeNormalizer()
 
 
 @normalize_type.register_generic(typing.Union)
-def _(self, t, fn):
+def _(self, t, fn):  # pragma: no cover
     return self(t.__args__, fn)
 
 

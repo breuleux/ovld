@@ -4,3 +4,5 @@ dist/
 .pytest_cache
 .coverage
 .benchmarks
+_/
+junkyard/

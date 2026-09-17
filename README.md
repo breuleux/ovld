@@ -25,25 +25,31 @@ from ovld import ovld
 from ovld.dependent import Regexp
 from typing import Literal
 
+
 @ovld
 def f(x: str):
     return f"The string {x!r}"
+
 
 @ovld
 def f(x: int):
     return f"The number {x}"
 
+
 @ovld
 def f(x: int, y: int):
     return "Two numbers!"
+
 
 @ovld
 def f(x: Literal[0]):
     return "zero"
 
+
 @ovld
 def f(x: Regexp[r"^X"]):
     return "A string that starts with X"
+
 
 assert f("hello") == "The string 'hello'"
 assert f(3) == "The number 3"
@@ -60,21 +66,26 @@ assert f("XSECRET") == "A string that starts with X"
 ```python
 from ovld import ovld, recurse
 
+
 @ovld
 def add(x: list, y: list):
     return [recurse(a, b) for a, b in zip(x, y)]
+
 
 @ovld
 def add(x: list, y: int):
     return [recurse(a, y) for a in x]
 
+
 @ovld
 def add(x: int, y: list):
     return [recurse(x, a) for a in y]
 
+
 @ovld
 def add(x: int, y: int):
     return x + y
+
 
 assert add([1, 2], [3, 4]) == [4, 6]
 assert add([1, 2, [3]], 7) == [8, 9, [10]]
@@ -94,6 +105,7 @@ A *variant* of an `ovld` is a copy of the `ovld`, with some methods added or cha
 def mul(x: int, y: int):
     return x * y
 
+
 assert mul([1, 2], [3, 4]) == [3, 8]
 ```
 
@@ -107,13 +119,16 @@ You can define a numeric priority for each method (the default priority is 0):
 ```python
 from ovld import call_next
 
+
 @ovld(priority=1000)
 def f(x: int):
     return call_next(x + 1)
 
+
 @ovld
 def f(x: int):
     return x * x
+
 
 assert f(10) == 121
 ```
@@ -142,16 +157,19 @@ A dependent type is a type that depends on a value. This enables dispatching bas
 from typing import Literal
 from ovld import ovld, recurse, Dependent
 
+
 @ovld
 def fact(n: Literal[0]):
     return 1
+
 
 @ovld
 def fact(n: Dependent[int, lambda n: n > 0]):
     return n * recurse(n - 1)
 
+
 assert fact(5) == 120
-fact(-1)   # Error!
+fact(-1)  # Error!
 ```
 
 The first argument to `Dependent` must be a type bound. The bound must match before the logic is called, which also ensures we don't get a performance hit for unrelated types. For type checking purposes, `Dependent[T, A]` is equivalent to `Annotated[T, A]`.
@@ -164,21 +182,24 @@ Define your own types with the `@dependent_check` decorator:
 import torch
 from ovld import ovld, dependent_check
 
+
 @dependent_check
 def Shape(tensor: torch.Tensor, *shape):
-    return (
-        len(tensor.shape) == len(shape)
-        and all(s2 is Any or s1 == s2 for s1, s2 in zip(tensor.shape, shape))
+    return len(tensor.shape) == len(shape) and all(
+        s2 is Any or s1 == s2 for s1, s2 in zip(tensor.shape, shape)
     )
+
 
 @dependent_check
 def Dtype(tensor: torch.Tensor, dtype):
     return tensor.dtype == dtype
 
+
 @ovld
 def f(tensor: Shape[3, Any]):
     # Matches 3xN tensors
     ...
+
 
 @ovld
 def f(tensor: Shape[2, 2] & Dtype[torch.float32]):
@@ -194,6 +215,7 @@ Either inherit from `OvldBase` or use the `OvldMC` metaclass to use multiple dis
 
 ```python
 from ovld import OvldBase, OvldMC
+
 
 # class Cat(OvldBase):  <= Also an option
 class Cat(metaclass=OvldMC):
@@ -215,14 +237,17 @@ Subclasses inherit overloaded methods. They may define additional overloads for 
 ```python
 from ovld import OvldMC, extend_super
 
+
 class One(metaclass=OvldMC):
     def f(self, x: int):
         return "an integer"
+
 
 class Two(One):
     @extend_super
     def f(self, x: str):
         return "a string"
+
 
 assert Two().f(1) == "an integer"
 assert Two().f("s") == "a string"
@@ -237,17 +262,20 @@ All medleys are dataclasses and you must define their data fields as you would f
 ```python
 from ovld import Medley
 
+
 class Punctuator(Medley):
     punctuation: str = "."
 
     def __call__(self, x: str):
         return f"{x}{self.punctuation}"
 
+
 class Multiplier(Medley):
     factor: int = 3
 
     def __call__(self, x: int):
         return x * self.factor
+
 
 # You can add the classes together to merge their methods and fields using ovld
 PuMu = Punctuator + Multiplier
@@ -259,9 +287,11 @@ f2 = Punctuator("!") + Multiplier(3)
 assert f("hello") == f2("hello") == "hello!"
 assert f(10) == f2(10) == 30
 
+
 # You can also meld medleys inplace, but only if all new fields have defaults
 class Total(Medley):
     pass
+
 
 Total.extend(Punctuator, Multiplier)
 f3 = Total(punctuation="!", factor=3)

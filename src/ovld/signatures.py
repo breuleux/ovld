@@ -9,7 +9,7 @@ from functools import cached_property
 from types import GenericAlias
 
 from .types import normalize_type
-from .utils import MISSING, subtler_type
+from .utils import MISSING, UsageError, subtler_type
 
 
 class LazySignature(inspect.Signature):
@@ -117,7 +117,10 @@ class Signature:
     arginfo: list[Arginfo] = field(default_factory=list, hash=False, compare=False)
 
     @classmethod
-    def extract(cls, fn, lcl={}):
+    def extract(cls, fn, lcl=None):
+        if lcl is None:
+            lcl = {}
+
         typelist = []
         sig = inspect.signature(fn)
         max_pos = 0
@@ -129,7 +132,7 @@ class Signature:
         for i, (name, param) in enumerate(sig.parameters.items()):
             if name == "self" or (name == "cls" and getattr(fn, "specializer", False)):
                 if i != 0:  # pragma: no cover
-                    raise Exception(
+                    raise UsageError(
                         f"Argument name '{name}' marks a method and must always be in the first position."
                     )
                 is_method = True

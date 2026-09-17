@@ -6,7 +6,7 @@ from typing import Annotated, TypeVar, get_origin
 
 from .core import Ovld, to_ovld
 from .types import eval_annotation
-from .utils import Named
+from .utils import Named, UsageError
 
 ABSENT = Named("ABSENT")
 CODEGEN = Named("CODEGEN")
@@ -175,7 +175,7 @@ class medley_cls_dict(dict):
             return
 
         if attr == "__init__":
-            raise Exception("Do not define __init__ in a Medley, use __post_init__.")
+            raise UsageError("Do not define __init__ in a Medley, use __post_init__.")
 
         if isinstance(value, Combiner):
             value.__set_name__(None, attr)

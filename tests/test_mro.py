@@ -1,6 +1,9 @@
 import sys
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Annotated, Any, Iterable, Mapping
+from typing import Annotated, Any
+from typing import Iterable as IterableT  # noqa: UP035
+from typing import Mapping as MappingT  # noqa: UP035
 
 import pytest
 
@@ -94,9 +97,12 @@ def test_typeorder():
     inorder(object, Iterable, Iterable[int], list[int])
     inorder(Iterable[int], list)
     inorder(list, list[int])
+    inorder(object, IterableT, IterableT[int], list[int])
+    inorder(IterableT[int], list)
 
     sameorder(int, int)
     sameorder(Mapping[str, int], Mapping[str, int])
+    sameorder(MappingT[str, int], MappingT[str, int])
 
     noorder(tuple[int, int], tuple[int])
     noorder(dict[str, int], dict[int, str])

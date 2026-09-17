@@ -76,7 +76,7 @@ def rename_function(fn, newname):
     )
 
 
-def instantiate_code(symbol, code, inject={}):
+def instantiate_code(symbol, code, inject={}):  # noqa: B006
     virtual_file = f"<ovld:{abs(hash(code)):x}>"
     linecache.cache[virtual_file] = (None, None, splitlines(code), virtual_file)
     code = compile(source=code, filename=virtual_file, mode="exec")
@@ -136,7 +136,7 @@ def _gensym():
 
 
 class Code:
-    def __init__(self, template, substitutions={}, **substitutions_kw):
+    def __init__(self, template, substitutions={}, **substitutions_kw):  # noqa: B006
         self.template = template
         self.substitutions = {**substitutions, **substitutions_kw}
 

@@ -40,12 +40,33 @@ packages = ["src/ovld"]
 
 [tool.ruff]
 line-length = 95
+exclude = ["docs/"]
 
 [tool.ruff.lint]
 extend-select = ["I"]
-ignore = ["E241", "F722", "E501", "E203", "F811", "F821"]
+ignore = [
+    "B015",     # because of lazy tests
+    "B018",     # because of lazy tests
+    "DTZ001",   # require tzinfo arg to datetime, not appropriate for our tests
+    "FA102",    # tests are 3.9 incompatible but that's fine
+    "FA100",    # tests are 3.9 incompatible but that's fine
+    "F811",     # repeated defs, ovld basically requires disabling this
+    "F821",     # because of strings in advanced annotations that are not references
+    "PLW0120",  # else:return -> return; I don't like this rule
+    "RET501",   # return None -> return; I don't like this rule
+    "RUF023",   # who cares if slots are sorted?
+    "S102",     # use of exec is fine
+    "SIM102",   # combine if statements; I don't like this rule
+    "SIM114",   # combine if statements; I don't like this rule
+    "TC004",    # irrelevant
+    "UP007",    # Union[] vs |
+    "UP045",    # Optional[] vs |None
+
+    "PYI041",   # int | float = float; need to fix this
+]
+
 # Ignore these for now, ruff reports SyntaxError because they use Python 3.10+ features
-exclude = ["benchmarks/test_calc.py", "benchmarks/test_tweaknum.py"]
+exclude = ["benchmarks/test_calc.py", "benchmarks/test_tweaknum.py", "docs/", "gen*"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

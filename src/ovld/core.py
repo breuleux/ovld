@@ -101,7 +101,7 @@ class Ovld:
     def __init__(
         self,
         *,
-        mixins=[],
+        mixins=(),
         name=None,
         linkback=False,
     ):
@@ -151,7 +151,7 @@ class Ovld:
                         fdoc += "\n"
                     fdoc = textwrap.indent(fdoc, " " * 4)
                     doc += f"{self.__name__}{fndef}\n{fdoc}\n"
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover # noqa
             doc = f"An exception occurred when calculating the docstring: {exc}"
         return doc
 
@@ -169,7 +169,7 @@ class Ovld:
 
     def _attempt_modify(self):
         if self._locked:
-            raise Exception(f"ovld {self} is locked for modifications")
+            raise UsageError(f"ovld {self} is locked for modifications")
 
     def add_mixins(self, *mixins):
         self._attempt_modify()
@@ -194,7 +194,7 @@ class Ovld:
                     filename = inspect.getsourcefile(c.handler)
                     lineno = inspect.getsourcelines(c.handler)[1]
                     hlp += f"    @ {filename}:{lineno}\n"
-                except Exception:  # pragma: no cover
+                except Exception:  # pragma: no cover # noqa
                     pass
             return ResolutionError(
                 f"Ambiguous resolution in {self} for"
@@ -356,7 +356,7 @@ class Ovld:
         if hasattr(self, "dispatch"):
             self.dispatch.__calculate_doc__ = self.mkdoc
 
-    def copy(self, mixins=[], linkback=False):
+    def copy(self, mixins=(), linkback=False):
         """Create a copy of this Ovld.
 
         New functions can be registered to the copy without affecting the
@@ -480,7 +480,7 @@ class OvldMC(type):
         return type(cls)(name, bases, cls.__prepare__(name, bases))
 
     @classmethod
-    def __prepare__(metacls, name, bases):
+    def __prepare__(metacls, _, bases):
         d = ovld_cls_dict(bases)
 
         names = set()

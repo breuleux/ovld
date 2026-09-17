@@ -1,12 +1,11 @@
 import inspect
 import re
 from collections.abc import Callable as _Callable
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Collection,
     TypeVar,
 )
 
@@ -70,10 +69,8 @@ class DependentType(type):
     def __is_supertype__(self, other):
         if isinstance(other, DependentType):
             return False
-        elif subclasscheck(other, self.bound):
-            return True
         else:
-            return False
+            return subclasscheck(other, self.bound)
 
     def __instancecheck__(self, other):
         return isinstance(other, self.bound) and self.check(other)
@@ -178,7 +175,7 @@ def dependent_check(fn=None, bound_is_name=False):
     else:
         params = inspect.signature(fn).parameters
         bound = normalize_type(
-            list(inspect.signature(fn).parameters.values())[0].annotation, fn
+            next(iter(inspect.signature(fn).parameters.values())).annotation, fn
         )
         t = type(
             fn.__name__,

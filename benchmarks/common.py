@@ -54,7 +54,7 @@ def function_builder(defn):
     def wrapper(dispatch):
         try:
             rval = defn(dispatch)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             e = exc
 
             def reraise(*args, **kwargs):
@@ -71,12 +71,12 @@ def function_builder(defn):
 
 
 __all__ = [
+    "function_builder",
     "multimethod_dispatch",
+    "multipledispatch_dispatch",
+    "ovld_dispatch",
     "plum_dispatch",
     "runtype_dispatch",
-    "ovld_dispatch",
-    "multipledispatch_dispatch",
     "singledispatch_dispatch",
-    "function_builder",
     "with_functions",
 ]

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import sys
+from collections import Counter
 from dataclasses import field, replace
-from typing import Counter
 
 import pytest
 
