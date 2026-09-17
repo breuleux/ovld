@@ -117,7 +117,7 @@ class Signature:
     arginfo: list[Arginfo] = field(default_factory=list, hash=False, compare=False)
 
     @classmethod
-    def extract(cls, fn, lcl=None):
+    def extract(cls, fn, lcl=None, normalize_type=normalize_type):
         if lcl is None:
             lcl = {}
 

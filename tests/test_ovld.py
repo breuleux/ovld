@@ -249,6 +249,48 @@ def test_typetuple_override():
     assert f(1.0) == "if"
 
 
+def test_numbertower_container():
+    @ovld(numtower=True)
+    def f(x: list[float]):
+        return "floats"
+
+    @ovld
+    def f(x: object):
+        return "other"
+
+    assert f([1, 2, 3]) == "floats"
+    assert f([1.5]) == "floats"
+    assert f(["a"]) == "other"
+
+
+def test_numbertower_variant_propagates():
+    @ovld(numtower=True)
+    def f(x: float):
+        return "float"
+
+    @f.variant
+    def f(x: str):
+        return "str"
+
+    assert f(2) == "float"
+    assert f("a") == "str"
+
+
+def test_numbertower_literal_untouched():
+    from typing import Literal
+
+    @ovld(numtower=True)
+    def f(x: Literal[5]):
+        return "five"
+
+    @ovld
+    def f(x: object):
+        return "other"
+
+    assert f(5) == "five"
+    assert f(6) == "other"
+
+
 def test_union():
     o = Ovld()
 
