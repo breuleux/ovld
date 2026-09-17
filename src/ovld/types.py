@@ -61,7 +61,7 @@ class TypeNormalizer:
             lcl = {}
 
         if isinstance(t, str):
-            t = eval_annotation(t, fn, lcl)
+            return self(eval_annotation(t, fn, lcl), fn, lcl)
 
         if t is type:
             t = type[object]

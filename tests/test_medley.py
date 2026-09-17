@@ -21,6 +21,7 @@ from ovld.medley import (
     meld,
     use_combiner,
 )
+from ovld.utils import UsageError
 
 # Skip all tests if Python version is less than 3.10
 pytestmark = pytest.mark.skipif(
@@ -591,3 +592,36 @@ def test_redundant_base():
     assert synth.a == 3
     assert synth.b == 2
     assert synth.c == 4
+
+
+def test_medley_numtower():
+    class NumMed(Medley, numtower=True):
+        def f(self, x: float):
+            return "float"
+
+        def f(self, x: str):
+            return "str"
+
+    m = NumMed()
+    assert m.f(2) == "float"
+    assert m.f("a") == "str"
+
+    class Plain(Medley):
+        def f(self, x: float):
+            return "float"
+
+        def f(self, x: object):
+            return "other"
+
+    p = Plain()
+    assert p.f(2) == "other"
+    assert p.f(2.5) == "float"
+
+    melded = NumMed() + Plain()
+    assert melded.f(2) == "float"
+    assert melded.f(2.5) == "float"
+
+    with pytest.raises(UsageError):
+
+        class Both(Medley, default_combiner=KeepLast, numtower=True):
+            pass

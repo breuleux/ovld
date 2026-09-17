@@ -12,6 +12,15 @@ ABSENT = Named("ABSENT")
 CODEGEN = Named("CODEGEN")
 
 
+def _merge(c1, c2):
+    if issubclass(c1, c2):
+        return c1
+    elif issubclass(c2, c1):  # pragma: no cover
+        return c2
+    else:
+        raise TypeError("Cannot merge different combiner classes.")
+
+
 class Combiner:
     def __init__(self, field=None):
         self.field = field
@@ -26,8 +35,7 @@ class Combiner:
         return type(self)(self.field)
 
     def include(self, other):
-        if type(self) is not type(other):
-            raise TypeError("Cannot merge different combiner classes.")
+        _merge(type(self), type(other))  # check compatibility
         self.include_sametype(other)
 
     def include_sametype(self, other):  # pragma: no cover
@@ -114,9 +122,11 @@ class ChainAll(ImplList):
 
 
 class BuildOvld(Combiner):
+    numtower = False
+
     def __init__(self, field=None, ovld=None):
         super().__init__(field)
-        self.ovld = ovld or Ovld(name=field, linkback=True)
+        self.ovld = ovld or Ovld(name=field, linkback=True, numtower=type(self).numtower)
         self.pending = []
         if field is not None:
             self.__set_name__(None, field)
@@ -149,10 +159,16 @@ class BuildOvld(Combiner):
             raise TypeError("Expected a function or ovld.")
 
 
+class BuildOvldNumtower(BuildOvld):
+    numtower = True
+
+
 class medley_cls_dict(dict):
     def __init__(self, bases, default_combiner=None):
         if default_combiner is None:
-            (default_combiner,) = {b._ovld_default_combiner for b in bases}
+            default_combiner = functools.reduce(
+                _merge, (b._ovld_default_combiner for b in bases)
+            )
         super().__init__()
         self._combiners = {}
         self._default_combiner = default_combiner
@@ -185,7 +201,8 @@ class medley_cls_dict(dict):
         combiner = self._combiners.get(attr, None)
         if combiner is None:
             if to_ovld(value, force=False):
-                combiner = BuildOvld(attr)
+                bo = issubclass(self._default_combiner, BuildOvld)
+                combiner = (self._default_combiner if bo else BuildOvld)(attr)
             elif inspect.isfunction(value):
                 combiner = self._default_combiner(attr)
             else:
@@ -239,10 +256,14 @@ class MedleyMC(type):
         return super().__subclasscheck__(subclass)
 
     @classmethod
-    def __prepare__(mcls, name, bases, default_combiner=None):
+    def __prepare__(mcls, name, bases, default_combiner=None, numtower=None):
+        if numtower is not None and default_combiner is not None:
+            raise UsageError("Cannot specify both default_combiner and numtower.")
+        if numtower is not None:
+            default_combiner = BuildOvldNumtower if numtower else BuildOvld
         return medley_cls_dict(bases, default_combiner=default_combiner)
 
-    def __new__(mcls, name, bases, namespace, default_combiner=None):
+    def __new__(mcls, name, bases, namespace, default_combiner=None, numtower=None):
         result = super().__new__(mcls, name, bases, namespace)
         for attr, combiner in result._ovld_combiners.items():
             if (value := combiner.get(result)) is not ABSENT:
